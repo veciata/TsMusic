@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'providers/theme_provider.dart';
+import 'screens/home_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() => runApp(const MusicPlayerApp());
 
@@ -8,62 +12,91 @@ class MusicPlayerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'TS Music',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1DB954),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        textTheme: GoogleFonts.poppinsTextTheme(),
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider()..loadTheme(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          final lightTheme = themeProvider.getLightTheme();
+          final darkTheme = themeProvider.getDarkTheme();
+          
+          return MaterialApp(
+            title: 'TS Music',
+            debugShowCheckedModeBanner: false,
+            theme: lightTheme.copyWith(
+              textTheme: GoogleFonts.poppinsTextTheme(
+                Theme.of(context).textTheme,
+              ),
+              appBarTheme: AppBarTheme(
+                backgroundColor: lightTheme.colorScheme.primary,
+                foregroundColor: lightTheme.colorScheme.onPrimary,
+                elevation: 0,
+              ),
+            ),
+            darkTheme: darkTheme.copyWith(
+              textTheme: GoogleFonts.poppinsTextTheme(
+                ThemeData.dark().textTheme,
+              ),
+              appBarTheme: AppBarTheme(
+                backgroundColor: darkTheme.colorScheme.primary,
+                foregroundColor: darkTheme.colorScheme.onPrimary,
+                elevation: 0,
+              ),
+            ),
+            themeMode: themeProvider.themeMode,
+            home: const MainNavigationScreen(),
+          );
+        },
       ),
-      home: const MusicPlayerHome(),
     );
   }
 }
 
-class MusicPlayerHome extends StatefulWidget {
-  const MusicPlayerHome({super.key});
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
 
   @override
-  State<MusicPlayerHome> createState() => _MusicPlayerHomeState();
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MusicPlayerHomeState extends State<MusicPlayerHome> {
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   final List<Map<String, String>> _songs = [
     {'title': 'Blinding Lights', 'artist': 'The Weeknd', 'duration': '3:20'},
     {'title': 'Save Your Tears', 'artist': 'The Weeknd', 'duration': '3:35'},
     {'title': 'Starboy', 'artist': 'The Weeknd, Daft Punk', 'duration': '3:50'},
+    {'title': 'After Hours', 'artist': 'The Weeknd', 'duration': '4:01'},
+    {'title': 'Die For You', 'artist': 'The Weeknd', 'duration': '4:20'},
   ];
+
+  void _onSongSelected(int index) {
+    // TODO: Implement song playback
+    debugPrint('Selected song: ${_songs[index]['title']}');
+  }
+
+  void _navigateToSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('TS Music'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          HomeScreen(
+            songs: _songs,
+            onSongTap: _onSongSelected,
+            onSettingsTap: _navigateToSettings,
           ),
+          // Add more screens here if needed
+          const Center(child: Text('Library')),
+          const SettingsScreen(),
         ],
-      ),
-      body: ListView.builder(
-        itemCount: _songs.length,
-        itemBuilder: (context, index) {
-          final song = _songs[index];
-          return ListTile(
-            leading: const Icon(Icons.music_note, size: 40),
-            title: Text(song['title']!),
-            subtitle: Text(song['artist']!),
-            trailing: Text(song['duration']!),
-            onTap: () {},
-          );
-        },
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
@@ -77,14 +110,14 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.favorite_border),
-            selectedIcon: Icon(Icons.favorite),
-            label: 'Favorites',
+            icon: Icon(Icons.library_music_outlined),
+            selectedIcon: Icon(Icons.library_music),
+            label: 'Library',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
@@ -122,27 +155,6 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
           ],
         ),
       ),
-    );
-  }
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
