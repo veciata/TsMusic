@@ -1,0 +1,389 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path/path.dart' as path;
+import '../models/song.dart';
+
+class NewMusicProvider extends ChangeNotifier {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  List<Song> _playlist = [];
+  int _currentIndex = 0;
+  bool _isLoading = false;
+  String? _error;
+
+  List<Song> get songs => _playlist;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  bool get isPlaying => _audioPlayer.playing;
+  Duration get position => _audioPlayer.position;
+  Duration get duration => _audioPlayer.duration ?? Duration.zero;
+  Song? get currentSong => _playlist.isNotEmpty ? _playlist[_currentIndex] : null;
+
+  // Helper method to find music files in a directory
+  Future<List<FileSystemEntity>> _findMusicFiles(Directory dir) async {
+    final List<FileSystemEntity> files = [];
+    if (kDebugMode) {
+      print('Scanning directory: ${dir.path}');
+    }
+    
+    try {
+      final List<FileSystemEntity> entities = await dir.list(recursive: true, followLinks: false).toList();
+      if (kDebugMode) {
+        print('Found ${entities.length} items in ${dir.path}');
+      }
+      
+      for (var entity in entities) {
+        try {
+          if (entity is File) {
+            final ext = entity.path.toLowerCase().split('.').last;
+            if (['mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac'].contains(ext)) {
+              if (kDebugMode) {
+                print('Found music file: ${entity.path}');
+              }
+              files.add(entity);
+              
+              // Update UI periodically as we find files
+              if (files.length % 5 == 0) {
+                _playlist = files.map((file) => Song(
+                  id: file.path,
+                  title: file.path.split('/').last.split('.').first,
+                  artist: 'Unknown Artist',
+                  album: 'Unknown Album',
+                  url: file.path,
+                  duration: Duration.zero,
+                )).toList();
+                notifyListeners();
+              }
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error processing entity ${entity.path}: $e');
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error scanning directory ${dir.path}: $e');
+      }
+    }
+    return files;
+  }
+
+  // Load local music files
+  Future<bool> loadLocalMusic() async {
+    if (_isLoading) {
+      if (kDebugMode) {
+        print('loadLocalMusic: Already loading, skipping');
+      }
+      return false;
+    }
+    
+    _isLoading = true;
+    _error = null;
+    _playlist = [];
+    notifyListeners();
+
+    if (kDebugMode) {
+      print('loadLocalMusic: Starting music scan');
+    }
+
+    try {
+      // Check storage permission
+      if (kDebugMode) {
+        print('loadLocalMusic: Checking storage permission');
+      }
+      final hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        _error = 'Storage permission is required to access your music files.';
+        _isLoading = false;
+        notifyListeners();
+        if (kDebugMode) {
+          print('loadLocalMusic: Storage permission denied');
+        }
+        return false;
+      }
+
+      if (kDebugMode) {
+        print('loadLocalMusic: Permission granted, starting directory scan');
+      }
+
+      // Common music directories to scan
+      final List<Directory> directories = [
+        Directory('/storage/emulated/0/Music'),
+        Directory('/storage/emulated/0/Download'),
+        Directory('/storage/emulated/0/DCIM'),
+        Directory('/storage/emulated/0/Notifications'),
+        Directory('/storage/emulated/0/Ringtones'),
+        Directory('/storage/emulated/0/Podcasts'),
+        Directory('/storage/emulated/0/Audio'),
+        Directory('/sdcard/Music'),
+        Directory('/sdcard/Download'),
+      ];
+
+      if (kDebugMode) {
+        print('loadLocalMusic: Checking external storage directory');
+      }
+      
+      // Add external storage directory if it exists
+      final externalDir = await getExternalStorageDirectory();
+      if (externalDir != null) {
+        if (kDebugMode) {
+          print('loadLocalMusic: Found external storage directory: ${externalDir.path}');
+        }
+        directories.add(externalDir);
+      } else if (kDebugMode) {
+        print('loadLocalMusic: No external storage directory found');
+      }
+
+      if (kDebugMode) {
+        print('loadLocalMusic: Scanning ${directories.length} directories for music files');
+      }
+
+      // Process all directories in parallel
+      await Future.wait(directories.map((dir) async {
+        try {
+          if (await dir.exists()) {
+            if (kDebugMode) {
+              print('loadLocalMusic: Scanning directory: ${dir.path}');
+            }
+            await _findMusicFiles(dir);
+          } else if (kDebugMode) {
+            print('loadLocalMusic: Directory does not exist: ${dir.path}');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error scanning directory ${dir.path}: $e');
+          }
+        }
+      }));
+
+      if (kDebugMode) {
+        print('loadLocalMusic: Found ${_playlist.length} music files');
+      }
+
+      // Final update with all found files
+      _playlist = _playlist.toSet().toList(); // Remove duplicates
+      
+      if (kDebugMode) {
+        print('loadLocalMusic: After deduplication, ${_playlist.length} unique files');
+      }
+      
+      // Load durations in the background
+      if (_playlist.isNotEmpty) {
+        if (kDebugMode) {
+          print('loadLocalMusic: Starting background duration loading');
+        }
+        _loadDurationsInBackground();
+      } else if (kDebugMode) {
+        print('loadLocalMusic: No music files found to load durations for');
+      }
+      
+      return true;
+    } catch (e) {
+      _error = 'Failed to load music: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Play a song
+  Future<void> playSong(Song song) async {
+    try {
+      await _audioPlayer.setUrl(song.url);
+      await _audioPlayer.play();
+      _currentIndex = _playlist.indexWhere((s) => s.id == song.id);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to play song: $e';
+      notifyListeners();
+    }
+  }
+
+  // Toggle play/pause
+  Future<void> togglePlayPause() async {
+    if (_audioPlayer.playing) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.play();
+    }
+    notifyListeners();
+  }
+
+  // Request storage permission
+  Future<bool> _requestStoragePermission() async {
+    if (kDebugMode) {
+      print('_requestStoragePermission: Starting permission request');
+    }
+
+    Permission permission;
+    if (Platform.isAndroid) {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      final sdkInt = androidInfo.version.sdkInt;
+      
+      if (sdkInt >= 33) {
+        // Android 13+ needs READ_MEDIA_AUDIO
+        permission = Permission.audio;
+        if (kDebugMode) {
+          print('_requestStoragePermission: Android 13+ detected, using READ_MEDIA_AUDIO');
+        }
+      } else if (sdkInt >= 29) {
+        // Android 10-12 needs READ_EXTERNAL_STORAGE
+        permission = Permission.storage;
+        if (kDebugMode) {
+          print('_requestStoragePermission: Android 10-12 detected, using READ_EXTERNAL_STORAGE');
+        }
+      } else {
+        // Android 9 and below needs both READ and WRITE
+        permission = Permission.storage;
+        if (kDebugMode) {
+          print('_requestStoragePermission: Android 9 or below detected, using READ/WRITE_EXTERNAL_STORAGE');
+        }
+      }
+    } else {
+      // For non-Android platforms, use storage permission
+      permission = Permission.storage;
+    }
+
+    // Check if we already have permission
+    var status = await permission.status;
+    if (kDebugMode) {
+      print('_requestStoragePermission: Current permission status: $status');
+    }
+
+    // If permission is already granted, return true
+    if (status.isGranted) {
+      if (kDebugMode) {
+        print('_requestStoragePermission: Permission already granted');
+      }
+      return true;
+    }
+
+    // If permission is permanently denied, open app settings
+    if (status.isPermanentlyDenied) {
+      if (kDebugMode) {
+        print('_requestStoragePermission: Permission permanently denied, opening app settings');
+      }
+      _error = 'Storage permission is required to access music files. Please enable it in app settings.';
+      notifyListeners();
+      await openAppSettings();
+      return false;
+    }
+
+    // Request the permission
+    if (kDebugMode) {
+      print('_requestStoragePermission: Requesting permission');
+    }
+    status = await permission.request();
+    
+    if (kDebugMode) {
+      print('_requestStoragePermission: Permission request result: $status');
+    }
+
+    // Check the result
+    if (status.isGranted) {
+      if (kDebugMode) {
+        print('_requestStoragePermission: Permission granted after request');
+      }
+      return true;
+    } else if (status.isPermanentlyDenied) {
+      if (kDebugMode) {
+        print('_requestStoragePermission: Permission permanently denied after request');
+      }
+      _error = 'Storage permission is required to access music files. Please enable it in app settings.';
+      notifyListeners();
+      await openAppSettings();
+    } else {
+      if (kDebugMode) {
+        print('_requestStoragePermission: Permission denied');
+      }
+      _error = 'Storage permission is required to access music files.';
+      notifyListeners();
+    }
+    
+    return status.isGranted;
+  }
+
+  // Seek to a specific position in the current track
+  Future<void> seek(Duration position) async {
+    try {
+      await _audioPlayer.seek(position);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to seek: $e';
+      notifyListeners();
+    }
+  }
+
+  // Play the previous track in the playlist
+  Future<void> previous() async {
+    if (_playlist.isEmpty) return;
+    
+    _currentIndex = (_currentIndex - 1) % _playlist.length;
+    if (_currentIndex < 0) {
+      _currentIndex = _playlist.length - 1;
+    }
+    
+    await playSong(_playlist[_currentIndex]);
+  }
+
+  // Play the next track in the playlist
+  Future<void> next() async {
+    if (_playlist.isEmpty) return;
+    
+    _currentIndex = (_currentIndex + 1) % _playlist.length;
+    await playSong(_playlist[_currentIndex]);
+  }
+
+  @override
+  Future<void> _loadDurationsInBackground() async {
+    // Process songs in chunks to avoid blocking the UI
+    const chunkSize = 10;
+    for (var i = 0; i < _playlist.length; i += chunkSize) {
+      final end = (i + chunkSize < _playlist.length) ? i + chunkSize : _playlist.length;
+      final chunk = _playlist.sublist(i, end);
+      
+      // Process each song in the current chunk
+      for (var song in chunk) {
+        try {
+          final file = File(song.url);
+          if (await file.exists()) {
+            final audioPlayer = AudioPlayer();
+            await audioPlayer.setFilePath(file.path);
+            final duration = audioPlayer.duration ?? Duration.zero;
+            await audioPlayer.dispose();
+            
+            // Update the song duration
+            final index = _playlist.indexWhere((s) => s.id == song.id);
+            if (index != -1) {
+              _playlist[index] = song.copyWith(duration: duration);
+              // Notify listeners after each chunk is processed
+              if (index % 5 == 0) {
+                notifyListeners();
+              }
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error loading duration for ${song.title}: $e');
+          }
+        }
+      }
+      
+      // Notify listeners after each chunk
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+}

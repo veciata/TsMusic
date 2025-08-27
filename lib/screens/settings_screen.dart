@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../utils/package_info_utils.dart';
 
 class SettingsSection extends StatelessWidget {
   final String title;
@@ -24,7 +25,8 @@ class SettingsSection extends StatelessWidget {
           child: Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+                Icon(icon,
+                    size: 20, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
               ],
               Text(
@@ -82,9 +84,7 @@ class ColorSelector extends StatelessWidget {
             ),
           ],
         ),
-        child: isSelected
-            ? const Icon(Icons.check, color: Colors.white)
-            : null,
+        child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
       ),
     );
   }
@@ -96,21 +96,40 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
     builder: (context) {
       return AlertDialog(
         title: const Text('Select Player Style'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: PlayerStyle.values.map((style) {
-            return RadioListTile<PlayerStyle>(
-              title: Text(themeProvider.getPlayerStyleName(style)),
-              value: style,
-              groupValue: themeProvider.playerStyle,
-              onChanged: (PlayerStyle? value) {
-                if (value != null) {
-                  themeProvider.setPlayerStyle(value);
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: PlayerStyle.values.map((style) {
+              final isSelected = style == themeProvider.playerStyle;
+              return ListTile(
+                title: Text(
+                  themeProvider.getPlayerStyleName(style),
+                  style: TextStyle(
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                ),
+                leading: Radio<PlayerStyle>(
+                  value: style,
+                  groupValue: themeProvider.playerStyle,
+                  onChanged: (PlayerStyle? newStyle) {
+                    if (newStyle != null) {
+                      themeProvider.setPlayerStyle(newStyle);
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+                onTap: () {
+                  themeProvider.setPlayerStyle(style);
                   Navigator.of(context).pop();
-                }
-              },
-            );
-          }).toList(),
+                },
+              );
+            }).toList(),
+          ),
         ),
         actions: [
           TextButton(
@@ -129,61 +148,60 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDarkMode = themeProvider.isDarkMode;
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        centerTitle: true,
       ),
       body: ListView(
         children: [
-          // Appearance Section
           SettingsSection(
             title: 'Appearance',
             icon: Icons.palette,
             children: [
               SwitchListTile(
                 title: const Text('Dark Mode'),
-                subtitle: Text(isDarkMode ? 'On' : 'Off'),
-                secondary: Icon(
-                  isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
                 value: isDarkMode,
-                onChanged: (_) => themeProvider.toggleTheme(),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Theme Color', style: TextStyle(fontSize: 16)),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 50,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: themeProvider.availableColors.map((color) {
-                          return ColorSelector(
-                            color: color,
-                            isSelected: themeProvider.primaryColor.value == color.value,
-                            onTap: () => themeProvider.setPrimaryColor(color),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
+                onChanged: (value) {
+                  themeProvider.setThemeMode(
+                    value ? ThemeMode.dark : ThemeMode.light,
+                  );
+                },
+                secondary: const Icon(Icons.dark_mode),
               ),
               const Divider(height: 1),
               ListTile(
                 title: const Text('Player Style'),
-                subtitle: Text(themeProvider.getPlayerStyleName(themeProvider.playerStyle)),
                 leading: const Icon(Icons.style),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showPlayerStyleDialog(context, themeProvider),
+                trailing: Text(
+                  themeProvider.getPlayerStyleName(themeProvider.playerStyle),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                onTap: () {
+                  _showPlayerStyleDialog(context, themeProvider);
+                },
+              ),
+              const Divider(height: 1),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Text('Accent Color'),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: themeProvider.availableColors.map((color) {
+                    return ColorSelector(
+                      color: color,
+                      isSelected:
+                          themeProvider.primaryColor.value == color.value,
+                      onTap: () => themeProvider.setPrimaryColor(color),
+                    );
+                  }).toList(),
+                ),
               ),
             ],
           ),
@@ -242,7 +260,7 @@ class SettingsScreen extends StatelessWidget {
                   showAboutDialog(
                     context: context,
                     applicationName: 'TS Music',
-                    applicationVersion: '1.0.0',
+                    applicationVersion: '${PackageInfoUtils.version}',
                     applicationIcon: const Icon(Icons.music_note, size: 50),
                     children: const [
                       Text('A beautiful music player app'),

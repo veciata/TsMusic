@@ -103,7 +103,8 @@ class ThemeProvider with ChangeNotifier {
   
   // Get the current theme data
   ThemeData getLightTheme() {
-    return ThemeData(
+    final baseTheme = ThemeData.light();
+    return baseTheme.copyWith(
       colorScheme: ColorScheme.light(
         primary: _primaryColor,
         secondary: _primaryColor.withOpacity(0.8),
@@ -115,11 +116,16 @@ class ThemeProvider with ChangeNotifier {
       scaffoldBackgroundColor: Colors.grey[50],
       cardColor: Colors.white,
       dividerColor: Colors.grey[300],
+      // Ensure text themes are properly inherited
+      textTheme: baseTheme.textTheme,
+      primaryTextTheme: baseTheme.primaryTextTheme,
+      iconTheme: baseTheme.iconTheme,
     );
   }
   
   ThemeData getDarkTheme() {
-    return ThemeData(
+    final baseTheme = ThemeData.dark();
+    return baseTheme.copyWith(
       colorScheme: ColorScheme.dark(
         primary: _primaryColor,
         secondary: _primaryColor.withOpacity(0.8),
@@ -131,6 +137,10 @@ class ThemeProvider with ChangeNotifier {
       scaffoldBackgroundColor: Colors.grey[900],
       cardColor: Colors.grey[850],
       dividerColor: Colors.grey[700],
+      // Ensure text themes are properly inherited
+      textTheme: baseTheme.textTheme,
+      primaryTextTheme: baseTheme.primaryTextTheme,
+      iconTheme: baseTheme.iconTheme,
     );
   }
 }
