@@ -14,6 +14,14 @@ class NewMusicProvider extends ChangeNotifier {
   int _currentIndex = 0;
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<Duration>? _positionSubscription;
+  
+  NewMusicProvider() {
+    // Listen to position changes and notify listeners
+    _positionSubscription = _audioPlayer.positionStream.listen((position) {
+      notifyListeners();
+    });
+  }
 
   List<Song> get songs => _playlist;
   bool get isLoading => _isLoading;
@@ -31,6 +39,14 @@ class NewMusicProvider extends ChangeNotifier {
     }
     
     try {
+      // First, check if directory exists
+      if (!await dir.exists()) {
+        if (kDebugMode) {
+          print('Directory does not exist: ${dir.path}');
+        }
+        return [];
+      }
+      
       final List<FileSystemEntity> entities = await dir.list(recursive: true, followLinks: false).toList();
       if (kDebugMode) {
         print('Found ${entities.length} items in ${dir.path}');
@@ -39,25 +55,13 @@ class NewMusicProvider extends ChangeNotifier {
       for (var entity in entities) {
         try {
           if (entity is File) {
-            final ext = entity.path.toLowerCase().split('.').last;
+            final path = entity.path.toLowerCase();
+            final ext = path.split('.').last;
             if (['mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac'].contains(ext)) {
               if (kDebugMode) {
                 print('Found music file: ${entity.path}');
               }
               files.add(entity);
-              
-              // Update UI periodically as we find files
-              if (files.length % 5 == 0) {
-                _playlist = files.map((file) => Song(
-                  id: file.path,
-                  title: file.path.split('/').last.split('.').first,
-                  artist: 'Unknown Artist',
-                  album: 'Unknown Album',
-                  url: file.path,
-                  duration: Duration.zero,
-                )).toList();
-                notifyListeners();
-              }
             }
           }
         } catch (e) {
@@ -145,13 +149,21 @@ class NewMusicProvider extends ChangeNotifier {
       }
 
       // Process all directories in parallel
-      await Future.wait(directories.map((dir) async {
+      final List<FileSystemEntity> allMusicFiles = [];
+      
+      for (var dir in directories) {
         try {
           if (await dir.exists()) {
             if (kDebugMode) {
               print('loadLocalMusic: Scanning directory: ${dir.path}');
             }
-            await _findMusicFiles(dir);
+            final files = await _findMusicFiles(dir);
+            if (files.isNotEmpty) {
+              allMusicFiles.addAll(files);
+              if (kDebugMode) {
+                print('loadLocalMusic: Found ${files.length} music files in ${dir.path}');
+              }
+            }
           } else if (kDebugMode) {
             print('loadLocalMusic: Directory does not exist: ${dir.path}');
           }
@@ -160,14 +172,25 @@ class NewMusicProvider extends ChangeNotifier {
             print('Error scanning directory ${dir.path}: $e');
           }
         }
-      }));
-
-      if (kDebugMode) {
-        print('loadLocalMusic: Found ${_playlist.length} music files');
       }
 
-      // Final update with all found files
-      _playlist = _playlist.toSet().toList(); // Remove duplicates
+      // Convert FileSystemEntity to Song objects
+      final Set<String> uniquePaths = {}; // To avoid duplicates
+      _playlist = allMusicFiles
+          .where((file) => uniquePaths.add(file.path)) // This ensures unique paths
+          .map((file) => Song(
+                id: file.path,
+                title: file.path.split('/').last.split('.').first,
+                artist: 'Unknown Artist',
+                album: 'Unknown Album',
+                url: file.path,
+                duration: Duration.zero,
+              ))
+          .toList();
+
+      if (kDebugMode) {
+        print('loadLocalMusic: Found ${_playlist.length} unique music files');
+      }
       
       if (kDebugMode) {
         print('loadLocalMusic: After deduplication, ${_playlist.length} unique files');
@@ -383,6 +406,7 @@ class NewMusicProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
