@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/new_music_provider.dart' as music_provider;
 import 'local_music_screen.dart';
 import '../models/song.dart';
+// Using built-in Flutter widgets for text scrolling
 
 class HomeScreen extends StatelessWidget {
   final Function() onSettingsTap;
@@ -14,6 +15,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('TS Music'),
@@ -99,11 +102,42 @@ class HomeScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Your Music (${musicProvider.songs.length})',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                    Row(
+                      children: [
+                        // Sort button
+                        PopupMenuButton<music_provider.SongSortOption>(
+                          icon: Icon(Icons.sort, size: 20, color: Theme.of(context).primaryColor),
+                          tooltip: 'Sort by',
+                          onSelected: (option) {
+                            final isSameOption = musicProvider.currentSortOption == option;
+                            musicProvider.sortSongs(
+                              sortBy: option,
+                              ascending: isSameOption ? !musicProvider.sortAscending : true,
+                            );
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: music_provider.SongSortOption.title,
+                              child: const Text('Sort by Title'),
+                            ),
+                            PopupMenuItem(
+                              value: music_provider.SongSortOption.artist,
+                              child: const Text('Sort by Artist'),
+                            ),
+                            PopupMenuItem(
+                              value: music_provider.SongSortOption.duration,
+                              child: const Text('Sort by Duration'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Your Music (${musicProvider.songs.length})',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh),
@@ -128,10 +162,53 @@ class HomeScreen extends StatelessWidget {
                         ),
                         child: const Icon(Icons.music_note, size: 24),
                       ),
-                      title: Text(
-                        song.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      title: SizedBox(
+                        height: 24, // Same height as normal text
+                        child: song.title.length > 20
+                            ? LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final textPainter = TextPainter(
+                                    text: TextSpan(
+                                      text: song.title,
+                                      style: Theme.of(context).textTheme.titleMedium,
+                                    ),
+                                    maxLines: 1,
+                                    textDirection: TextDirection.ltr,
+                                  )..layout();
+                                  
+                                  final isTextWider = textPainter.width > constraints.maxWidth;
+                                  
+                                  return isTextWider
+                                      ? SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                song.title,
+                                                style: Theme.of(context).textTheme.titleMedium,
+                                              ),
+                                              const SizedBox(width: 20), // Add some space before repeating
+                                              Text(
+                                                song.title,
+                                                style: Theme.of(context).textTheme.titleMedium,
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Text(
+                                          song.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        );
+                                },
+                              )
+                            : Text(
+                                song.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
                       ),
                       subtitle: Text(
                         song.artist,
@@ -159,5 +236,21 @@ class HomeScreen extends StatelessWidget {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
+  }
+  
+  String _getSortLabel(music_provider.NewMusicProvider musicProvider) {
+    final sortOption = musicProvider.currentSortOption;
+    final arrow = musicProvider.sortAscending ? '↑' : '↓';
+    
+    switch (sortOption) {
+      case music_provider.SongSortOption.title:
+        return 'Title $arrow';
+      case music_provider.SongSortOption.artist:
+        return 'Artist $arrow';
+      case music_provider.SongSortOption.duration:
+        return 'Duration $arrow';
+      case music_provider.SongSortOption.dateAdded:
+        return 'Date Added $arrow';
+    }
   }
 }

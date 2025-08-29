@@ -3,17 +3,33 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+// No external dependencies needed for filename parsing
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import '../models/song.dart';
 
+// Add this extension for string manipulation
+extension StringExtension on String {
+  String trimAll() => this.trim().replaceAll(RegExp(r'\s+'), ' ');
+}
+
+enum SongSortOption {
+  title,
+  artist,
+  duration,
+  dateAdded,
+}
+
 class NewMusicProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   List<Song> _playlist = [];
+  List<Song> _displayedSongs = [];
   int _currentIndex = 0;
   bool _isLoading = false;
   String? _error;
+  SongSortOption _currentSortOption = SongSortOption.title;
+  bool _sortAscending = true;
   StreamSubscription<Duration>? _positionSubscription;
   
   NewMusicProvider() {
@@ -23,13 +39,123 @@ class NewMusicProvider extends ChangeNotifier {
     });
   }
 
-  List<Song> get songs => _playlist;
+  List<Song> get songs => _displayedSongs;
+  List<Song> get allSongs => _playlist;
+  SongSortOption get currentSortOption => _currentSortOption;
+  bool get sortAscending => _sortAscending;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isPlaying => _audioPlayer.playing;
   Duration get position => _audioPlayer.position;
   Duration get duration => _audioPlayer.duration ?? Duration.zero;
   Song? get currentSong => _playlist.isNotEmpty ? _playlist[_currentIndex] : null;
+
+  // Helper method to extract metadata from audio file
+  Future<Map<String, String>> _extractMetadata(File file) async {
+    try {
+      final fileName = path.basenameWithoutExtension(file.path);
+      
+      // Try different patterns in order of likelihood
+      
+      // Pattern 1: "Artist - Title"
+      if (fileName.contains(' - ')) {
+        final parts = fileName.split(' - ');
+        if (parts.length >= 2) {
+          return {
+            'title': parts.sublist(1).join(' - ').trimAll(),
+            'artist': parts[0].trimAll(),
+            'album': 'Unknown Album',
+          };
+        }
+      }
+      
+      // Pattern 2: "Title | Artist | Album"
+      if (fileName.contains('|')) {
+        final parts = fileName.split('|').map((s) => s.trimAll()).toList();
+        if (parts.length >= 3) {
+          return {
+            'title': parts[0],
+            'artist': parts[1],
+            'album': parts[2],
+          };
+        } else if (parts.length == 2) {
+          return {
+            'title': parts[0],
+            'artist': parts[1],
+            'album': 'Unknown Album',
+          };
+        }
+      }
+      
+      // Default: Use filename as title
+      return {
+        'title': fileName.trimAll(),
+        'artist': 'Unknown Artist',
+        'album': 'Unknown Album',
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error extracting metadata from ${file.path}: $e');
+      }
+      return {};
+    }
+  }
+  
+  // Parse metadata from filename patterns
+  Map<String, String> _parseMetadataFromFilename(String filePath) {
+    final name = path.basenameWithoutExtension(filePath);
+    final result = {
+      'title': name,
+      'artist': 'Unknown Artist',
+      'album': 'Unknown Album',
+    };
+    
+    // Try different patterns in order of specificity
+    
+    // Pattern 1: "Title | Artist | Album"
+    if (name.contains('|')) {
+      final parts = name.split('|').map((s) => s.trimAll()).toList();
+      if (parts.length >= 3) {
+        return {
+          'title': parts[0],
+          'artist': parts[1],
+          'album': parts[2],
+        };
+      } else if (parts.length == 2) {
+        return {
+          'title': parts[0],
+          'artist': parts[1],
+          'album': 'Unknown Album',
+        };
+      }
+    }
+    
+    // Pattern 2: "Artist - Title"
+    if (name.contains(' - ')) {
+      final parts = name.split(' - ').map((s) => s.trimAll()).toList();
+      if (parts.length >= 2) {
+        return {
+          'title': parts.sublist(1).join(' - '),
+          'artist': parts[0],
+          'album': 'Unknown Album',
+        };
+      }
+    }
+    
+    // Pattern 3: "Title - Artist"
+    if (name.contains(' - ')) {
+      final parts = name.split(' - ').map((s) => s.trimAll()).toList();
+      if (parts.length >= 2) {
+        return {
+          'title': parts[0],
+          'artist': parts.sublist(1).join(' - '),
+          'album': 'Unknown Album',
+        };
+      }
+    }
+    
+    return result;
+  }
 
   // Helper method to find music files in a directory
   Future<List<FileSystemEntity>> _findMusicFiles(Directory dir) async {
@@ -89,7 +215,8 @@ class NewMusicProvider extends ChangeNotifier {
     
     _isLoading = true;
     _error = null;
-    _playlist = [];
+    _playlist.clear();
+    _displayedSongs.clear();
     notifyListeners();
 
     if (kDebugMode) {
@@ -174,19 +301,56 @@ class NewMusicProvider extends ChangeNotifier {
         }
       }
 
-      // Convert FileSystemEntity to Song objects
+      // Convert FileSystemEntity to Song objects with metadata extraction
       final Set<String> uniquePaths = {}; // To avoid duplicates
-      _playlist = allMusicFiles
-          .where((file) => uniquePaths.add(file.path)) // This ensures unique paths
-          .map((file) => Song(
-                id: file.path,
-                title: file.path.split('/').last.split('.').first,
-                artist: 'Unknown Artist',
-                album: 'Unknown Album',
-                url: file.path,
-                duration: Duration.zero,
-              ))
-          .toList();
+      _playlist = [];
+      
+      // Process files one by one to handle async metadata extraction
+      for (final file in allMusicFiles) {
+        if (!uniquePaths.add(file.path)) continue; // Skip duplicates
+        
+        try {
+          // Get metadata from file (if available)
+          final fileMetadata = await _extractMetadata(File(file.path));
+          // Parse metadata from filename as fallback
+          final filenameMetadata = _parseMetadataFromFilename(file.path);
+          
+          // Use metadata if available, otherwise fall back to filename parsing
+          final title = fileMetadata['title']?.isNotEmpty == true 
+              ? fileMetadata['title']! 
+              : filenameMetadata['title']!;
+              
+          final artist = fileMetadata['artist']?.isNotEmpty == true 
+              ? fileMetadata['artist']! 
+              : filenameMetadata['artist']!;
+              
+          final album = fileMetadata['album']?.isNotEmpty == true 
+              ? fileMetadata['album']! 
+              : filenameMetadata['album']!;
+          
+          _playlist.add(Song(
+            id: file.path,
+            title: title,
+            artist: artist,
+            album: album,
+            url: file.path,
+            duration: Duration.zero, // Will be updated later
+          ));
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error processing file ${file.path}: $e');
+          }
+          // Add with basic info if there's an error
+          _playlist.add(Song(
+            id: file.path,
+            title: path.basenameWithoutExtension(file.path),
+            artist: 'Unknown Artist',
+            album: 'Unknown Album',
+            url: file.path,
+            duration: Duration.zero,
+          ));
+        }
+      }
 
       if (kDebugMode) {
         print('loadLocalMusic: Found ${_playlist.length} unique music files');
@@ -206,6 +370,8 @@ class NewMusicProvider extends ChangeNotifier {
         print('loadLocalMusic: No music files found to load durations for');
       }
       
+      _applySorting();
+      notifyListeners();
       return true;
     } catch (e) {
       _error = 'Failed to load music: $e';
@@ -214,6 +380,48 @@ class NewMusicProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void _addSong(Song song) {
+    if (!_playlist.any((s) => s.id == song.id)) {
+      _playlist.add(song);
+      _applySorting();
+      notifyListeners();
+    }
+  }
+
+  void sortSongs({required SongSortOption sortBy, bool? ascending}) {
+    _currentSortOption = sortBy;
+    _sortAscending = ascending ?? _sortAscending;
+    _applySorting();
+    notifyListeners();
+  }
+
+  void _applySorting() {
+    _displayedSongs = List<Song>.from(_playlist);
+    
+    _displayedSongs.sort((a, b) {
+      int comparison;
+      
+      switch (_currentSortOption) {
+        case SongSortOption.title:
+          comparison = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          break;
+        case SongSortOption.artist:
+          comparison = a.artist.toLowerCase().compareTo(b.artist.toLowerCase());
+          break;
+        case SongSortOption.duration:
+          comparison = a.duration.compareTo(b.duration);
+          break;
+        case SongSortOption.dateAdded:
+          // Assuming we have a dateAdded field in the Song model
+          // If not, we can use the file's last modified date
+          comparison = 0; // Default to no change if dateAdded is not available
+          break;
+      }
+      
+      return _sortAscending ? comparison : -comparison;
+    });
   }
 
   // Play a song
