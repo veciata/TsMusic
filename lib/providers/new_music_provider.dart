@@ -24,7 +24,11 @@ enum SongSortOption {
 class NewMusicProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   List<Song> _playlist = [];
+  List<Song> _songs = [];
   List<Song> _displayedSongs = [];
+  List<Song> _filteredSongs = [];
+  List<Song> get songs => _displayedSongs;
+  List<Song> get filteredSongs => _filteredSongs;
   int _currentIndex = 0;
   bool _isLoading = false;
   String? _error;
@@ -39,7 +43,6 @@ class NewMusicProvider extends ChangeNotifier {
     });
   }
 
-  List<Song> get songs => _displayedSongs;
   List<Song> get allSongs => _playlist;
   SongSortOption get currentSortOption => _currentSortOption;
   bool get sortAscending => _sortAscending;
@@ -217,6 +220,7 @@ class NewMusicProvider extends ChangeNotifier {
     _error = null;
     _playlist.clear();
     _displayedSongs.clear();
+    _filteredSongs.clear();
     notifyListeners();
 
     if (kDebugMode) {
@@ -390,9 +394,27 @@ class NewMusicProvider extends ChangeNotifier {
     }
   }
 
-  void sortSongs({required SongSortOption sortBy, bool? ascending}) {
+  void filterSongs(String query) {
+    if (query.isEmpty) {
+      _filteredSongs.clear();
+    } else {
+      final searchQuery = query.toLowerCase();
+      _filteredSongs = _playlist.where((song) {
+        return song.title.toLowerCase().contains(searchQuery) ||
+            song.artist.toLowerCase().contains(searchQuery);
+      }).toList();
+    }
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _filteredSongs.clear();
+    notifyListeners();
+  }
+
+  void sortSongs({required SongSortOption sortBy, bool ascending = true}) {
     _currentSortOption = sortBy;
-    _sortAscending = ascending ?? _sortAscending;
+    _sortAscending = ascending;
     _applySorting();
     notifyListeners();
   }

@@ -2,16 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/new_music_provider.dart' as music_provider;
 import 'local_music_screen.dart';
+import 'search_screen.dart';
 import '../models/song.dart';
-// Using built-in Flutter widgets for text scrolling
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final Function() onSettingsTap;
 
   const HomeScreen({
     super.key,
     required this.onSettingsTap,
   });
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+
 
   @override
   Widget build(BuildContext context) {
@@ -25,12 +32,17 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // TODO: Implement search functionality
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SearchScreen(),
+                ),
+              );
             },
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: onSettingsTap,
+            onPressed: widget.onSettingsTap,
           ),
         ],
       ),
