@@ -250,7 +250,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           return GestureDetector(
             onTap: () {
               if (currentSong != null) {
-                NowPlayingBottomSheet.show(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NowPlayingScreen(),
+                  ),
+                );
               }
             },
             child: Container(

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -45,6 +46,12 @@ class NewMusicProvider extends ChangeNotifier {
   bool get isEnriching => _isEnriching;
   int get enrichedCount => _enrichedCount;
 
+  // Shuffle / Repeat state
+  bool _shuffleEnabled = false;
+  LoopMode _loopMode = LoopMode.off;
+  bool get shuffleEnabled => _shuffleEnabled;
+  LoopMode get loopMode => _loopMode;
+
   // Notification service related
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
   Stream<bool> get playingStream => _audioPlayer.playingStream;
@@ -59,6 +66,8 @@ class NewMusicProvider extends ChangeNotifier {
       (_playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length)
           ? _currentIndex
           : null;
+  // Expose read-only queue for UI
+  List<Song> get queue => List.unmodifiable(_playlist);
 
   NewMusicProvider() {
     // Listen to position changes and notify listeners
@@ -76,6 +85,16 @@ class NewMusicProvider extends ChangeNotifier {
         notifyListeners();
       },
     );
+
+    // Keep internal state in sync if needed
+    _audioPlayer.loopModeStream.listen((mode) {
+      _loopMode = mode;
+      notifyListeners();
+    });
+    _audioPlayer.shuffleModeEnabledStream.listen((enabled) {
+      _shuffleEnabled = enabled;
+      notifyListeners();
+    });
 
     // Load songs from storage when provider is created
     _initialize();
@@ -883,9 +902,102 @@ class NewMusicProvider extends ChangeNotifier {
   // Play the next track in the playlist
   Future<void> next() async {
     if (_playlist.isEmpty) return;
-
-    _currentIndex = (_currentIndex + 1) % _playlist.length;
+    if (_shuffleEnabled && _playlist.length > 1) {
+      final rnd = Random();
+      int nextIndex;
+      do {
+        nextIndex = rnd.nextInt(_playlist.length);
+      } while (nextIndex == _currentIndex);
+      _currentIndex = nextIndex;
+    } else {
+      _currentIndex = (_currentIndex + 1) % _playlist.length;
+    }
     await playSong(_playlist[_currentIndex]);
+  }
+
+  // Toggle shuffle mode
+  Future<void> toggleShuffle() async {
+    _shuffleEnabled = !_shuffleEnabled;
+    await _audioPlayer.setShuffleModeEnabled(_shuffleEnabled);
+    notifyListeners();
+  }
+
+  // Cycle repeat mode: off -> all -> one -> off
+  Future<void> cycleRepeatMode() async {
+    if (_loopMode == LoopMode.off) {
+      _loopMode = LoopMode.all;
+    } else if (_loopMode == LoopMode.all) {
+      _loopMode = LoopMode.one;
+    } else {
+      _loopMode = LoopMode.off;
+    }
+    await _audioPlayer.setLoopMode(_loopMode);
+    notifyListeners();
+  }
+
+  // Clear entire queue
+  Future<void> clearQueue() async {
+    _playlist.clear();
+    _displayedSongs = [];
+    _currentIndex = 0;
+    await stop();
+    notifyListeners();
+  }
+
+  // Play item at a specific index in the queue
+  Future<void> playAt(int index) async {
+    if (index < 0 || index >= _playlist.length) return;
+    _currentIndex = index;
+    await playSong(_playlist[_currentIndex]);
+  }
+
+  // Remove an item from the queue
+  Future<void> removeFromQueue(int index) async {
+    if (index < 0 || index >= _playlist.length) return;
+    final removingCurrent = index == _currentIndex;
+    _playlist.removeAt(index);
+
+    if (_playlist.isEmpty) {
+      _currentIndex = 0;
+      await stop();
+      _displayedSongs = [];
+      notifyListeners();
+      return;
+    }
+
+    if (index < _currentIndex) {
+      _currentIndex -= 1;
+    } else if (removingCurrent) {
+      if (_currentIndex >= _playlist.length) {
+        _currentIndex = 0;
+      }
+      await playSong(_playlist[_currentIndex]);
+    }
+
+    _displayedSongs = List.from(_playlist);
+    notifyListeners();
+  }
+
+  // Move an item within the queue (supports ReorderableListView)
+  void moveInQueue(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _playlist.length) return;
+    if (newIndex < 0 || newIndex > _playlist.length) return;
+    if (newIndex > oldIndex) newIndex -= 1; // ReorderableListView behavior
+
+    final moved = _playlist.removeAt(oldIndex);
+    _playlist.insert(newIndex, moved);
+
+    // Adjust current index
+    if (_currentIndex == oldIndex) {
+      _currentIndex = newIndex;
+    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
+      _currentIndex -= 1;
+    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
+      _currentIndex += 1;
+    }
+
+    _displayedSongs = List.from(_playlist);
+    notifyListeners();
   }
 
   @override

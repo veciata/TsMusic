@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/new_music_provider.dart' as music_provider;
 import '../screens/now_playing_screen.dart';
+import '../screens/queue_screen.dart';
 
 class NowPlayingBottomSheet extends StatelessWidget {
   const NowPlayingBottomSheet({super.key});
@@ -233,7 +234,12 @@ class NowPlayingBottomSheet extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.queue_music),
                       onPressed: () {
-                        // TODO: Show queue
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const QueueScreen(),
+                          ),
+                        );
                       },
                     ),
                   ],

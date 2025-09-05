@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import '../providers/new_music_provider.dart';
+import 'queue_screen.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -316,11 +317,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   IconButton(
                     icon: Icon(
                       Icons.shuffle,
-                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                      color: musicProvider.shuffleEnabled
+                          ? theme.colorScheme.secondary
+                          : theme.colorScheme.onPrimary.withOpacity(0.7),
                       size: 28,
                     ),
+                    tooltip: musicProvider.shuffleEnabled ? 'Shuffle: On' : 'Shuffle: Off',
                     onPressed: () {
-                      // TODO: Implement shuffle
+                      musicProvider.toggleShuffle();
                     },
                   ),
                   // Previous
@@ -373,12 +377,26 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   // Repeat
                   IconButton(
                     icon: Icon(
-                      Icons.repeat,
-                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                      musicProvider.loopMode == LoopMode.one
+                          ? Icons.repeat_one
+                          : Icons.repeat,
+                      color: musicProvider.loopMode == LoopMode.off
+                          ? theme.colorScheme.onPrimary.withOpacity(0.7)
+                          : theme.colorScheme.secondary,
                       size: 28,
                     ),
+                    tooltip: () {
+                      switch (musicProvider.loopMode) {
+                        case LoopMode.off:
+                          return 'Repeat: Off';
+                        case LoopMode.all:
+                          return 'Repeat: All';
+                        case LoopMode.one:
+                          return 'Repeat: One';
+                      }
+                    }(),
                     onPressed: () {
-                      // TODO: Implement repeat
+                      musicProvider.cycleRepeatMode();
                     },
                   ),
                 ],
@@ -414,7 +432,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                       size: 28,
                     ),
                     onPressed: () {
-                      // TODO: Show queue
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const QueueScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],
