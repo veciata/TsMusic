@@ -84,7 +84,8 @@ class MusicScannerService {
     try {
       // Load the audio file to get metadata
       await _audioPlayer.setFilePath(file.path);
-      final audioMetadata = _audioPlayer.audioSource?.sequence?.firstOrNull?.tag;
+      final source = _audioPlayer.audioSource;
+      final audioMetadata = source?.sequence.firstOrNull?.tag;
       
       return {
         'title': audioMetadata?.title ?? path.basenameWithoutExtension(file.path),
@@ -94,7 +95,7 @@ class MusicScannerService {
             ? audioMetadata!.genre 
             : 'Unknown Genre',
         'file_path': file.path,
-        'duration': (await _audioPlayer.duration)?.inMilliseconds ?? 0,
+        'duration': _audioPlayer.duration?.inMilliseconds ?? 0,
         'track_number': audioMetadata?.trackNumber ?? 0,
         'year': audioMetadata?.publishDate?.year,
       };

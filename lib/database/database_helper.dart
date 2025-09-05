@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:tsmusic/models/song.dart';
@@ -12,6 +13,7 @@ class DatabaseHelper {
   static const String tableArtists = 'artists';
   static const String tableGenres = 'genres';
   static const String tableSongs = 'songs';
+  static const String tableAlbums = 'albums';
   
   // Junction tables for many-to-many relationships
   static const String tableArtistGenre = 'artist_genre';
@@ -58,6 +60,19 @@ class DatabaseHelper {
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
         $columnName TEXT NOT NULL UNIQUE,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    // Create albums table
+    await db.execute('''
+      CREATE TABLE $tableAlbums (
+        $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        artist_id INTEGER NOT NULL,
+        year INTEGER,
+        $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(name, artist_id),
+        FOREIGN KEY (artist_id) REFERENCES $tableArtists($columnId) ON DELETE CASCADE
       )
     ''');
 
@@ -295,7 +310,7 @@ class DatabaseHelper {
         {
           'title': song.title,
           'file_path': song.url,
-          'duration': song.duration.inMilliseconds,
+          'duration': song.duration,
           'track_number': 0, // Default value, can be updated if available
           'created_at': DateTime.now().toIso8601String(),
         },
@@ -344,6 +359,100 @@ class DatabaseHelper {
     });
   }
   
+  /// Upserts an artist by name and returns the artist id
+  Future<int> upsertArtistByName(String artistName) async {
+    final db = await database;
+    final existing = await db.query(
+      tableArtists,
+      where: '$columnName = ?',
+      whereArgs: [artistName],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      return existing.first[columnId] as int;
+    }
+    return await db.insert(tableArtists, {
+      columnName: artistName,
+      columnCreatedAt: DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Updates a song's metadata and artist relation using the unique file_path as key
+  Future<void> updateSongMetadataByFilePath({
+    required String filePath,
+    String? title,
+    required String artistName,
+    String? album,
+    String? genreName,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Find song id by file_path
+      final rows = await txn.query(
+        tableSongs,
+        columns: [columnId],
+        where: 'file_path = ?',
+        whereArgs: [filePath],
+        limit: 1,
+      );
+      if (rows.isEmpty) return; // song not found in DB
+      final songId = rows.first[columnId] as int;
+
+      // Update title if provided
+      if (title != null && title.isNotEmpty) {
+        await txn.update(
+          tableSongs,
+          {'title': title},
+          where: '$columnId = ?',
+          whereArgs: [songId],
+        );
+      }
+
+      // Ensure artist exists
+      final artistId = await _getOrCreateArtist(txn, artistName);
+
+      // Reset and set song-artist relation
+      await txn.delete(tableSongArtist, where: 'song_id = ?', whereArgs: [songId]);
+      await txn.insert(
+        tableSongArtist,
+        {
+          'song_id': songId,
+          'artist_id': artistId,
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // Optionally link album as a genre for simplicity
+      if (album != null && album.isNotEmpty) {
+        final genreId = await _getOrCreateGenre(txn, album);
+        await txn.insert(
+          tableSongGenre,
+          {
+            'song_id': songId,
+            'genre_id': genreId,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      // Also link detected genre name if provided (preferred)
+      if (genreName != null && genreName.isNotEmpty) {
+        final gId = await _getOrCreateGenre(txn, genreName);
+        await txn.insert(
+          tableSongGenre,
+          {
+            'song_id': songId,
+            'genre_id': gId,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    });
+  }
+
   /// Gets an existing artist ID or creates a new one if it doesn't exist
   Future<int> _getOrCreateArtist(Transaction txn, String artistName) async {
     // Try to find existing artist

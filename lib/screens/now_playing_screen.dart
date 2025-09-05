@@ -1,0 +1,428 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:just_audio/just_audio.dart';
+import '../providers/new_music_provider.dart';
+
+class NowPlayingScreen extends StatefulWidget {
+  const NowPlayingScreen({super.key});
+
+  @override
+  State<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+class _NowPlayingScreenState extends State<NowPlayingScreen> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  bool _isDragging = false;
+  double _currentSliderValue = 0.0;
+  StreamSubscription? _positionSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    );
+    _startOrStopAnimation();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final musicProvider = context.watch<NewMusicProvider>();
+    _positionSubscription?.cancel();
+    _positionSubscription = musicProvider.positionStream.listen((_) {
+      if (!_isDragging) {
+        setState(() {
+          _currentSliderValue = musicProvider.position.inSeconds.toDouble();
+        });
+      }
+    });
+  }
+
+  void _startOrStopAnimation() {
+    final musicProvider = context.read<NewMusicProvider>();
+    if (musicProvider.isPlaying) {
+      _animationController.repeat();
+    } else {
+      _animationController.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _positionSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _showSongOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add_to_queue),
+              title: const Text('Add to queue'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement add to queue
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.playlist_add),
+              title: const Text('Add to playlist'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement add to playlist
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('Share'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement share
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+
+  Widget _buildDefaultArt(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: theme.colorScheme.primary.withOpacity(0.1),
+      ),
+      child: Icon(
+        Icons.music_note,
+        size: 80,
+        color: theme.colorScheme.onPrimary.withOpacity(0.8),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final musicProvider = context.watch<NewMusicProvider>();
+    final currentSong = musicProvider.currentSong;
+    
+    if (currentSong == null) {
+      return const Scaffold(
+        body: Center(child: Text('No song playing')),
+      );
+    }
+
+    final duration = musicProvider.duration;
+    
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0, top: 8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.black26,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_downward_rounded, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: _showSongOptions,
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.primary.withOpacity(0.9),
+              theme.colorScheme.primary.withOpacity(0.7),
+              theme.colorScheme.background,
+              theme.colorScheme.background,
+            ],
+            stops: const [0.0, 0.3, 0.7, 1.0],
+          ),
+        ),
+        child: Column(
+          children: [
+            const Spacer(flex: 2),
+            // Album Art with Rotation
+            Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Vinyl Record Effect
+                  AnimatedBuilder(
+                    animation: _animationController,
+                    builder: (_, child) {
+                      return Transform.rotate(
+                        angle: _animationController.value * 2 * 3.14159 * (musicProvider.isPlaying ? 1 : 0),
+                        child: Container(
+                          width: 280,
+                          height: 280,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black12,
+                            border: Border.all(color: Colors.white24, width: 12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 10,
+                              ),
+                            ],
+                            image: currentSong.albumArtUrl != null
+                                ? DecorationImage(
+                                    image: NetworkImage(currentSong.albumArtUrl!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: currentSong.albumArtUrl == null
+                              ? _buildDefaultArt(theme)
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            // Song Info
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+              child: Column(
+                children: [
+                  Text(
+                    currentSong.title,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    currentSong.artist,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Progress Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
+                children: [
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: theme.colorScheme.secondary,
+                      inactiveTrackColor: theme.colorScheme.secondary.withOpacity(0.3),
+                      thumbColor: theme.colorScheme.secondary,
+                      overlayColor: theme.colorScheme.secondary.withOpacity(0.3),
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
+                    ),
+                    child: Slider(
+                      value: _currentSliderValue,
+                      min: 0.0,
+                      max: duration.inSeconds.toDouble(),
+                      onChanged: (value) {
+                        setState(() {
+                          _currentSliderValue = value;
+                          _isDragging = true;
+                        });
+                      },
+                      onChangeEnd: (value) {
+                        musicProvider.seek(Duration(seconds: value.toInt()));
+                        setState(() {
+                          _isDragging = false;
+                        });
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(Duration(seconds: _currentSliderValue.toInt())),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                          ),
+                        ),
+                        Text(
+                          _formatDuration(duration),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Controls
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Shuffle
+                  IconButton(
+                    icon: Icon(
+                      Icons.shuffle,
+                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      // TODO: Implement shuffle
+                    },
+                  ),
+                  // Previous
+                  IconButton(
+                    icon: Icon(
+                      Icons.skip_previous_rounded,
+                      color: theme.colorScheme.onPrimary,
+                      size: 36,
+                    ),
+                    onPressed: musicProvider.previous,
+                  ),
+                  // Play/Pause
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.colorScheme.secondary,
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.secondary.withOpacity(0.5),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        musicProvider.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: theme.colorScheme.onSecondary,
+                        size: 48,
+                      ),
+                      onPressed: () {
+                        if (musicProvider.isPlaying) {
+                          musicProvider.pause();
+                        } else {
+                          musicProvider.play();
+                        }
+                        _startOrStopAnimation();
+                      },
+                    ),
+                  ),
+                  // Next
+                  IconButton(
+                    icon: Icon(
+                      Icons.skip_next_rounded,
+                      color: theme.colorScheme.onPrimary,
+                      size: 36,
+                    ),
+                    onPressed: musicProvider.next,
+                  ),
+                  // Repeat
+                  IconButton(
+                    icon: Icon(
+                      Icons.repeat,
+                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      // TODO: Implement repeat
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            // Bottom Controls
+            Padding(
+              padding: const EdgeInsets.only(bottom: 32.0, left: 32.0, right: 32.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Favorite
+                  IconButton(
+                    icon: Icon(
+                      musicProvider.isFavorite(currentSong.id) 
+                          ? Icons.favorite 
+                          : Icons.favorite_border,
+                      color: musicProvider.isFavorite(currentSong.id)
+                          ? Colors.red
+                          : theme.colorScheme.onPrimary.withOpacity(0.7),
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      musicProvider.toggleFavorite(currentSong.id);
+                    },
+                  ),
+                  // Queue
+                  IconButton(
+                    icon: Icon(
+                      Icons.queue_music_rounded,
+                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      // TODO: Show queue
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

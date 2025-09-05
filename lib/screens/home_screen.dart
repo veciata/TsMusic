@@ -6,11 +6,11 @@ import 'search_screen.dart';
 import '../models/song.dart';
 
 class HomeScreen extends StatefulWidget {
-  final Function() onSettingsTap;
+  final VoidCallback? onSettingsTap;
 
   const HomeScreen({
     super.key,
-    required this.onSettingsTap,
+    this.onSettingsTap,
   });
 
   @override
@@ -243,8 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _formatDuration(Duration duration) {
+  String _formatDuration(int durationMs) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final duration = Duration(milliseconds: durationMs);
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';

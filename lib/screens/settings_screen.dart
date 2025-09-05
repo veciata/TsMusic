@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../utils/package_info_utils.dart';
+import '../providers/new_music_provider.dart' as music_provider;
 
 class SettingsSection extends StatelessWidget {
   final String title;
@@ -156,6 +157,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
+          // Appearance Section
           SettingsSection(
             title: 'Appearance',
             icon: Icons.palette,
@@ -202,48 +204,6 @@ class SettingsScreen extends StatelessWidget {
                     );
                   }).toList(),
                 ),
-              ),
-            ],
-          ),
-          // Audio Section
-          SettingsSection(
-            title: 'Audio',
-            icon: Icons.volume_up,
-            children: [
-              ListTile(
-                title: const Text('Audio Quality'),
-                subtitle: const Text('High (320 kbps)'),
-                leading: const Icon(Icons.equalizer),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Show audio quality options
-                },
-              ),
-            ],
-          ),
-          // Storage Section
-          SettingsSection(
-            title: 'Storage',
-            icon: Icons.storage,
-            children: [
-              ListTile(
-                title: const Text('Offline Storage'),
-                subtitle: const Text('Manage downloaded content'),
-                leading: const Icon(Icons.download_done),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Navigate to storage management
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                title: const Text('Clear Cache'),
-                subtitle: const Text('Free up storage space'),
-                leading: const Icon(Icons.cleaning_services),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Clear cache
-                },
               ),
             ],
           ),

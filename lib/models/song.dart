@@ -5,9 +5,22 @@ class Song {
   final String? album;
   final String? albumArtUrl;
   final String url;
-  final Duration duration;
+  final int duration; // Duration in milliseconds
+  final List<String> tags;
+  
+  String get formattedDuration {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final duration = this.duration ~/ 1000; // Convert to seconds
+    final minutes = duration ~/ 60;
+    final seconds = duration % 60;
+    return '$minutes:${twoDigits(seconds)}';
+  }
+  
+  Duration get durationObject => Duration(milliseconds: duration);
   final bool isFavorite;
   final bool isDownloaded;
+  
+  bool hasTag(String tag) => tags.any((t) => t.toLowerCase() == tag.toLowerCase());
 
   Song({
     required this.id,
@@ -19,7 +32,8 @@ class Song {
     required this.duration,
     this.isFavorite = false,
     this.isDownloaded = false,
-  });
+    List<String>? tags,
+  }) : tags = tags ?? [];
 
   Song copyWith({
     String? id,
@@ -28,9 +42,10 @@ class Song {
     String? album,
     String? albumArtUrl,
     String? url,
-    Duration? duration,
+    int? duration,
     bool? isFavorite,
     bool? isDownloaded,
+    List<String>? tags,
   }) {
     return Song(
       id: id ?? this.id,
@@ -42,6 +57,7 @@ class Song {
       duration: duration ?? this.duration,
       isFavorite: isFavorite ?? this.isFavorite,
       isDownloaded: isDownloaded ?? this.isDownloaded,
+      tags: tags ?? this.tags,
     );
   }
 
@@ -53,9 +69,10 @@ class Song {
       album: json['album'] as String?,
       albumArtUrl: json['albumArtUrl'] as String?,
       url: json['url'] as String,
-      duration: Duration(milliseconds: json['duration'] as int),
+      duration: json['duration'] as int,
       isFavorite: json['isFavorite'] as bool? ?? false,
       isDownloaded: json['isDownloaded'] as bool? ?? false,
+      tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
     );
   }
 
@@ -67,9 +84,10 @@ class Song {
       'album': album,
       'albumArtUrl': albumArtUrl,
       'url': url,
-      'duration': duration.inMilliseconds,
+      'duration': duration, // duration is already in milliseconds
       'isFavorite': isFavorite,
       'isDownloaded': isDownloaded,
+      'tags': tags,
     };
   }
 }
