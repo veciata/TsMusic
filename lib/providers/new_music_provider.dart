@@ -146,6 +146,41 @@ class NewMusicProvider extends ChangeNotifier {
     }
   }
 
+  // Refresh provider state from the SQLite database. If unique=true, de-duplicate by (title, artist).
+  Future<void> refreshFromDatabase({bool unique = true}) async {
+    try {
+      final db = DatabaseHelper();
+      final rows = unique
+          ? await db.getUniqueSongsWithArtist()
+          : await db.getSongsWithArtist();
+
+      final List<Song> dbSongs = rows.map((m) {
+        final title = (m['title'] ?? '').toString();
+        final artist = (m['artist'] ?? '').toString();
+        final filePath = (m['file_path'] ?? '').toString();
+        final duration = (m['duration'] ?? 0) as int;
+        return Song(
+          id: filePath.isNotEmpty ? filePath : title, // unique by path; fallback to title
+          title: title.isNotEmpty ? title : 'Unknown Title',
+          artist: artist.isNotEmpty ? artist : 'Unknown Artist',
+          album: null,
+          url: filePath,
+          duration: duration,
+        );
+      }).toList();
+
+      _playlist = List.from(dbSongs);
+      _displayedSongs = List.from(dbSongs);
+      _filteredSongs.clear();
+      _applySorting();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('refreshFromDatabase: failed: $e');
+      }
+    }
+  }
+
   static const String _songsKey = 'cached_songs';
 
   Future<void> _saveSongsToStorage() async {
@@ -482,15 +517,10 @@ class NewMusicProvider extends ChangeNotifier {
         print('loadLocalMusic: Permission granted, starting directory scan');
       }
 
-      // Common music directories to scan
+      // Scan only Music and Download roots (recursively scans all subfolders)
       final List<Directory> directories = [
         Directory('/storage/emulated/0/Music'),
         Directory('/storage/emulated/0/Download'),
-        Directory('/storage/emulated/0/DCIM'),
-        Directory('/storage/emulated/0/Notifications'),
-        Directory('/storage/emulated/0/Ringtones'),
-        Directory('/storage/emulated/0/Podcasts'),
-        Directory('/storage/emulated/0/Audio'),
         Directory('/sdcard/Music'),
         Directory('/sdcard/Download'),
       ];
@@ -499,12 +529,11 @@ class NewMusicProvider extends ChangeNotifier {
         print('loadLocalMusic: Checking external storage directory');
       }
 
-      // Add external storage directory if it exists
+      // Add external storage directory if it exists (some devices map Music/Download under this tree)
       final externalDir = await getExternalStorageDirectory();
       if (externalDir != null) {
         if (kDebugMode) {
-          print(
-              'loadLocalMusic: Found external storage directory: ${externalDir.path}');
+          print('loadLocalMusic: Found external storage directory: ${externalDir.path}');
         }
         directories.add(externalDir);
       } else if (kDebugMode) {
@@ -613,8 +642,25 @@ class NewMusicProvider extends ChangeNotifier {
         print('loadLocalMusic: No music files found to load durations for');
       }
 
-      _applySorting();
-      notifyListeners();
+      // At this point, _playlist contains the scan results.
+      // Sync them into the SQL database, then refresh UI from DB as the single source of truth.
+      try {
+        if (kDebugMode) {
+          print('loadLocalMusic: Syncing ${_playlist.length} songs to database');
+        }
+        await DatabaseHelper().syncMusicLibrary(this);
+        if (kDebugMode) {
+          print('loadLocalMusic: Refreshing songs from database');
+        }
+        await refreshFromDatabase(unique: true);
+      } catch (e) {
+        if (kDebugMode) {
+          print('loadLocalMusic: Database sync failed: $e');
+        }
+        // Fall back to in-memory list if DB fails
+        _applySorting();
+        notifyListeners();
+      }
       return true;
     } catch (e) {
       _error = 'Failed to load music: $e';

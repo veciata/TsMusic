@@ -7,10 +7,10 @@ class PlayerScreen extends StatefulWidget {
   final Duration? duration;
   final Duration? position;
   final bool isPlaying;
-  final VoidCallback? onPlayPause;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final ValueChanged<Duration>? onSeek;
+  final VoidCallback onPlayPause;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final ValueChanged<Duration> onSeek;
 
   const PlayerScreen({
     super.key,
@@ -18,7 +18,7 @@ class PlayerScreen extends StatefulWidget {
     this.artist,
     this.albumArt,
     this.duration,
-    required this.position,
+    this.position,
     required this.isPlaying,
     required this.onPlayPause,
     required this.onPrevious,
@@ -34,7 +34,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.songTitle ?? 'No Title'),
@@ -85,7 +85,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   value: widget.position!.inSeconds.toDouble(),
                   max: widget.duration!.inSeconds.toDouble(),
                   onChanged: (value) {
-                    widget.onSeek?.call(Duration(seconds: value.toInt()));
+                    widget.onSeek(Duration(seconds: value.toInt()));
                   },
                 ),
                 Padding(

@@ -122,6 +122,9 @@ class YouTubeService extends ChangeNotifier {
   List<DownloadProgress> get activeDownloads =>
       _activeDownloads.values.toList();
 
+  // Cache search pages per query for pagination
+  final Map<String, VideoSearchList> _searchPages = {};
+
   void _notifyProgressUpdate() {
     notifyListeners();
   }
@@ -186,10 +189,27 @@ class YouTubeService extends ChangeNotifier {
   Future<List<YouTubeAudio>> searchAudio(String query) async {
     try {
       final searchResults = await _yt.search.search(query);
+      // Cache the first page for pagination
+      _searchPages[query] = searchResults;
       final videos = searchResults.whereType<Video>().toList();
       return videos.map((video) => YouTubeAudio.fromVideo(video)).toList();
     } catch (e) {
       print('Error searching YouTube: $e');
+      return [];
+    }
+  }
+
+  Future<List<YouTubeAudio>> searchAudioNextPage(String query) async {
+    try {
+      final VideoSearchList? current = _searchPages[query];
+      if (current == null) return [];
+      final VideoSearchList? next = await current.nextPage();
+      if (next == null) return [];
+      _searchPages[query] = next;
+      final videos = next.whereType<Video>().toList();
+      return videos.map((video) => YouTubeAudio.fromVideo(video)).toList();
+    } catch (e) {
+      print('Error loading next page for "$query": $e');
       return [];
     }
   }

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/new_music_provider.dart' as music_provider;
-import 'local_music_screen.dart';
+import '../providers/theme_provider.dart' as theme_provider;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'search_screen.dart';
 import '../models/song.dart';
 
@@ -18,12 +19,45 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final DraggableScrollableController _playerSheetController = DraggableScrollableController();
+  double _playerSize = 0.12;
+  bool _dragFromHandle = false;
+  bool _showWelcome = false;
+  bool _welcomeChecked = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _initFirstLaunchAndLoad();
+  }
+
+  Future<void> _initFirstLaunchAndLoad() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool('tsmusic_welcome_done') ?? false;
+    if (!mounted) return;
+    setState(() {
+      _showWelcome = !done;
+      _welcomeChecked = true;
+    });
+    _loadMusic();
+  }
+
+  Future<void> _loadMusic() async {
+    final provider = context.read<music_provider.NewMusicProvider>();
+    await provider.loadLocalMusic();
+    if (provider.songs.isEmpty) {
+      debugPrint('No local music found on device.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
-    
+    final musicProvider = context.watch<music_provider.NewMusicProvider>();
+
+    if (!_welcomeChecked) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('TS Music'),
@@ -34,9 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const SearchScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
               );
             },
           ),
@@ -44,203 +76,202 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.settings),
             onPressed: widget.onSettingsTap,
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadMusic,
+          ),
         ],
       ),
-      body: Consumer<music_provider.NewMusicProvider>(
-        builder: (context, musicProvider, _) {
-          if (musicProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (musicProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error loading music',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    musicProvider.error!,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => musicProvider.loadLocalMusic(),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (musicProvider.songs.isEmpty) {
-            return Center(
+      body: Stack(
+        children: [
+          if (musicProvider.isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (musicProvider.songs.isEmpty)
+            Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.music_off, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  Text(
-                    'No music found',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('No music found', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Text(
-                    'Add some music files to your device and refresh',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  Text('Add some music files to your device and refresh', style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    onPressed: () => musicProvider.loadLocalMusic(),
+                    onPressed: _loadMusic,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Refresh'),
                   ),
                 ],
               ),
-            );
-          }
+            )
+          else
+            ListView.builder(
+              itemCount: musicProvider.songs.length,
+              padding: const EdgeInsets.only(bottom: 120),
+              itemBuilder: (context, index) {
+                final song = musicProvider.songs[index];
+                return ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(Icons.music_note),
+                  ),
+                  title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: Text(_formatDuration(song.duration)),
+                  onTap: () => musicProvider.playSong(song),
+                );
+              },
+            ),
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        // Sort button
-                        PopupMenuButton<music_provider.SongSortOption>(
-                          icon: Icon(Icons.sort, size: 20, color: Theme.of(context).primaryColor),
-                          tooltip: 'Sort by',
-                          onSelected: (option) {
-                            final isSameOption = musicProvider.currentSortOption == option;
-                            musicProvider.sortSongs(
-                              sortBy: option,
-                              ascending: isSameOption ? !musicProvider.sortAscending : true,
-                            );
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: music_provider.SongSortOption.title,
-                              child: const Text('Sort by Title'),
-                            ),
-                            PopupMenuItem(
-                              value: music_provider.SongSortOption.artist,
-                              child: const Text('Sort by Artist'),
-                            ),
-                            PopupMenuItem(
-                              value: music_provider.SongSortOption.duration,
-                              child: const Text('Sort by Duration'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Your Music (${musicProvider.songs.length})',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
+          if (_showWelcome)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('tsmusic_welcome_done', true);
+                  setState(() => _showWelcome = false);
+                  _loadMusic();
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: const Center(
+                    child: Text(
+                      'Welcome! Tap to load local music',
+                      style: TextStyle(color: Colors.white, fontSize: 20),
+                      textAlign: TextAlign.center,
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () => musicProvider.loadLocalMusic(),
-                      tooltip: 'Refresh music library',
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: musicProvider.songs.length,
-                  itemBuilder: (context, index) {
-                    final song = musicProvider.songs[index];
-                    return ListTile(
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Icon(Icons.music_note, size: 24),
-                      ),
-                      title: SizedBox(
-                        height: 24, // Same height as normal text
-                        child: song.title.length > 20
-                            ? LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final textPainter = TextPainter(
-                                    text: TextSpan(
-                                      text: song.title,
-                                      style: Theme.of(context).textTheme.titleMedium,
+            ),
+
+          Consumer<music_provider.NewMusicProvider>(
+            builder: (context, provider, _) {
+              final song = provider.currentSong;
+              if (song == null) return const SizedBox.shrink();
+
+              return NotificationListener<DraggableScrollableNotification>(
+                onNotification: (notification) {
+                  setState(() => _playerSize = notification.extent);
+                  return false;
+                },
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: DraggableScrollableSheet(
+                    controller: _playerSheetController,
+                    initialChildSize: 0.12,
+                    minChildSize: 0.12,
+                    maxChildSize: 1.0,
+                    snap: true,
+                    snapSizes: const [0.12, 0.5, 1.0],
+                    builder: (context, scrollController) {
+                      final theme = Theme.of(context);
+                      final bool isMini = _playerSize <= 0.15;
+                      final bool isMid = _playerSize > 0.15 && _playerSize < 1.0;
+                      final tProvider = context.watch<theme_provider.ThemeProvider>();
+                      final style = tProvider.playerStyle;
+                      final bool showSlider = style != theme_provider.PlayerStyle.minimal;
+                      final double artworkSize = style == theme_provider.PlayerStyle.compact ? 40 : 48;
+                      final EdgeInsets contentPadding = style == theme_provider.PlayerStyle.compact
+                          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                          : const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+
+                      return Material(
+                        elevation: 12,
+                        color: theme.colorScheme.surface,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        child: Container(
+                          padding: contentPadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Center(
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.translucent,
+                                  onPanDown: (_) => _dragFromHandle = true,
+                                  onPanEnd: (_) => _dragFromHandle = false,
+                                  onPanCancel: () => _dragFromHandle = false,
+                                  child: Container(
+                                    width: 36,
+                                    height: 4,
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: theme.dividerColor,
+                                      borderRadius: BorderRadius.circular(2),
                                     ),
-                                    maxLines: 1,
-                                    textDirection: TextDirection.ltr,
-                                  )..layout();
-                                  
-                                  final isTextWider = textPainter.width > constraints.maxWidth;
-                                  
-                                  return isTextWider
-                                      ? SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: Row(
-                                            children: [
-                                              Text(
-                                                song.title,
-                                                style: Theme.of(context).textTheme.titleMedium,
-                                              ),
-                                              const SizedBox(width: 20), // Add some space before repeating
-                                              Text(
-                                                song.title,
-                                                style: Theme.of(context).textTheme.titleMedium,
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : Text(
-                                          song.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.titleMedium,
-                                        );
-                                },
-                              )
-                            : Text(
-                                song.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                ),
                               ),
-                      ),
-                      subtitle: Text(
-                        song.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Text(
-                        _formatDuration(song.duration),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      onTap: () => musicProvider.playSong(song),
-                    );
-                  },
+                              InkWell(
+                                onTap: () {
+                                  if (_playerSheetController.size <= 0.15) {
+                                    _playerSheetController.animateTo(
+                                      0.5,
+                                      duration: const Duration(milliseconds: 220),
+                                      curve: Curves.easeOut,
+                                    );
+                                  }
+                                },
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: artworkSize,
+                                      height: artworkSize,
+                                      decoration: BoxDecoration(
+                                        color: theme.primaryColor.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.music_note),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          if (style != theme_provider.PlayerStyle.minimal)
+                                            Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(provider.isPlaying ? Icons.pause : Icons.play_arrow),
+                                      onPressed: () => provider.isPlaying ? provider.pause() : provider.play(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (showSlider)
+                                Slider(
+                                  value: provider.position.inSeconds.toDouble().clamp(0.0, provider.duration.inSeconds.toDouble()),
+                                  max: provider.duration.inSeconds.toDouble(),
+                                  onChanged: (v) => provider.seek(Duration(seconds: v.toInt())),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              );
+            },
+          ),
+        ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _playerSheetController.dispose();
+    super.dispose();
   }
 
   String _formatDuration(int durationMs) {
@@ -249,21 +280,5 @@ class _HomeScreenState extends State<HomeScreen> {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
-  }
-  
-  String _getSortLabel(music_provider.NewMusicProvider musicProvider) {
-    final sortOption = musicProvider.currentSortOption;
-    final arrow = musicProvider.sortAscending ? '↑' : '↓';
-    
-    switch (sortOption) {
-      case music_provider.SongSortOption.title:
-        return 'Title $arrow';
-      case music_provider.SongSortOption.artist:
-        return 'Artist $arrow';
-      case music_provider.SongSortOption.duration:
-        return 'Duration $arrow';
-      case music_provider.SongSortOption.dateAdded:
-        return 'Date Added $arrow';
-    }
   }
 }

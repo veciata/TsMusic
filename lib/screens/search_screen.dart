@@ -21,12 +21,18 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isSearchingYouTube = false;
   Timer? _debounceTimer;
   String? _loadingYouTubeId;
+  // Infinite scroll state
+  final ScrollController _searchScrollController = ScrollController();
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String _lastQuery = '';
 
   @override
   void initState() {
     super.initState();
     _youTubeService = context.read<YouTubeService>();
     _searchFocusNode.requestFocus();
+    _searchScrollController.addListener(_onScroll);
   }
 
   @override
@@ -34,6 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _searchScrollController.dispose();
     // Don't dispose the YouTube service here - it's managed at the app level
     super.dispose();
   }
@@ -135,13 +142,21 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {
           _youtubeResults.clear();
           _isSearchingYouTube = false;
+          _isLoadingMore = false;
+          _hasMore = true;
+          _lastQuery = '';
         });
       }
       return;
     }
 
     if (mounted) {
-      setState(() => _isSearchingYouTube = true);
+      setState(() {
+        _isSearchingYouTube = true;
+        _isLoadingMore = false;
+        _hasMore = true;
+        _lastQuery = query;
+      });
     }
 
     try {
@@ -171,6 +186,41 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) {
         setState(() => _isSearchingYouTube = false);
       }
+    }
+  }
+
+  void _onScroll() {
+    if (!_hasMore || _isLoadingMore || _isSearchingYouTube) return;
+    if (_lastQuery.isEmpty) return;
+    if (!_searchScrollController.hasClients) return;
+    final position = _searchScrollController.position;
+    const threshold = 300.0; // px before bottom
+    if (position.pixels >= position.maxScrollExtent - threshold) {
+      _loadMoreYouTube();
+    }
+  }
+
+  Future<void> _loadMoreYouTube() async {
+    if (_isLoadingMore || !_hasMore || _lastQuery.isEmpty) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final more = await _youTubeService.searchAudioNextPage(_lastQuery);
+      if (!mounted) return;
+      if (more.isEmpty) {
+        setState(() {
+          _hasMore = false;
+          _isLoadingMore = false;
+        });
+        return;
+      }
+      setState(() {
+        _youtubeResults.addAll(more);
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingMore = false);
+      debugPrint('Error loading more YouTube results: $e');
     }
   }
 
@@ -385,6 +435,20 @@ class _SearchScreenState extends State<SearchScreen> {
                             ? 'Pause'
                             : 'Play',
                       ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: Icon(
+                          isDownloaded
+                              ? Icons.check_circle
+                              : (downloadProgress != null ? Icons.downloading : Icons.download),
+                        ),
+                        onPressed: isDownloaded || downloadProgress != null
+                            ? null
+                            : () => _handleDownload(audio),
+                        tooltip: isDownloaded
+                            ? 'Downloaded'
+                            : (downloadProgress != null ? 'Downloading…' : 'Download'),
+                      ),
                     ],
                     // Keep trailing compact: download/cancel controls are shown in subtitle
                   ],
@@ -513,6 +577,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 }
 
                 return ListView(
+                  controller: _searchScrollController,
                   children: [
                     // Local results
                     if (results.isNotEmpty) ...[
@@ -575,6 +640,11 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                       ),
                       _buildYouTubeResults(),
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
                     ],
                   ],
                 );

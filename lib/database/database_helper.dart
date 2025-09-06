@@ -32,6 +32,38 @@ class DatabaseHelper {
     return _database!;
   }
 
+  // Returns unique songs by (title, artist) case-insensitive to avoid duplicates
+  Future<List<Map<String, dynamic>>> getUniqueSongsWithArtist() async {
+    final db = await database;
+    return await db.rawQuery('''
+      WITH song_artist_first AS (
+        SELECT s.$columnId AS song_id,
+               s.title,
+               s.file_path,
+               s.duration,
+               a.$columnName AS artist,
+               ROW_NUMBER() OVER (PARTITION BY s.$columnId ORDER BY sa.artist_id) AS rn
+        FROM $tableSongs s
+        LEFT JOIN $tableSongArtist sa ON sa.song_id = s.$columnId
+        LEFT JOIN $tableArtists a ON a.$columnId = sa.artist_id
+      ),
+      normalized AS (
+        SELECT title, file_path, duration, COALESCE(artist, '') AS artist,
+               LOWER(TRIM(title)) AS norm_title,
+               LOWER(TRIM(COALESCE(artist, ''))) AS norm_artist
+        FROM song_artist_first
+        WHERE rn = 1 OR rn IS NULL
+      )
+      SELECT MIN(file_path) AS file_path,
+             MIN(title) AS title,
+             MIN(artist) AS artist,
+             MIN(duration) AS duration
+      FROM normalized
+      GROUP BY norm_title, norm_artist
+      ORDER BY title COLLATE NOCASE ASC
+    ''');
+  }
+
   DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
 
@@ -168,6 +200,27 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getSongs() async {
     final db = await database;
     return await db.query(tableSongs, orderBy: 'title');
+  }
+
+  // Returns songs with a primary artist (first linked artist) to simplify UI
+  Future<List<Map<String, dynamic>>> getSongsWithArtist() async {
+    final db = await database;
+    // Join songs with first artist relation (min artist_id per song_id)
+    return await db.rawQuery('''
+      SELECT s.$columnId as song_id,
+             s.title as title,
+             s.file_path as file_path,
+             s.duration as duration,
+             COALESCE(a.$columnName, '') as artist
+      FROM $tableSongs s
+      LEFT JOIN (
+        SELECT sa.song_id, MIN(sa.artist_id) as artist_id
+        FROM $tableSongArtist sa
+        GROUP BY sa.song_id
+      ) x ON x.song_id = s.$columnId
+      LEFT JOIN $tableArtists a ON a.$columnId = x.artist_id
+      ORDER BY s.title COLLATE NOCASE ASC
+    ''');
   }
 
   // Junction table methods
