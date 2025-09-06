@@ -14,9 +14,8 @@ import '../services/audio_notification_service.dart';
 import '../services/metadata_enrichment_service.dart';
 import '../database/database_helper.dart';
 
-// Add this extension for string manipulation
 extension StringExtension on String {
-  String trimAll() => this.trim().replaceAll(RegExp(r'\s+'), ' ');
+  String trimAll() => trim().replaceAll(RegExp(r'\s+'), ' ');
 }
 
 enum SongSortOption {
@@ -30,11 +29,8 @@ class NewMusicProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final MetadataEnrichmentService _enrichment = MetadataEnrichmentService();
   List<Song> _playlist = [];
-  List<Song> _songs = [];
   List<Song> _displayedSongs = [];
   List<Song> _filteredSongs = [];
-  List<Song> get songs => _displayedSongs;
-  List<Song> get filteredSongs => _filteredSongs;
   int _currentIndex = 0;
   bool _isLoading = false;
   String? _error;
@@ -43,16 +39,15 @@ class NewMusicProvider extends ChangeNotifier {
   StreamSubscription<Duration>? _positionSubscription;
   bool _isEnriching = false;
   int _enrichedCount = 0;
-  bool get isEnriching => _isEnriching;
-  int get enrichedCount => _enrichedCount;
-
-  // Shuffle / Repeat state
   bool _shuffleEnabled = false;
   LoopMode _loopMode = LoopMode.off;
+
+  List<Song> get songs => _displayedSongs;
+  List<Song> get filteredSongs => _filteredSongs;
+  bool get isEnriching => _isEnriching;
+  int get enrichedCount => _enrichedCount;
   bool get shuffleEnabled => _shuffleEnabled;
   LoopMode get loopMode => _loopMode;
-
-  // Notification service related
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
   Stream<bool> get playingStream => _audioPlayer.playingStream;
   bool get isPlaying => _audioPlayer.playing;
@@ -66,27 +61,26 @@ class NewMusicProvider extends ChangeNotifier {
       (_playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length)
           ? _currentIndex
           : null;
-  // Expose read-only queue for UI
   List<Song> get queue => List.unmodifiable(_playlist);
+  List<Song> get allSongs => _playlist;
+  List<Song> get youtubeSongs =>
+      _playlist.where((song) => song.hasTag('tsmusic')).toList();
+  SongSortOption get currentSortOption => _currentSortOption;
+  bool get sortAscending => _sortAscending;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  static const String _songsKey = 'cached_songs';
 
   NewMusicProvider() {
-    // Listen to position changes and notify listeners
-    _positionSubscription = _audioPlayer.positionStream.listen((position) {
+    _positionSubscription = _audioPlayer.positionStream.listen((_) {
       notifyListeners();
     });
-    // Initialize audio notification service with this provider's player
     AudioNotificationService.init(
       player: _audioPlayer,
-      onCurrentSongChanged: (song) {
-        // keep UI in sync when media item changes via notification
-        notifyListeners();
-      },
-      onPlaybackStateChanged: (isPlaying) {
-        notifyListeners();
-      },
+      onCurrentSongChanged: (_) => notifyListeners(),
+      onPlaybackStateChanged: (_) => notifyListeners(),
     );
-
-    // Keep internal state in sync if needed
     _audioPlayer.loopModeStream.listen((mode) {
       _loopMode = mode;
       notifyListeners();
@@ -95,8 +89,6 @@ class NewMusicProvider extends ChangeNotifier {
       _shuffleEnabled = enabled;
       notifyListeners();
     });
-
-    // Load songs from storage when provider is created
     _initialize();
   }
 
@@ -112,25 +104,13 @@ class NewMusicProvider extends ChangeNotifier {
     await loadSongsFromStorage();
   }
 
-  List<Song> get allSongs => _playlist;
-  List<Song> get youtubeSongs =>
-      _playlist.where((song) => song.hasTag('tsmusic')).toList();
-  SongSortOption get currentSortOption => _currentSortOption;
-  bool get sortAscending => _sortAscending;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
   Future<void> addSong(Song song) async {
-    // Check if song already exists by ID
     final existingIndex = _playlist.indexWhere((s) => s.id == song.id);
     if (existingIndex != -1) {
-      // Update existing song
       _playlist[existingIndex] = song;
     } else {
-      // Add new song
       _playlist.add(song);
     }
-
     _displayedSongs = List.from(_playlist);
     await _saveSongsToStorage();
     notifyListeners();
@@ -146,86 +126,40 @@ class NewMusicProvider extends ChangeNotifier {
     }
   }
 
-  // Refresh provider state from the SQLite database. If unique=true, de-duplicate by (title, artist).
-  Future<void> refreshFromDatabase({bool unique = true}) async {
-    try {
-      final db = DatabaseHelper();
-      final rows = unique
-          ? await db.getUniqueSongsWithArtist()
-          : await db.getSongsWithArtist();
-
-      final List<Song> dbSongs = rows.map((m) {
-        final title = (m['title'] ?? '').toString();
-        final artist = (m['artist'] ?? '').toString();
-        final filePath = (m['file_path'] ?? '').toString();
-        final duration = (m['duration'] ?? 0) as int;
-        return Song(
-          id: filePath.isNotEmpty ? filePath : title, // unique by path; fallback to title
-          title: title.isNotEmpty ? title : 'Unknown Title',
-          artist: artist.isNotEmpty ? artist : 'Unknown Artist',
-          album: null,
-          url: filePath,
-          duration: duration,
-        );
-      }).toList();
-
-      _playlist = List.from(dbSongs);
-      _displayedSongs = List.from(dbSongs);
-      _filteredSongs.clear();
-      _applySorting();
-      notifyListeners();
-    } catch (e) {
-      if (kDebugMode) {
-        print('refreshFromDatabase: failed: $e');
-      }
-    }
-  }
-
-  static const String _songsKey = 'cached_songs';
-
   Future<void> _saveSongsToStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final songsJson = _playlist.map((song) => song.toJson()).toList();
       await prefs.setString(_songsKey, jsonEncode(songsJson));
-    } catch (e) {
-      debugPrint('Error saving songs to storage: $e');
-      // Don't throw, as we don't want to break the app if saving fails
-    }
+    } catch (_) {}
   }
 
   Future<void> loadSongsFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final songsJson = prefs.getString(_songsKey);
-
       if (songsJson != null) {
         final List<dynamic> jsonList = jsonDecode(songsJson);
         _playlist = jsonList.map((json) => Song.fromJson(json)).toList();
         _displayedSongs = List.from(_playlist);
         notifyListeners();
       }
-    } catch (e) {
-      debugPrint('Error loading songs from storage: $e');
-      // If there's an error, start with an empty playlist
+    } catch (_) {
       _playlist = [];
       _displayedSongs = [];
     }
   }
 
-  // Favorites helpers
   bool isFavorite(String songId) {
     final idx = _playlist.indexWhere((s) => s.id == songId);
-    if (idx == -1) return false;
-    return _playlist[idx].isFavorite;
+    return idx != -1 && _playlist[idx].isFavorite;
   }
 
   Future<void> toggleFavorite(String songId) async {
     final idx = _playlist.indexWhere((s) => s.id == songId);
     if (idx == -1) return;
     final song = _playlist[idx];
-    final updated = song.copyWith(isFavorite: !song.isFavorite);
-    _playlist[idx] = updated;
+    _playlist[idx] = song.copyWith(isFavorite: !song.isFavorite);
     _displayedSongs = List.from(_playlist);
     await _saveSongsToStorage();
     notifyListeners();
@@ -233,45 +167,26 @@ class NewMusicProvider extends ChangeNotifier {
 
   Future<void> play() async {
     if (_playlist.isEmpty) return;
-
-    try {
-      // If no audio source is set, set it up
-      if (_audioPlayer.audioSource == null && currentSong != null) {
-        await _setAudioSource(currentSong!);
-      }
-      await _audioPlayer.play();
-      await _updateNotification();
-      notifyListeners();
-    } catch (e) {
-      _error = 'Error playing audio: $e';
-      notifyListeners();
+    if (_audioPlayer.audioSource == null && currentSong != null) {
+      await _setAudioSource(currentSong!);
     }
+    await _audioPlayer.play();
+    await _updateNotification();
+    notifyListeners();
   }
 
   Future<void> pause() async {
-    try {
-      await _audioPlayer.pause();
-      await _updateNotification();
-      notifyListeners();
-    } catch (e) {
-      _error = 'Error pausing audio: $e';
-      notifyListeners();
-    }
+    await _audioPlayer.pause();
+    await _updateNotification();
+    notifyListeners();
   }
 
-  // Stop playback completely
   Future<void> stop() async {
-    try {
-      await _audioPlayer.stop();
-      await _updateNotification();
-      notifyListeners();
-    } catch (e) {
-      _error = 'Failed to stop: $e';
-      notifyListeners();
-    }
+    await _audioPlayer.stop();
+    await _updateNotification();
+    notifyListeners();
   }
 
-  // Set the current song by index
   Future<void> setCurrentSong(Song song) async {
     final index = _playlist.indexWhere((s) => s.id == song.id);
     if (index != -1) {
@@ -281,12 +196,9 @@ class NewMusicProvider extends ChangeNotifier {
     }
   }
 
-  // Set audio source for playback
   Future<void> _setAudioSource(Song song) async {
     try {
-      final isRemote =
-          song.url.startsWith('http://') || song.url.startsWith('https://');
-      if (isRemote) {
+      if (song.url.startsWith('http')) {
         await _audioPlayer.setUrl(song.url);
       } else {
         await _audioPlayer.setFilePath(song.url);
@@ -299,37 +211,25 @@ class NewMusicProvider extends ChangeNotifier {
     }
   }
 
-  // Update the notification with current song info
   Future<void> _updateNotification() async {
     if (currentSong == null) return;
-
-    try {
-      final audioHandler = AudioNotificationService.audioHandler;
-      if (audioHandler != null) {
-        await audioHandler.setAudioSource(
-          AudioSource.uri(Uri.parse(currentSong!.url)),
-          song: currentSong,
-        );
-
-        if (_audioPlayer.playing) {
-          await audioHandler.play();
-        } else {
-          await audioHandler.pause();
-        }
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      await audioHandler.setAudioSource(
+        AudioSource.uri(Uri.parse(currentSong!.url)),
+        song: currentSong,
+      );
+      if (_audioPlayer.playing) {
+        await audioHandler.play();
+      } else {
+        await audioHandler.pause();
       }
-    } catch (e) {
-      debugPrint('Error updating notification: $e');
     }
   }
 
-  // Helper method to extract metadata from audio file
   Future<Map<String, String>> _extractMetadata(File file) async {
     try {
       final fileName = path.basenameWithoutExtension(file.path);
-
-      // Try different patterns in order of likelihood
-
-      // Pattern 1: "Artist - Title"
       if (fileName.contains(' - ')) {
         final parts = fileName.split(' - ');
         if (parts.length >= 2) {
@@ -340,8 +240,6 @@ class NewMusicProvider extends ChangeNotifier {
           };
         }
       }
-
-      // Pattern 2: "Title | Artist | Album"
       if (fileName.contains('|')) {
         final parts = fileName.split('|').map((s) => s.trimAll()).toList();
         if (parts.length >= 3) {
@@ -358,22 +256,16 @@ class NewMusicProvider extends ChangeNotifier {
           };
         }
       }
-
-      // Default: Use filename as title
       return {
         'title': fileName.trimAll(),
         'artist': 'Unknown Artist',
         'album': 'Unknown Album',
       };
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error extracting metadata from ${file.path}: $e');
-      }
+    } catch (_) {
       return {};
     }
   }
 
-  // Parse metadata from filename patterns
   Map<String, String> _parseMetadataFromFilename(String filePath) {
     final name = path.basenameWithoutExtension(filePath);
     final result = {
@@ -381,710 +273,406 @@ class NewMusicProvider extends ChangeNotifier {
       'artist': 'Unknown Artist',
       'album': 'Unknown Album',
     };
-
-    // Try different patterns in order of specificity
-
-    // Pattern 1: "Title | Artist | Album"
     if (name.contains('|')) {
       final parts = name.split('|').map((s) => s.trimAll()).toList();
       if (parts.length >= 3) {
-        return {
-          'title': parts[0],
-          'artist': parts[1],
-          'album': parts[2],
-        };
+        return {'title': parts[0], 'artist': parts[1], 'album': parts[2]};
       } else if (parts.length == 2) {
-        return {
-          'title': parts[0],
-          'artist': parts[1],
-          'album': 'Unknown Album',
-        };
+        return {'title': parts[0], 'artist': parts[1], 'album': 'Unknown Album'};
       }
     }
-
-    // Pattern 2: "Artist - Title"
     if (name.contains(' - ')) {
       final parts = name.split(' - ').map((s) => s.trimAll()).toList();
       if (parts.length >= 2) {
-        return {
-          'title': parts.sublist(1).join(' - '),
-          'artist': parts[0],
-          'album': 'Unknown Album',
-        };
+        return {'title': parts.sublist(1).join(' - '), 'artist': parts[0], 'album': 'Unknown Album'};
       }
     }
-
-    // Pattern 3: "Title - Artist"
-    if (name.contains(' - ')) {
-      final parts = name.split(' - ').map((s) => s.trimAll()).toList();
-      if (parts.length >= 2) {
-        return {
-          'title': parts[0],
-          'artist': parts.sublist(1).join(' - '),
-          'album': 'Unknown Album',
-        };
-      }
-    }
-
     return result;
   }
 
-  // Helper method to find music files in a directory
-  Future<List<FileSystemEntity>> _findMusicFiles(Directory dir) async {
-    final List<FileSystemEntity> files = [];
-    if (kDebugMode) {
-      print('Scanning directory: ${dir.path}');
-    }
-
-    try {
-      // First, check if directory exists
-      if (!await dir.exists()) {
-        if (kDebugMode) {
-          print('Directory does not exist: ${dir.path}');
-        }
-        return [];
-      }
-
-      final List<FileSystemEntity> entities =
-          await dir.list(recursive: true, followLinks: false).toList();
-      if (kDebugMode) {
-        print('Found ${entities.length} items in ${dir.path}');
-      }
-
-      for (var entity in entities) {
-        try {
-          if (entity is File) {
-            final path = entity.path.toLowerCase();
-            final ext = path.split('.').last;
-            if (['mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac'].contains(ext)) {
-              if (kDebugMode) {
-                print('Found music file: ${entity.path}');
-              }
-              files.add(entity);
-            }
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error processing entity ${entity.path}: $e');
-          }
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error scanning directory ${dir.path}: $e');
-      }
-    }
-    return files;
-  }
-
-  // Load local music files
-  Future<bool> loadLocalMusic() async {
-    if (_isLoading) {
-      if (kDebugMode) {
-        print('loadLocalMusic: Already loading, skipping');
-      }
-      return false;
-    }
-
+  // Method to load local music files
+  Future<void> loadLocalMusic() async {
+    if (_isLoading) return;
     _isLoading = true;
-    _error = null;
-    _playlist.clear();
-    _displayedSongs.clear();
-    _filteredSongs.clear();
     notifyListeners();
-
-    if (kDebugMode) {
-      print('loadLocalMusic: Starting music scan');
-    }
-
     try {
-      // Check storage permission
-      if (kDebugMode) {
-        print('loadLocalMusic: Checking storage permission');
-      }
-      final hasPermission = await _requestStoragePermission();
-      if (!hasPermission) {
-        _error = 'Storage permission is required to access your music files.';
-        _isLoading = false;
-        notifyListeners();
-        if (kDebugMode) {
-          print('loadLocalMusic: Storage permission denied');
-        }
-        return false;
-      }
-
-      if (kDebugMode) {
-        print('loadLocalMusic: Permission granted, starting directory scan');
-      }
-
-      // Scan only Music and Download roots (recursively scans all subfolders)
-      final List<Directory> directories = [
-        Directory('/storage/emulated/0/Music'),
-        Directory('/storage/emulated/0/Download'),
-        Directory('/sdcard/Music'),
-        Directory('/sdcard/Download'),
-      ];
-
-      if (kDebugMode) {
-        print('loadLocalMusic: Checking external storage directory');
-      }
-
-      // Add external storage directory if it exists (some devices map Music/Download under this tree)
-      final externalDir = await getExternalStorageDirectory();
-      if (externalDir != null) {
-        if (kDebugMode) {
-          print('loadLocalMusic: Found external storage directory: ${externalDir.path}');
-        }
-        directories.add(externalDir);
-      } else if (kDebugMode) {
-        print('loadLocalMusic: No external storage directory found');
-      }
-
-      if (kDebugMode) {
-        print(
-            'loadLocalMusic: Scanning ${directories.length} directories for music files');
-      }
-
-      // Process all directories in parallel
-      final List<FileSystemEntity> allMusicFiles = [];
-
-      for (var dir in directories) {
-        try {
-          if (await dir.exists()) {
-            if (kDebugMode) {
-              print('loadLocalMusic: Scanning directory: ${dir.path}');
-            }
-            final files = await _findMusicFiles(dir);
-            if (files.isNotEmpty) {
-              allMusicFiles.addAll(files);
-              if (kDebugMode) {
-                print(
-                    'loadLocalMusic: Found ${files.length} music files in ${dir.path}');
-              }
-            }
-          } else if (kDebugMode) {
-            print('loadLocalMusic: Directory does not exist: ${dir.path}');
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error scanning directory ${dir.path}: $e');
-          }
-        }
-      }
-
-      // Convert FileSystemEntity to Song objects with metadata extraction
-      final Set<String> uniquePaths = {}; // To avoid duplicates
-      _playlist = [];
-
-      // Process files one by one to handle async metadata extraction
-      for (final file in allMusicFiles) {
-        if (!uniquePaths.add(file.path)) continue; // Skip duplicates
-
-        try {
-          // Get metadata from file (if available)
-          final fileMetadata = await _extractMetadata(File(file.path));
-          // Parse metadata from filename as fallback
-          final filenameMetadata = _parseMetadataFromFilename(file.path);
-
-          // Use metadata if available, otherwise fall back to filename parsing
-          final title = fileMetadata['title']?.isNotEmpty == true
-              ? fileMetadata['title']!
-              : filenameMetadata['title']!;
-
-          final artist = fileMetadata['artist']?.isNotEmpty == true
-              ? fileMetadata['artist']!
-              : filenameMetadata['artist']!;
-
-          final album = fileMetadata['album']?.isNotEmpty == true
-              ? fileMetadata['album']!
-              : filenameMetadata['album']!;
-
-          _playlist.add(Song(
-            id: file.path,
-            title: title,
-            artist: artist,
-            album: album,
-            url: file.path,
-            duration: 0, // Will be updated later
-          ));
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error processing file ${file.path}: $e');
-          }
-          // Add with basic info if there's an error
-          _playlist.add(Song(
-            id: file.path,
-            title: path.basenameWithoutExtension(file.path),
-            artist: 'Unknown Artist',
-            album: 'Unknown Album',
-            url: file.path,
-            duration: 0,
-          ));
-        }
-      }
-
-      if (kDebugMode) {
-        print('loadLocalMusic: Found ${_playlist.length} unique music files');
-      }
-
-      if (kDebugMode) {
-        print(
-            'loadLocalMusic: After deduplication, ${_playlist.length} unique files');
-      }
-
-      // Load durations in the background
-      if (_playlist.isNotEmpty) {
-        if (kDebugMode) {
-          print('loadLocalMusic: Starting background duration loading');
-        }
-        _loadDurationsInBackground();
-      } else if (kDebugMode) {
-        print('loadLocalMusic: No music files found to load durations for');
-      }
-
-      // At this point, _playlist contains the scan results.
-      // Sync them into the SQL database, then refresh UI from DB as the single source of truth.
-      try {
-        if (kDebugMode) {
-          print('loadLocalMusic: Syncing ${_playlist.length} songs to database');
-        }
-        await DatabaseHelper().syncMusicLibrary(this);
-        if (kDebugMode) {
-          print('loadLocalMusic: Refreshing songs from database');
-        }
-        await refreshFromDatabase(unique: true);
-      } catch (e) {
-        if (kDebugMode) {
-          print('loadLocalMusic: Database sync failed: $e');
-        }
-        // Fall back to in-memory list if DB fails
-        _applySorting();
-        notifyListeners();
-      }
-      return true;
-    } catch (e) {
-      _error = 'Failed to load music: $e';
-      return false;
+      await scanLocalMusic();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  void _addSong(Song song) {
-    if (!_playlist.any((s) => s.id == song.id)) {
-      _playlist.add(song);
-      _applySorting();
-      notifyListeners();
-    }
-  }
-
-  void filterSongs(String query) {
-    if (query.isEmpty) {
-      _filteredSongs.clear();
-    } else {
-      final searchQuery = query.toLowerCase();
-      _filteredSongs = _playlist.where((song) {
-        return song.title.toLowerCase().contains(searchQuery) ||
-            song.artist.toLowerCase().contains(searchQuery);
-      }).toList();
-    }
-    notifyListeners();
-  }
-
-  void clearSearch() {
-    _filteredSongs.clear();
-    notifyListeners();
-  }
-
-  void sortSongs({required SongSortOption sortBy, bool ascending = true}) {
-    _currentSortOption = sortBy;
-    _sortAscending = ascending;
-    _applySorting();
-    notifyListeners();
-  }
-
-  void _applySorting() {
-    _displayedSongs = List<Song>.from(_playlist);
-
-    _displayedSongs.sort((a, b) {
-      int comparison;
-
-      switch (_currentSortOption) {
-        case SongSortOption.title:
-          comparison = a.title.toLowerCase().compareTo(b.title.toLowerCase());
-          break;
-        case SongSortOption.artist:
-          comparison = a.artist.toLowerCase().compareTo(b.artist.toLowerCase());
-          break;
-        case SongSortOption.duration:
-          comparison = a.duration.compareTo(b.duration);
-          break;
-        case SongSortOption.dateAdded:
-          // Assuming we have a dateAdded field in the Song model
-          // If not, we can use the file's last modified date
-          comparison = 0; // Default to no change if dateAdded is not available
-          break;
-      }
-
-      return _sortAscending ? comparison : -comparison;
-    });
-  }
-
-  // Play a song
-  Future<void> playSong(Song song) async {
+  /// Scans for music files in common directories
+  Future<void> scanLocalMusic() async {
     try {
-      // Ensure the song exists in the playlist and set current index
-      var index = _playlist.indexWhere((s) => s.id == song.id);
-      if (index == -1) {
-        _playlist.add(song);
-        _displayedSongs = List.from(_playlist);
-        index = _playlist.length - 1;
+      // Clear existing playlist to avoid duplicates
+      _playlist.clear();
+      _displayedSongs.clear();
+      _filteredSongs.clear();
+      
+      // Get all possible external storage directories
+      final List<Directory> dirs = [];
+      
+      // Add standard music directories
+      final musicDirs = await getExternalStorageDirectories(type: StorageDirectory.music);
+      if (musicDirs != null) {
+        dirs.addAll(musicDirs);
       }
-      _currentIndex = index;
-
-      // Set audio source based on URL type and start playback
-      await _setAudioSource(song);
-      await _audioPlayer.play();
-      await _updateNotification();
+      
+      // Add downloads directory
+      final downloadDirs = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+      if (downloadDirs != null) {
+        dirs.addAll(downloadDirs.where((dir) => !dirs.any((d) => d.path == dir.path)));
+      }
+      
+      // Add root of external storage
+      final externalStorage = await getExternalStorageDirectory();
+      if (externalStorage != null && !dirs.any((d) => d.path == externalStorage.path)) {
+        dirs.add(Directory(externalStorage.path));
+      }
+      
+      // Add common music directories
+      final commonMusicDirs = [
+        '/storage/emulated/0/Music',
+        '/storage/emulated/0/Download',
+        '/storage/emulated/0/Media/Music',
+        '/storage/emulated/0/Media/Audio',
+        '/storage/emulated/0/audio',
+      ];
+      
+      for (final path in commonMusicDirs) {
+        final dir = Directory(path);
+        if (await dir.exists() && !dirs.any((d) => d.path == dir.path)) {
+          dirs.add(dir);
+        }
+      }
+      
+      debugPrint('Scanning in ${dirs.length} directories for music files...');
+      
+      // Process each directory sequentially to avoid overwhelming the system
+      for (final dir in dirs) {
+        await _processDirectory(dir);
+      }
+      
+      // Deduplicate songs by path
+      final uniqueSongs = <String, Song>{};
+      for (final song in _playlist) {
+        uniqueSongs[song.id] = song;
+      }
+      
+      _playlist = uniqueSongs.values.toList();
+      _displayedSongs = List.from(_playlist);
+      _filteredSongs = List.from(_playlist);
+      
+      debugPrint('Finished scanning. Found ${_playlist.length} unique music files.');
+      
+      // Save the updated playlist
+      await _saveSongsToStorage();
+      
+      // Notify listeners after all processing is complete
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to play song: $e';
+      debugPrint('Error during music scan: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
+  
+  /// Processes a single directory for music files
+  Future<void> _processDirectory(Directory dir) async {
+    try {
+      if (!await dir.exists()) {
+        debugPrint('Directory does not exist: ${dir.path}');
+        return;
+      }
+      
+      debugPrint('Scanning directory: ${dir.path}');
+      
+      // Get all music files in this directory
+      final files = await _findMusicFiles(dir);
+      
+      if (files.isEmpty) {
+        debugPrint('No music files found in ${dir.path}');
+        return;
+      }
+      
+      debugPrint('Found ${files.length} music files in ${dir.path}');
+      
+      // Process files in smaller batches to avoid overwhelming the system
+      const batchSize = 5;
+      int processedCount = 0;
+      
+      for (var i = 0; i < files.length; i += batchSize) {
+        // Check if we should stop processing
+        if (_isLoading == false) {
+          debugPrint('Scan cancelled by user');
+          break;
+        }
+        
+        final batch = files.sublist(
+          i, 
+          i + batchSize > files.length ? files.length : i + batchSize
+        );
+        
+        // Process batch
+        await Future.wait(batch.map((file) async {
+          try {
+            // Skip if already in playlist (check by path)
+            if (_playlist.any((song) => song.id == file.path)) {
+              debugPrint('Skipping duplicate: ${file.path}');
+              return;
+            }
+            
+            // Extract metadata
+            final metadata = await _extractMetadata(File(file.path));
+            
+            // Create song object
+            final song = Song(
+              id: file.path,
+              title: (metadata['title'] as String?)?.trim() ?? path.basenameWithoutExtension(file.path),
+              artist: (metadata['artist'] as String?)?.trim() ?? 'Unknown Artist',
+              album: (metadata['album'] as String?)?.trim() ?? 'Unknown Album',
+              url: file.path,
+              duration: 0, // Will be updated when played
+            );
+            
+            // Add to playlist
+            await addSong(song);
+            processedCount++;
+            
+            // Update progress every 10 files
+            if (processedCount % 10 == 0) {
+              debugPrint('Processed $processedCount files...');
+              notifyListeners();
+            }
+            
+          } catch (e) {
+            debugPrint('Error processing file ${file.path}: $e');
+          }
+        }));
+      }
+      
+      debugPrint('Processed $processedCount files from ${dir.path}');
+      
+    } catch (e) {
+      debugPrint('Error processing directory ${dir.path}: $e');
+    }
+  }
 
-  // Toggle play/pause
+  /// Recursively finds all music files in the given directory
+  Future<List<FileSystemEntity>> _findMusicFiles(Directory dir) async {
+    final List<FileSystemEntity> files = [];
+    if (!await dir.exists()) return [];
+    
+    try {
+      // Common music file extensions (unique set)
+      const musicExtensions = {
+        // Audio formats
+        'mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac', 'aiff', 'alac', 'opus',
+        'wma', 'wv', 'ape', 'mka', 'm4b', 'm4p', 'mp4', 'm4r', 'aa',
+        'aax', 'dsf', 'mpc', 'mpp', 'oga',
+        // Less common formats
+        '3gp', 'aa3', 'aif', 'aifc', 'amr', 'awb', 'dff', 'dts', 'gsm',
+        'm3u', 'mid', 'midi', 'mogg', 'ra', 'ram', 'rm', 'snd', 'vox'
+      };
+      
+      // Skip system directories that are unlikely to contain music
+      final skipDirs = {'android', 'data', 'obb', 'system', 'cache', 'temp', 'tmp', 'lost+found'};
+      
+      // Process directory contents
+      final lister = dir.list(recursive: true, followLinks: false);
+      
+      await for (FileSystemEntity entity in lister) {
+        try {
+          if (entity is File) {
+            final path = entity.path.toLowerCase();
+            
+            // Skip files in system directories
+            if (path.split(Platform.pathSeparator).any((part) => skipDirs.contains(part.toLowerCase()))) {
+              continue;
+            }
+            
+            // Check file extension
+            final ext = path.split('.').last;
+            if (musicExtensions.contains(ext)) {
+              files.add(entity);
+            }
+          }
+        } catch (e) {
+          debugPrint('Error processing ${entity.path}: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error scanning directory ${dir.path}: $e');
+    }
+    
+    return files;
+  }
+
+  Future<void> seek(Duration position) async {
+    await _audioPlayer.seek(position);
+    notifyListeners();
+  }
+
+  void cycleRepeatMode() {
+    switch (_loopMode) {
+      case LoopMode.off:
+        setLoopMode(LoopMode.all);
+        break;
+      case LoopMode.all:
+        setLoopMode(LoopMode.one);
+        break;
+      case LoopMode.one:
+        setLoopMode(LoopMode.off);
+        break;
+    }
+  }
+
+  void setLoopMode(LoopMode mode) {
+    _loopMode = mode;
+    _audioPlayer.setLoopMode(mode);
+    notifyListeners();
+  }
+
+  void toggleShuffle() {
+    _shuffleEnabled = !_shuffleEnabled;
+    _audioPlayer.setShuffleModeEnabled(_shuffleEnabled);
+    notifyListeners();
+  }
+
+  Future<void> clearQueue() async {
+    _playlist.clear();
+    _displayedSongs.clear();
+    _filteredSongs.clear();
+    _currentIndex = 0;
+    await _saveSongsToStorage();
+    notifyListeners();
+  }
+
+  void moveInQueue(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _playlist.length) return;
+    if (newIndex < 0 || newIndex >= _playlist.length) return;
+    final song = _playlist.removeAt(oldIndex);
+    _playlist.insert(newIndex, song);
+    notifyListeners();
+  }
+
+  Future<void> playAt(int index) async {
+    if (index < 0 || index >= _playlist.length) return;
+    _currentIndex = index;
+    await _setAudioSource(_playlist[_currentIndex]);
+    await _audioPlayer.play();
+    notifyListeners();
+  }
+
+  Future<void> removeFromQueue(int index) async {
+    if (index < 0 || index >= _playlist.length) return;
+    _playlist.removeAt(index);
+    await _saveSongsToStorage();
+    notifyListeners();
+  }
+
+  Future<Song> enrichSongMetadata(Song song) async {
+    _isEnriching = true;
+    notifyListeners();
+    final result = await _enrichment.enrichSong(song);
+    if (result != null) {
+      updateSong(result.updatedSong);
+      return result.updatedSong;
+    }
+    _enrichedCount++;
+    _isEnriching = false;
+    notifyListeners();
+    return song;
+  }
+
+  // Play the next song in the queue
+  Future<void> next() async {
+    if (_playlist.isEmpty) return;
+    _currentIndex = (_currentIndex + 1) % _playlist.length;
+    await _setAudioSource(_playlist[_currentIndex]);
+    await _audioPlayer.play();
+    await _updateNotification();
+    notifyListeners();
+  }
+
+  // Play the previous song in the queue
+  Future<void> previous() async {
+    if (_playlist.isEmpty) return;
+    _currentIndex = (_currentIndex - 1) % _playlist.length;
+    if (_currentIndex < 0) _currentIndex = _playlist.length - 1;
+    await _setAudioSource(_playlist[_currentIndex]);
+    await _audioPlayer.play();
+    await _updateNotification();
+    notifyListeners();
+  }
+
+  // Toggle play/pause state
   Future<void> togglePlayPause() async {
     if (_audioPlayer.playing) {
       await _audioPlayer.pause();
     } else {
       await _audioPlayer.play();
     }
+    await _updateNotification();
     notifyListeners();
   }
 
-  // Request storage permission
-  Future<bool> _requestStoragePermission() async {
-    if (kDebugMode) {
-      print('_requestStoragePermission: Starting permission request');
-    }
-
-    Permission permission;
-    if (Platform.isAndroid) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
-      final sdkInt = androidInfo.version.sdkInt;
-
-      if (sdkInt >= 33) {
-        // Android 13+ needs READ_MEDIA_AUDIO
-        permission = Permission.audio;
-        if (kDebugMode) {
-          print(
-              '_requestStoragePermission: Android 13+ detected, using READ_MEDIA_AUDIO');
-        }
-      } else if (sdkInt >= 29) {
-        // Android 10-12 needs READ_EXTERNAL_STORAGE
-        permission = Permission.storage;
-        if (kDebugMode) {
-          print(
-              '_requestStoragePermission: Android 10-12 detected, using READ_EXTERNAL_STORAGE');
-        }
-      } else {
-        // Android 9 and below needs both READ and WRITE
-        permission = Permission.storage;
-        if (kDebugMode) {
-          print(
-              '_requestStoragePermission: Android 9 or below detected, using READ/WRITE_EXTERNAL_STORAGE');
-        }
-      }
-    } else {
-      // For non-Android platforms, use storage permission
-      permission = Permission.storage;
-    }
-
-    // Check if we already have permission
-    var status = await permission.status;
-    if (kDebugMode) {
-      print('_requestStoragePermission: Current permission status: $status');
-    }
-
-    // If permission is already granted, return true
-    if (status.isGranted) {
-      if (kDebugMode) {
-        print('_requestStoragePermission: Permission already granted');
-      }
-      return true;
-    }
-
-    // If permission is permanently denied, open app settings
-    if (status.isPermanentlyDenied) {
-      if (kDebugMode) {
-        print(
-            '_requestStoragePermission: Permission permanently denied, opening app settings');
-      }
-      _error =
-          'Storage permission is required to access music files. Please enable it in app settings.';
-      notifyListeners();
-      await openAppSettings();
-      return false;
-    }
-
-    // Request the permission
-    if (kDebugMode) {
-      print('_requestStoragePermission: Requesting permission');
-    }
-    status = await permission.request();
-
-    if (kDebugMode) {
-      print('_requestStoragePermission: Permission request result: $status');
-    }
-
-    // Check the result
-    if (status.isGranted) {
-      if (kDebugMode) {
-        print('_requestStoragePermission: Permission granted after request');
-      }
-      return true;
-    } else if (status.isPermanentlyDenied) {
-      if (kDebugMode) {
-        print(
-            '_requestStoragePermission: Permission permanently denied after request');
-      }
-      _error =
-          'Storage permission is required to access music files. Please enable it in app settings.';
-      notifyListeners();
-      await openAppSettings();
-    } else {
-      if (kDebugMode) {
-        print('_requestStoragePermission: Permission denied');
-      }
-      _error = 'Storage permission is required to access music files.';
-      notifyListeners();
-    }
-
-    return status.isGranted;
-  }
-
-  /// Enrich songs with unknown/empty artist using MusicBrainz and persist to DB
-  Future<void> enrichUnknownArtists() async {
-    if (_isEnriching) return;
-    _isEnriching = true;
-    _enrichedCount = 0;
-    notifyListeners();
-
-    try {
-      // Define unknown heuristics
-      bool isUnknown(String? a) {
-        if (a == null) return true;
-        final t = a.trim().toLowerCase();
-        return t.isEmpty || t == 'unknown' || t == 'unknown artist';
-      }
-
-      for (var i = 0; i < _playlist.length; i++) {
-        final s = _playlist[i];
-        if (!isUnknown(s.artist)) continue;
-
-        try {
-          final result = await _enrichment.enrichSong(s);
-          if (result != null && result.updatedSong.artist.trim().isNotEmpty) {
-            final enriched = result.updatedSong;
-            // Update in memory
-            _playlist[i] = enriched;
-            _displayedSongs = List.from(_playlist);
-
-            // Persist JSON cache
-            await _saveSongsToStorage();
-
-            // Update DB relations
-            await DatabaseHelper().updateSongMetadataByFilePath(
-              filePath: enriched.url,
-              title: enriched.title,
-              artistName: enriched.artist,
-              album: enriched.album,
-              genreName: result.genreName,
-            );
-
-            _enrichedCount++;
-            // Notify occasionally to update any UI
-            if (_enrichedCount % 3 == 0) {
-              notifyListeners();
-            }
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Enrichment failed for ${s.title}: $e');
-          }
-        }
-      }
-    } finally {
-      _isEnriching = false;
+  // Load and play a specific song from the playlist
+  Future<void> playSong(Song song) async {
+    final index = _playlist.indexWhere((s) => s.id == song.id);
+    if (index != -1) {
+      _currentIndex = index;
+      await _setAudioSource(song);
+      await _audioPlayer.play();
+      await _updateNotification();
       notifyListeners();
     }
   }
 
-  // Seek to a specific position in the current track
-  Future<void> seek(Duration position) async {
-    try {
-      await _audioPlayer.seek(position);
-      notifyListeners();
-    } catch (e) {
-      _error = 'Failed to seek: $e';
-      notifyListeners();
-    }
-  }
-
-  // Play the previous track in the playlist
-  Future<void> previous() async {
-    if (_playlist.isEmpty) return;
-
-    _currentIndex = (_currentIndex - 1) % _playlist.length;
-    if (_currentIndex < 0) {
-      _currentIndex = _playlist.length - 1;
-    }
-
-    await playSong(_playlist[_currentIndex]);
-  }
-
-  // Play the next track in the playlist
-  Future<void> next() async {
-    if (_playlist.isEmpty) return;
-    if (_shuffleEnabled && _playlist.length > 1) {
-      final rnd = Random();
-      int nextIndex;
-      do {
-        nextIndex = rnd.nextInt(_playlist.length);
-      } while (nextIndex == _currentIndex);
-      _currentIndex = nextIndex;
-    } else {
-      _currentIndex = (_currentIndex + 1) % _playlist.length;
-    }
-    await playSong(_playlist[_currentIndex]);
-  }
-
-  // Toggle shuffle mode
-  Future<void> toggleShuffle() async {
-    _shuffleEnabled = !_shuffleEnabled;
-    await _audioPlayer.setShuffleModeEnabled(_shuffleEnabled);
-    notifyListeners();
-  }
-
-  // Cycle repeat mode: off -> all -> one -> off
-  Future<void> cycleRepeatMode() async {
-    if (_loopMode == LoopMode.off) {
-      _loopMode = LoopMode.all;
-    } else if (_loopMode == LoopMode.all) {
-      _loopMode = LoopMode.one;
-    } else {
-      _loopMode = LoopMode.off;
-    }
-    await _audioPlayer.setLoopMode(_loopMode);
-    notifyListeners();
-  }
-
-  // Clear entire queue
-  Future<void> clearQueue() async {
-    _playlist.clear();
-    _displayedSongs = [];
-    _currentIndex = 0;
-    await stop();
-    notifyListeners();
-  }
-
-  // Play item at a specific index in the queue
-  Future<void> playAt(int index) async {
-    if (index < 0 || index >= _playlist.length) return;
-    _currentIndex = index;
-    await playSong(_playlist[_currentIndex]);
-  }
-
-  // Remove an item from the queue
-  Future<void> removeFromQueue(int index) async {
-    if (index < 0 || index >= _playlist.length) return;
-    final removingCurrent = index == _currentIndex;
-    _playlist.removeAt(index);
-
-    if (_playlist.isEmpty) {
-      _currentIndex = 0;
-      await stop();
-      _displayedSongs = [];
-      notifyListeners();
-      return;
-    }
-
-    if (index < _currentIndex) {
-      _currentIndex -= 1;
-    } else if (removingCurrent) {
-      if (_currentIndex >= _playlist.length) {
-        _currentIndex = 0;
+  // Apply sorting to the current playlist
+  void sortSongs({required SongSortOption sortBy, bool ascending = true}) {
+    _currentSortOption = sortBy;
+    _sortAscending = ascending;
+    
+    _playlist.sort((a, b) {
+      int compare;
+      switch (sortBy) {
+        case SongSortOption.title:
+          compare = a.title.compareTo(b.title);
+          break;
+        case SongSortOption.artist:
+          compare = a.artist.compareTo(b.artist);
+          break;
+        case SongSortOption.duration:
+          compare = a.duration.compareTo(b.duration);
+          break;
+        case SongSortOption.dateAdded:
+          compare = 0; // Assuming all songs are added at the same time
+          break;
       }
-      await playSong(_playlist[_currentIndex]);
-    }
-
+      return ascending ? compare : -compare;
+    });
+    
     _displayedSongs = List.from(_playlist);
     notifyListeners();
   }
 
-  // Move an item within the queue (supports ReorderableListView)
-  void moveInQueue(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _playlist.length) return;
-    if (newIndex < 0 || newIndex > _playlist.length) return;
-    if (newIndex > oldIndex) newIndex -= 1; // ReorderableListView behavior
-
-    final moved = _playlist.removeAt(oldIndex);
-    _playlist.insert(newIndex, moved);
-
-    // Adjust current index
-    if (_currentIndex == oldIndex) {
-      _currentIndex = newIndex;
-    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
-      _currentIndex -= 1;
-    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
-      _currentIndex += 1;
+  // Filter songs based on search query
+  void filterSongs(String query) {
+    if (query.isEmpty) {
+      _displayedSongs = List.from(_playlist);
+    } else {
+      final lowerQuery = query.toLowerCase();
+      _displayedSongs = _playlist.where((song) {
+        return song.title.toLowerCase().contains(lowerQuery) ||
+               song.artist.toLowerCase().contains(lowerQuery) ||
+               (song.album?.toLowerCase().contains(lowerQuery) ?? false);
+      }).toList();
     }
-
-    _displayedSongs = List.from(_playlist);
     notifyListeners();
-  }
-
-  @override
-  Future<void> _loadDurationsInBackground() async {
-    // Process songs in chunks to avoid blocking the UI
-    const chunkSize = 10;
-    for (var i = 0; i < _playlist.length; i += chunkSize) {
-      final end =
-          (i + chunkSize < _playlist.length) ? i + chunkSize : _playlist.length;
-      final chunk = _playlist.sublist(i, end);
-
-      // Process each song in the current chunk
-      for (var song in chunk) {
-        try {
-          final file = File(song.url);
-          if (await file.exists()) {
-            final audioPlayer = AudioPlayer();
-            await audioPlayer.setFilePath(file.path);
-            final duration = audioPlayer.duration ?? Duration.zero;
-            await audioPlayer.dispose();
-
-            // Update the song duration
-            final index = _playlist.indexWhere((s) => s.id == song.id);
-            if (index != -1) {
-              _playlist[index] =
-                  song.copyWith(duration: duration.inMilliseconds);
-              // Notify listeners after each chunk is processed
-              if (index % 5 == 0) {
-                notifyListeners();
-              }
-            }
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error loading duration for ${song.title}: $e');
-          }
-        }
-      }
-
-      // Notify listeners after each chunk
-      notifyListeners();
-    }
   }
 }
