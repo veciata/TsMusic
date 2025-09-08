@@ -27,13 +27,24 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Listen to YouTubeService changes to update the UI when downloads are removed
+    _youTubeService = Provider.of<YouTubeService>(context, listen: false);
+    _youTubeService.addListener(_onDownloadsChanged);
   }
 
   @override
   void dispose() {
+    _youTubeService.removeListener(_onDownloadsChanged);
     _tabController.dispose();
     super.dispose();
   }
+
+  void _onDownloadsChanged() {
+    if (mounted) {
+      setState(() {}); // Trigger a rebuild when downloads change
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +93,29 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                trailing: download.cancelRequested
+                    ? const Padding(
+                        padding: EdgeInsets.only(right: 12.0),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                          ),
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.cancel, color: Colors.red),
+                        onPressed: () async {
+                          final youTubeService = Provider.of<YouTubeService>(
+                            context,
+                            listen: false,
+                          );
+                          await youTubeService.cancelDownload(download.videoId);
+                        },
+                        tooltip: 'Cancel download',
+                      ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -91,13 +125,29 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
                       minHeight: 4,
                       backgroundColor: Colors.grey[300],
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).primaryColor,
+                        download.cancelRequested 
+                            ? Colors.orange 
+                            : Theme.of(context).primaryColor,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${(download.progress * 100).toStringAsFixed(1)}%',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${(download.progress * 100).toStringAsFixed(1)}%',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (download.cancelRequested)
+                          Text(
+                            'Canceling...',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
                     ),
                     if (download.error != null) ...[
                       const SizedBox(height: 4),

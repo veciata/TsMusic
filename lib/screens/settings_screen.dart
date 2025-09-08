@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
@@ -172,20 +173,22 @@ class SettingsScreen extends StatelessWidget {
                 },
                 secondary: const Icon(Icons.dark_mode),
               ),
-              const Divider(height: 1),
-              ListTile(
-                title: const Text('Player Style'),
-                leading: const Icon(Icons.style),
-                trailing: Text(
-                  themeProvider.getPlayerStyleName(themeProvider.playerStyle),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                onTap: () {
-                  _showPlayerStyleDialog(context, themeProvider);
-                },
-              ),
+if (kDebugMode) ...[
+  const Divider(height: 1),
+  ListTile(
+    title: const Text('Player Style'),
+    leading: const Icon(Icons.style),
+    trailing: Text(
+      themeProvider.getPlayerStyleName(themeProvider.playerStyle),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    ),
+    onTap: () {
+      _showPlayerStyleDialog(context, themeProvider);
+    },
+  ),
+],
               const Divider(height: 1),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -214,7 +217,8 @@ class SettingsScreen extends StatelessWidget {
             children: [
               ListTile(
                 title: const Text('Version'),
-                subtitle: const Text('1.0.0'),
+                subtitle: Text(PackageInfoUtils.version),
+
                 leading: const Icon(Icons.info_outline),
                 onTap: () {
                   showAboutDialog(

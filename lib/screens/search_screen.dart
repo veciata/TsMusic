@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/new_music_provider.dart' as music_provider;
 import '../models/song.dart';
 import '../services/youtube_service.dart';
+import '../main.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -19,12 +20,12 @@ class _SearchScreenState extends State<SearchScreen> {
   late final YouTubeService _youTubeService;
   List<YouTubeAudio> _youtubeResults = [];
   bool _isSearchingYouTube = false;
+  bool _hasMoreYouTubeResults = true;
   Timer? _debounceTimer;
   String? _loadingYouTubeId;
-  // Infinite scroll state
+  final ScrollController _scrollController = ScrollController();
   final ScrollController _searchScrollController = ScrollController();
   bool _isLoadingMore = false;
-  bool _hasMore = true;
   String _lastQuery = '';
 
   @override
@@ -32,6 +33,7 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _youTubeService = context.read<YouTubeService>();
     _searchFocusNode.requestFocus();
+    _scrollController.addListener(_onScroll);
     _searchScrollController.addListener(_onScroll);
   }
 
@@ -40,94 +42,59 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _scrollController.dispose();
     _searchScrollController.dispose();
-    // Don't dispose the YouTube service here - it's managed at the app level
     super.dispose();
   }
 
   Future<void> _playAudio(YouTubeAudio audio) async {
-    try {
-      // Show loading spinner on the tapped item
-      if (mounted) {
-        setState(() => _loadingYouTubeId = audio.id);
-      }
+    if (!mounted) return;
+    setState(() => _loadingYouTubeId = audio.id);
 
-      // Get the streaming URL
-      final streamUrl = await _youTubeService.getStreamUrl(audio.id);
+    final streamUrl = await _youTubeService.getStreamUrl(audio.id);
+    if (streamUrl != null && mounted) {
+      final musicProvider =
+          Provider.of<music_provider.NewMusicProvider>(context, listen: false);
 
-      if (streamUrl != null) {
-        final musicProvider = Provider.of<music_provider.NewMusicProvider>(
-          context,
-          listen: false,
-        );
+      final tempSong = Song(
+        id: 'temp_${audio.id}',
+        title: audio.title,
+        artist: audio.author,
+        album: 'YouTube Audio',
+        url: streamUrl,
+        duration: audio.duration?.inMilliseconds ?? 0,
+        isDownloaded: false,
+      );
 
-        // Create a temporary song for playback
-        final tempSong = Song(
-          id: 'temp_${audio.id}',
-          title: audio.title,
-          artist: audio.author,
-          album: 'YouTube Audio',
-          url: streamUrl,
-          duration: audio.duration?.inMilliseconds ?? 0,
-          isDownloaded: false,
-        );
+      musicProvider.playSong(tempSong);
 
-        // Play the audio
-        musicProvider.playSong(tempSong);
-        
-        // Clear per-item loading when playback starts
-        if (mounted) {
-          setState(() => _loadingYouTubeId = null);
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not load audio')),
-          );
-          setState(() => _loadingYouTubeId = null);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error playing audio')),
-        );
-        setState(() => _loadingYouTubeId = null);
-      }
+      if (mounted) setState(() => _loadingYouTubeId = null);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load audio')),
+      );
+      setState(() => _loadingYouTubeId = null);
     }
   }
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
-    final youTubeService = context.read<YouTubeService>();
-
-    // Check if already downloading
     final isDownloading =
-        youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
-    if (isDownloading) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download already in progress')),
-        );
-      }
+        _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
+    if (isDownloading && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download already in progress')),
+      );
       return;
     }
 
-    // Start download
     try {
-      // Start download - the YouTubeService will handle progress tracking
-      await _youTubeService.downloadAudio(
-        audio.id,
-        context: context,
-      );
-
-      // Show success message
+      await _youTubeService.downloadAudio(audio.id, context: context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download started: ${audio.title}')),
         );
       }
     } catch (e) {
-      debugPrint('Download error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download failed: $e')),
@@ -136,91 +103,86 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _searchYouTube(String query) async {
+  Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
     if (query.isEmpty) {
       if (mounted) {
         setState(() {
           _youtubeResults.clear();
           _isSearchingYouTube = false;
-          _isLoadingMore = false;
-          _hasMore = true;
-          _lastQuery = '';
+          _hasMoreYouTubeResults = true;
         });
       }
       return;
     }
 
-    if (mounted) {
-      setState(() {
-        _isSearchingYouTube = true;
-        _isLoadingMore = false;
-        _hasMore = true;
-        _lastQuery = query;
-      });
-    }
+    if (loadMore && (_isSearchingYouTube || !_hasMoreYouTubeResults)) return;
+
+    if (mounted) setState(() => _isSearchingYouTube = true);
 
     try {
-      debugPrint('🔍 [SearchScreen] Searching YouTube for: "$query"');
-      final results = await _youTubeService.searchAudio(query);
-      debugPrint('✅ [SearchScreen] Received ${results.length} results');
+      final List<YouTubeAudio> response = await _youTubeService.searchAudio(query);
 
       if (mounted) {
-        setState(() => _youtubeResults = results);
+        setState(() {
+          if (loadMore) {
+            _youtubeResults.addAll(response);
+          } else {
+            _youtubeResults = response;
+          }
+          _hasMoreYouTubeResults = response.isNotEmpty;
+          _lastQuery = query;
+        });
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ [SearchScreen] Error searching YouTube: $e');
-      debugPrint('📜 [SearchScreen] Stack trace: $stackTrace');
-
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Error searching YouTube'),
             action: SnackBarAction(
               label: 'Retry',
-              onPressed: () => _searchYouTube(query),
+              onPressed: () => _searchYouTube(query, loadMore: loadMore),
             ),
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSearchingYouTube = false);
-      }
-    }
-  }
-
-  void _onScroll() {
-    if (!_hasMore || _isLoadingMore || _isSearchingYouTube) return;
-    if (_lastQuery.isEmpty) return;
-    if (!_searchScrollController.hasClients) return;
-    final position = _searchScrollController.position;
-    const threshold = 300.0; // px before bottom
-    if (position.pixels >= position.maxScrollExtent - threshold) {
-      _loadMoreYouTube();
+      if (mounted) setState(() => _isSearchingYouTube = false);
     }
   }
 
   Future<void> _loadMoreYouTube() async {
-    if (_isLoadingMore || !_hasMore || _lastQuery.isEmpty) return;
+    if (_isLoadingMore || !_hasMoreYouTubeResults || _lastQuery.isEmpty) return;
     setState(() => _isLoadingMore = true);
+
     try {
-      final more = await _youTubeService.searchAudioNextPage(_lastQuery);
+      final List<YouTubeAudio> more = await _youTubeService.searchAudioNextPage(_lastQuery);
       if (!mounted) return;
+
       if (more.isEmpty) {
         setState(() {
-          _hasMore = false;
+          _hasMoreYouTubeResults = false;
           _isLoadingMore = false;
         });
         return;
       }
+
       setState(() {
         _youtubeResults.addAll(more);
         _isLoadingMore = false;
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoadingMore = false);
-      debugPrint('Error loading more YouTube results: $e');
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+
+    const threshold = 300.0;
+    final position = _scrollController.position;
+
+    if (position.pixels >= position.maxScrollExtent - threshold) {
+      _loadMoreYouTube();
     }
   }
 
@@ -230,234 +192,112 @@ class _SearchScreenState extends State<SearchScreen> {
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
 
-    if (hours > 0) {
-      return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
-    } else {
-      return '${twoDigits(minutes)}:${twoDigits(seconds)}';
-    }
+    if (hours > 0) return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 
-  Widget _buildYouTubeResults() {
-    if (_youtubeResults.isEmpty) return const SizedBox.shrink();
+  Widget _buildYouTubeResultItem(YouTubeAudio audio) {
+    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    final isCurrent = musicProvider.currentSong?.id == 'temp_${audio.id}';
+    final hasDuration = isCurrent
+        ? (musicProvider.duration.inMilliseconds > 0)
+        : ((audio.duration?.inMilliseconds ?? 0) > 0);
+    final playbackProgress = isCurrent && hasDuration
+        ? (musicProvider.position.inMilliseconds /
+            musicProvider.duration.inMilliseconds)
+        : null;
 
-    return Consumer2<YouTubeService, music_provider.NewMusicProvider>(
-      builder: (context, youTubeService, musicProvider, _) {
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _youtubeResults.length,
-          itemBuilder: (context, index) {
-            final audio = _youtubeResults[index];
-            final isCurrent =
-                musicProvider.currentSong?.id == 'temp_${audio.id}';
-            final hasDuration = isCurrent
-                ? (musicProvider.duration.inMilliseconds > 0)
-                : ((audio.duration?.inMilliseconds ?? 0) > 0);
-            final playbackProgress = isCurrent && hasDuration
-                ? (musicProvider.position.inMilliseconds /
-                    musicProvider.duration.inMilliseconds)
-                : null;
-            final downloadProgress = youTubeService.activeDownloads
-                .where((d) => d.videoId == audio.id)
-                .firstOrNull;
+    final downloadProgress =
+        _youTubeService.activeDownloads.where((d) => d.videoId == audio.id).firstOrNull;
 
-            // Check if already downloaded
-            final isDownloaded = musicProvider.songs
-                .any((s) => s.id.contains(audio.id) && s.isDownloaded);
+    final isDownloaded = musicProvider.songs
+        .any((s) => s.id.contains(audio.id) && s.isDownloaded);
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: ListTile(
-                leading: audio.thumbnailUrl?.isNotEmpty == true
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: CachedNetworkImage(
-                          imageUrl: audio.thumbnailUrl!,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 60,
-                            height: 60,
-                            color: Colors.grey[300],
-                            child: const Center(
-                                child: CircularProgressIndicator()),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            width: 60,
-                            height: 60,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.music_video),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 60,
-                        height: 60,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.music_video),
-                      ),
-                title: Text(
-                  audio.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        leading: audio.thumbnailUrl?.isNotEmpty == true
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: CachedNetworkImage(
+                  imageUrl: audio.thumbnailUrl!,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(width: 60, height: 60, color: Colors.grey[300]),
+                  errorWidget: (context, url, error) =>
+                      Container(width: 60, height: 60, color: Colors.grey[300]),
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      audio.author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (isCurrent && playbackProgress != null) ...[
-                      const SizedBox(height: 4),
-                      LinearProgressIndicator(
-                        value: playbackProgress.clamp(0.0, 1.0),
-                        minHeight: 4,
-                        backgroundColor: Colors.grey[300],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).colorScheme.secondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_formatDuration(musicProvider.position)} / ${_formatDuration(musicProvider.duration)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                    if (downloadProgress != null) ...[
-                      const SizedBox(height: 4),
-                      LinearProgressIndicator(
-                        value: downloadProgress.progress,
-                        minHeight: 4,
-                        backgroundColor: Colors.grey[300],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 0,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            '${(downloadProgress.progress * 100).toStringAsFixed(1)}%',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          TextButton.icon(
-                            onPressed: () {
-                              context.read<YouTubeService>().cancelDownload(audio.id);
-                            },
-                            icon: const Icon(Icons.close, size: 16),
-                            label: const Text('Cancel'),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              minimumSize: const Size(0, 28),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (downloadProgress.error != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          downloadProgress.error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ] else if (isDownloaded) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            size: 16,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Downloaded',
-                            style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isCurrent && hasDuration)
-                      Text(
-                        _formatDuration(musicProvider.duration),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      )
-                    else if (audio.duration != null)
-                      Text(
-                        _formatDuration(audio.duration!),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    const SizedBox(width: 8),
-                    if (_loadingYouTubeId == audio.id) ...[
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ] else ...[
-                      IconButton(
-                        icon: Icon(
-                          isCurrent && musicProvider.isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
-                        ),
-                        onPressed: () {
-                          if (isCurrent) {
-                            if (musicProvider.isPlaying) {
-                              musicProvider.pause();
-                            } else {
-                              musicProvider.play();
-                            }
-                          } else {
-                            _playAudio(audio);
-                          }
-                        },
-                        tooltip:  musicProvider.isPlaying
-                            ? 'Pause'
-                            : 'Play',
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: Icon(
-                          isDownloaded
-                              ? Icons.check_circle
-                              : (downloadProgress != null ? Icons.downloading : Icons.download),
-                        ),
-                        onPressed: isDownloaded || downloadProgress != null
-                            ? null
-                            : () => _handleDownload(audio),
-                        tooltip: isDownloaded
-                            ? 'Downloaded'
-                            : (downloadProgress != null ? 'Downloading…' : 'Download'),
-                      ),
-                    ],
-                    // Keep trailing compact: download/cancel controls are shown in subtitle
-                  ],
-                ),
+              )
+            : Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[300],
+                child: const Icon(Icons.music_video),
               ),
-            );
-          },
-        );
-      },
+        title: Text(
+          audio.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(audio.author, maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (isCurrent && playbackProgress != null)
+              LinearProgressIndicator(value: playbackProgress.clamp(0.0, 1.0)),
+            if (downloadProgress != null)
+              LinearProgressIndicator(value: downloadProgress.progress),
+            if (isDownloaded) const Text('Downloaded'),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(isCurrent && musicProvider.isPlaying
+                  ? Icons.pause
+                  : Icons.play_arrow),
+              onPressed: () {
+                if (isCurrent) {
+                  if (musicProvider.isPlaying) {
+                    musicProvider.pause();
+                  } else {
+                    musicProvider.play();
+                  }
+                } else {
+                  _playAudio(audio);
+                }
+              },
+            ),
+            IconButton(
+              icon: Icon(
+                isDownloaded
+                    ? Icons.check_circle
+                    : (downloadProgress != null ? Icons.downloading : Icons.download),
+              ),
+              onPressed: () async {
+                if (isDownloaded) {
+                  return;
+                }
+                if (downloadProgress != null) {
+                  // Navigate to downloads screen
+                  if (mainNavKey.currentState != null) {
+                    // Find the BottomNavigationBar in the widget tree and trigger a tap on the downloads tab
+                    final bottomNavBar = mainNavKey.currentContext?.findAncestorWidgetOfExactType<BottomNavigationBar>();
+                    if (bottomNavBar?.onTap != null) {
+                      bottomNavBar!.onTap!(1);
+                    }
+                  }
+                  return;
+                }
+                await _handleDownload(audio);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -469,11 +309,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        final provider =
-            Provider.of<music_provider.NewMusicProvider>(context, listen: false);
-        final current = provider.currentSong;
-        if (current != null && current.id.startsWith('temp_')) {
-          await provider.stop();
+        if (currentSong != null && currentSong.id.startsWith('temp_')) {
+          await musicProvider.stop();
         }
         return true;
       },
@@ -483,232 +320,70 @@ class _SearchScreenState extends State<SearchScreen> {
             controller: _searchController,
             focusNode: _searchFocusNode,
             autofocus: true,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Search songs...',
               border: InputBorder.none,
-              hintStyle: TextStyle(
-                color: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.color
-                    ?.withOpacity(0.7),
-              ),
-            ),
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color,
             ),
             onChanged: (value) {
               musicProvider.filterSongs(value);
-
-              // Cancel any previous debounce timer
               _debounceTimer?.cancel();
-
               if (value.isNotEmpty) {
-                // Show loading indicator immediately for YouTube section
                 setState(() => _isSearchingYouTube = true);
-
-                // Debounce YouTube search regardless of local results
-                _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                _debounceTimer =
+                    Timer(const Duration(milliseconds: 500), () {
                   _searchYouTube(value);
                 });
               } else {
-                // Clear results if search is empty
-                if (mounted) {
-                  setState(() {
-                    _youtubeResults.clear();
-                    _isSearchingYouTube = false;
-                  });
-                }
+                setState(() {
+                  _youtubeResults.clear();
+                  _isSearchingYouTube = false;
+                });
               }
             },
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              final musicProvider =
-                  Provider.of<music_provider.NewMusicProvider>(context, listen: false);
-              final current = musicProvider.currentSong;
-              if (current != null && current.id.startsWith('temp_')) {
+              if (currentSong != null && currentSong.id.startsWith('temp_')) {
                 musicProvider.stop();
               }
               Navigator.of(context).pop();
             },
           ),
         ),
-      body: Column(
-        children: [
-          // Search results (scrollable)
-          Expanded(
-            child: Consumer<music_provider.NewMusicProvider>(
-              builder: (context, musicProvider, _) {
-                final results = musicProvider.filteredSongs;
-
-                if (_searchController.text.isEmpty) {
-                  return const Center(
-                    child: Text('Type to search for songs'),
-                  );
-                }
-
-                if (results.isEmpty &&
-                    _youtubeResults.isEmpty &&
-                    !_isSearchingYouTube) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.search_off,
-                            size: 48, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No local results found\nfor "${_searchController.text}"',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () =>
-                              _searchYouTube(_searchController.text),
-                          icon: const Icon(Icons.search),
-                          label: const Text('Search on YouTube'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView(
-                  controller: _searchScrollController,
-                  children: [
-                    // Local results
-                    if (results.isNotEmpty) ...[
-                      const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Local Music',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      ...results.map((song) => ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Icon(Icons.music_note, size: 24),
-                            ),
-                            title: Text(
-                              song.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              song.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onTap: () {
-                              musicProvider.playSong(song);
-                              Navigator.pop(context);
-                            },
-                          )),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // YouTube loading indicator
-                    if (_isSearchingYouTube)
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-
-                    // YouTube audio results
-                    if (_youtubeResults.isNotEmpty) ...[
-                      const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Online Music',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      _buildYouTubeResults(),
-                      if (_isLoadingMore)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                    ],
-                  ],
-                );
-              },
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: _youtubeResults.length,
+                itemBuilder: (context, index) {
+                  return _buildYouTubeResultItem(_youtubeResults[index]);
+                },
+              ),
             ),
-          ),
-
-          // Bottom player for currently playing song (fixed at bottom)
-          if (currentSong != null && currentSong.id.startsWith('temp_'))
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                border: Border(
-                  top: BorderSide(
-                    color: Theme.of(context).dividerColor,
-                    width: 1.0,
+            if (currentSong != null && currentSong.id.startsWith('temp_'))
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: ListTile(
+                  leading: const Icon(Icons.music_note),
+                  title: Text(currentSong.title),
+                  subtitle: Text(currentSong.artist),
+                  trailing: IconButton(
+                    icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                    onPressed: () {
+                      if (isPlaying) {
+                        musicProvider.pause();
+                      } else {
+                        musicProvider.play();
+                      }
+                    },
                   ),
                 ),
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-              child: ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(Icons.music_note),
-                ),
-                title: Text(
-                  currentSong.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                subtitle: Text(
-                  currentSong.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        isPlaying ? Icons.pause : Icons.play_arrow,
-                        size: 32,
-                      ),
-                      onPressed: () {
-                        if (isPlaying) {
-                          musicProvider.pause();
-                        } else {
-                          musicProvider.play();
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

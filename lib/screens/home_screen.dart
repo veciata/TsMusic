@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final DraggableScrollableController _playerSheetController = DraggableScrollableController();
   double _playerSize = 0.12;
   bool _dragFromHandle = false;
-  bool _showWelcome = false;
+  bool _showWelcome = true;
   bool _welcomeChecked = false;
 
   @override
@@ -42,11 +42,38 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadMusic();
   }
 
+  bool _isLoadingMusic = false;
+  String? _loadingError;
+
   Future<void> _loadMusic() async {
-    final provider = context.read<music_provider.NewMusicProvider>();
-    await provider.loadLocalMusic();
-    if (provider.songs.isEmpty) {
-      debugPrint('No local music found on device.');
+    if (_isLoadingMusic) return;
+    
+    setState(() {
+      _isLoadingMusic = true;
+      _loadingError = null;
+    });
+
+    try {
+      final provider = context.read<music_provider.NewMusicProvider>();
+      await provider.loadLocalMusic();
+      
+      if (mounted) {
+        setState(() {
+          _isLoadingMusic = false;
+          if (provider.songs.isEmpty) {
+            _loadingError = 'No local music found on device.';
+            debugPrint(_loadingError);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMusic = false;
+          _loadingError = 'Failed to load music: $e';
+          debugPrint(_loadingError);
+        });
+      }
     }
   }
 
@@ -54,8 +81,39 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final musicProvider = context.watch<music_provider.NewMusicProvider>();
 
-    if (!_welcomeChecked) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!_welcomeChecked || _isLoadingMusic) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading your music...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_loadingError != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Error: $_loadingError', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadMusic,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -71,10 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (context) => const SearchScreen()),
               );
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: widget.onSettingsTap,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -142,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.black54,
                   child: const Center(
                     child: Text(
-                      'Welcome! Tap to load local music',
+                      'Welcome to TS Music! Tap to load local music',
                       style: TextStyle(color: Colors.white, fontSize: 20),
                       textAlign: TextAlign.center,
                     ),
