@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
+import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
-import 'dart:convert';
 import '../models/song.dart';
 import '../services/audio_notification_service.dart';
 import '../services/metadata_enrichment_service.dart';
@@ -193,8 +194,186 @@ class NewMusicProvider extends ChangeNotifier {
 
   // Local music loading
   Future<void> loadLocalMusic() async {
-    // Implement your local music loading logic here
-    notifyListeners();
+    try {
+      _isLoading = true;
+      _error = 'Checking permissions...';
+      notifyListeners();
+
+      // Clear existing data
+      _playlist.clear();
+      _displayedSongs.clear();
+
+      // Check and request storage permissions based on Android version
+      bool hasPermission = false;
+      
+      if (Platform.isAndroid) {
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+        final sdkInt = androidInfo.version.sdkInt;
+        
+        if (sdkInt >= 33) {
+          // Android 13+ needs READ_MEDIA_AUDIO
+          var status = await Permission.audio.status;
+          if (!status.isGranted) {
+            status = await Permission.audio.request();
+          }
+          hasPermission = status.isGranted;
+        } else {
+          // Android 10-12 needs storage permission
+          var status = await Permission.storage.status;
+          if (!status.isGranted) {
+            status = await Permission.storage.request();
+          }
+          hasPermission = status.isGranted;
+          
+          // Also request manage external storage for broader access
+          if (hasPermission && sdkInt >= 30) {
+            await Permission.manageExternalStorage.request();
+          }
+        }
+      } else {
+        // For non-Android platforms
+        var status = await Permission.storage.status;
+        if (!status.isGranted) {
+          status = await Permission.storage.request();
+        }
+        hasPermission = status.isGranted;
+      }
+
+      if (!hasPermission) {
+        _error = 'Storage permission is required to scan for music. Please enable it in app settings.';
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      _error = 'Scanning for music files...';
+      notifyListeners();
+
+      // Get all possible storage directories
+      final musicDirectories = <String>[];
+      
+      // Try to get external storage directory
+      try {
+        final externalDir = await getExternalStorageDirectory();
+        if (externalDir != null) {
+          musicDirectories.add(externalDir.path);
+          // Add common subdirectories
+          musicDirectories.add('${externalDir.path}/Music');
+          musicDirectories.add('${externalDir.path}/Download');
+          musicDirectories.add('${externalDir.path}/media');
+        }
+      } catch (e) {
+        print('Error getting external storage: $e');
+      }
+      
+      // Add common paths
+      musicDirectories.addAll([
+        '/storage/emulated/0/Music',
+        '/storage/emulated/0/Download',
+        '/sdcard/Music',
+        '/sdcard/Download',
+        '/storage/emulated/0/TSMusic',
+      ]);
+
+      final List<File> musicFiles = [];
+      final Set<String> processedPaths = {};
+      
+      // Supported audio extensions
+      const audioExtensions = ['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.opus', '.m4b', '.mp4'];
+      int totalFilesFound = 0;
+
+      // Scan each directory
+      for (final dirPath in musicDirectories) {
+        if (_isLoading == false) break; // Stop if loading was cancelled
+        
+        try {
+          final dir = Directory(dirPath);
+          if (await dir.exists()) {
+            final stream = dir.list(recursive: true, followLinks: false);
+            
+            await for (final entity in stream) {
+              if (entity is File) {
+                final ext = path.extension(entity.path).toLowerCase();
+                if (audioExtensions.contains(ext) && !processedPaths.contains(entity.path)) {
+                  try {
+                    final stat = await entity.stat();
+                    // Skip files smaller than 10KB as they're unlikely to be valid audio files
+                    if (stat.size > 10 * 1024) {
+                      musicFiles.add(entity);
+                      processedPaths.add(entity.path);
+                      totalFilesFound++;
+                      
+                      // Update progress every 10 files
+                      if (totalFilesFound % 10 == 0) {
+                        _error = 'Found $totalFilesFound songs...';
+                        notifyListeners();
+                      }
+                    }
+                  } catch (e) {
+                    print('Error accessing file ${entity.path}: $e');
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print('Error scanning $dirPath: $e');
+        }
+      }
+
+      // Process found files
+      final List<Song> songs = [];
+      for (int i = 0; i < musicFiles.length; i++) {
+        if (_isLoading == false) break; // Stop if loading was cancelled
+        
+        try {
+          final file = musicFiles[i];
+          final fileName = path.basenameWithoutExtension(file.path);
+          
+          // Update progress
+          if (i % 5 == 0) {
+            _error = 'Processing ${i + 1} of ${musicFiles.length} songs...';
+            notifyListeners();
+            // Allow UI to update
+            await Future.delayed(const Duration(milliseconds: 1));
+          }
+          
+          // Create song with basic info
+          final song = Song(
+            id: '${file.path}_${(await file.lastModified()).millisecondsSinceEpoch}',
+            title: fileName,
+            artist: 'Unknown Artist',
+            album: 'Unknown Album',
+            url: file.path,
+            duration: 0,
+          );
+          
+          songs.add(song);
+        } catch (e) {
+          print('Error processing song: $e');
+        }
+      }
+
+      // Update state
+      _playlist = songs;
+      _displayedSongs = List.from(_playlist);
+      _isLoading = false;
+      
+      if (songs.isNotEmpty) {
+        _error = null;
+        print('Successfully loaded ${songs.length} songs');
+      } else {
+        _error = 'No music files found. Please ensure you have music files in your device storage.';
+        print('No music files found in the scanned directories');
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error loading music: $e';
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   static const String _songsKey = 'cached_songs';
