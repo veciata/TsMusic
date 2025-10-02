@@ -89,7 +89,7 @@ class AudioPlayerTask extends BaseAudioHandler {
       mediaItem.add(MediaItem(
         id: song.id,
         title: song.title,
-        artist: song.artist,
+        artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
         artUri: song.albumArtUrl != null ? Uri.parse(song.albumArtUrl!) : null,
       ));
       onCurrentSongChanged(song);

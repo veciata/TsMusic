@@ -41,6 +41,21 @@ class _SqlScreenState extends State<SqlScreen> {
     final songs = await db.query(DatabaseHelper.tableSongs, orderBy: 'id DESC', limit: 100);
     final artists = await db.query(DatabaseHelper.tableArtists, orderBy: 'id DESC', limit: 100);
     final genres = await db.query(DatabaseHelper.tableGenres, orderBy: 'id DESC', limit: 100);
+    final playlists = await db.query(DatabaseHelper.tablePlaylists, orderBy: 'id');
+    
+    // Fetch songs for each playlist
+    final playlistSongs = <int, List<Map<String, Object?>>>{};
+    for (final playlist in playlists) {
+      final playlistId = playlist['id'] as int;
+      final songs = await db.rawQuery('''
+        SELECT s.*, ps.position 
+        FROM ${DatabaseHelper.tableSongs} s
+        JOIN ${DatabaseHelper.tablePlaylistSongs} ps ON s.id = ps.song_id
+        WHERE ps.playlist_id = ?
+        ORDER BY ps.position
+      ''', [playlistId]);
+      playlistSongs[playlistId] = songs;
+    }
 
     return _DbOverview(
       tableNames: tables.map((e) => e['name'] as String).toList(),
@@ -48,6 +63,8 @@ class _SqlScreenState extends State<SqlScreen> {
       songs: songs,
       artists: artists,
       genres: genres,
+      playlists: playlists,
+      playlistSongs: playlistSongs,
     );
   }
 
@@ -111,7 +128,7 @@ class _SqlScreenState extends State<SqlScreen> {
           final data = snapshot.data!;
           final allEmpty = data.counts.values.every((c) => c == 0);
           return DefaultTabController(
-            length: 4,
+            length: 5,
             child: Column(
               children: [
                 if (allEmpty)
@@ -132,13 +149,15 @@ class _SqlScreenState extends State<SqlScreen> {
                   ),
                 Material(
                   color: Theme.of(context).colorScheme.surface,
-                  child: const TabBar(
+                  child: TabBar(
                     isScrollable: true,
                     tabs: [
-                      Tab(text: 'Tables'),
-                      Tab(text: 'Songs'),
-                      Tab(text: 'Artists'),
-                      Tab(text: 'Genres'),
+                      const Tab(text: 'Tables'),
+                      Tab(text: 'Songs (${data.songs.length})'),
+                      Tab(text: 'Artists (${data.artists.length})'),
+                      Tab(text: 'Genres (${data.genres.length})'),
+                      Tab(text: 'Playlists (${data.playlists.length})'),
+                      const Tab(text: 'Schema'),
                     ],
                   ),
                 ),
@@ -161,6 +180,8 @@ class _SqlScreenState extends State<SqlScreen> {
                         subtitleBuilder: (m) => 'id: ${m['id']}',
                         rows: data.genres,
                       ),
+                      _buildPlaylistsTab(context, data),
+                      _buildSchemaTab(context, data),
                     ],
                   ),
                 ),
@@ -169,6 +190,93 @@ class _SqlScreenState extends State<SqlScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPlaylistsTab(BuildContext context, _DbOverview data) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(8.0),
+      itemCount: data.playlists.length,
+      itemBuilder: (context, index) {
+        final playlist = data.playlists[index];
+        final playlistId = playlist['id'] as int;
+        final songs = data.playlistSongs[playlistId] ?? [];
+        final isNowPlaying = playlistId == DatabaseHelper.nowPlayingPlaylistId;
+        
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+          child: ExpansionTile(
+            leading: isNowPlaying 
+                ? const Icon(Icons.play_arrow, color: Colors.green)
+                : const Icon(Icons.playlist_play),
+            title: Text(
+              playlist['name'] as String? ?? 'Unnamed Playlist',
+              style: TextStyle(
+                fontWeight: isNowPlaying ? FontWeight.bold : FontWeight.normal,
+                color: isNowPlaying ? Colors.green : null,
+              ),
+            ),
+            subtitle: Text('${songs.length} songs'),
+            children: [
+              if (playlist['description'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
+                  child: Text(playlist['description'].toString()),
+                ),
+              if (songs.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('No songs in this playlist'),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: songs.length,
+                  itemBuilder: (context, songIndex) {
+                    final song = songs[songIndex];
+                    return ListTile(
+                      leading: Text('${songIndex + 1}.'),
+                      title: Text(song['title']?.toString() ?? 'Unknown Title'),
+                      subtitle: Text(song['artists']?.toString() ?? 'Unknown Artist'),
+                      trailing: Text(
+                        _formatDuration(Duration(milliseconds: (song['duration'] as int?) ?? 0)),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    
+    if (hours > 0) {
+      return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
+    } else {
+      return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+    }
+  }
+
+  Widget _buildSchemaTab(BuildContext context, _DbOverview data) {
+    return ListView(
+      padding: const EdgeInsets.all(8.0),
+      children: [
+        const Text('Tables', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        ...data.tableNames.map((name) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Text('• $name (${data.counts[name] ?? 0} records)'),
+        )).toList(),
+      ],
     );
   }
 }
@@ -294,6 +402,8 @@ class _DbOverview {
   final List<Map<String, Object?>> songs;
   final List<Map<String, Object?>> artists;
   final List<Map<String, Object?>> genres;
+  final List<Map<String, Object?>> playlists;
+  final Map<int, List<Map<String, Object?>>> playlistSongs;
 
   _DbOverview({
     required this.tableNames,
@@ -301,5 +411,7 @@ class _DbOverview {
     required this.songs,
     required this.artists,
     required this.genres,
+    required this.playlists,
+    required this.playlistSongs,
   });
 }

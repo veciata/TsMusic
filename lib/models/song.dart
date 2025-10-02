@@ -1,12 +1,17 @@
 class Song {
   final String id;
   final String title;
-  final String artist;
+  final List<String> artists;
   final String? album;
   final String? albumArtUrl;
   final String url;
   final int duration; // Duration in milliseconds
   final List<String> tags;
+  final int? trackNumber; // Track number in album
+  final DateTime dateAdded; // When the song was added to the library
+  
+  // For backward compatibility
+  String get artist => artists.isNotEmpty ? artists.first : 'Unknown Artist';
   
   String get formattedDuration {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -24,8 +29,8 @@ class Song {
 
   Song({
     required this.id,
-    required this.title,
-    required this.artist,
+    required String title,
+    required List<String> artists,
     this.album,
     this.albumArtUrl,
     required this.url,
@@ -33,12 +38,17 @@ class Song {
     this.isFavorite = false,
     this.isDownloaded = false,
     List<String>? tags,
-  }) : tags = tags ?? [];
+    this.trackNumber,
+    DateTime? dateAdded,
+  })  : title = title,
+        artists = artists,
+        tags = tags ?? [],
+        dateAdded = dateAdded ?? DateTime.now();
 
   Song copyWith({
     String? id,
     String? title,
-    String? artist,
+    List<String>? artists,
     String? album,
     String? albumArtUrl,
     String? url,
@@ -46,11 +56,13 @@ class Song {
     bool? isFavorite,
     bool? isDownloaded,
     List<String>? tags,
+    int? trackNumber,
+    DateTime? dateAdded,
   }) {
     return Song(
       id: id ?? this.id,
       title: title ?? this.title,
-      artist: artist ?? this.artist,
+      artists: artists ?? this.artists,
       album: album ?? this.album,
       albumArtUrl: albumArtUrl ?? this.albumArtUrl,
       url: url ?? this.url,
@@ -58,6 +70,8 @@ class Song {
       isFavorite: isFavorite ?? this.isFavorite,
       isDownloaded: isDownloaded ?? this.isDownloaded,
       tags: tags ?? this.tags,
+      trackNumber: trackNumber ?? this.trackNumber,
+      dateAdded: dateAdded ?? this.dateAdded,
     );
   }
 
@@ -65,7 +79,9 @@ class Song {
     return Song(
       id: json['id'] as String,
       title: json['title'] as String,
-      artist: json['artist'] as String,
+      artists: json['artists'] is List 
+          ? List<String>.from(json['artists'])
+          : [json['artist'] as String? ?? 'Unknown Artist'],
       album: json['album'] as String?,
       albumArtUrl: json['albumArtUrl'] as String?,
       url: json['url'] as String,
@@ -73,21 +89,29 @@ class Song {
       isFavorite: json['isFavorite'] as bool? ?? false,
       isDownloaded: json['isDownloaded'] as bool? ?? false,
       tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
+      trackNumber: json['trackNumber'] as int?,
+      dateAdded: json['dateAdded'] != null 
+          ? DateTime.parse(json['dateAdded'] as String) 
+          : null,
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
       'title': title,
-      'artist': artist,
+      'artists': artists,
       'album': album,
       'albumArtUrl': albumArtUrl,
       'url': url,
-      'duration': duration, // duration is already in milliseconds
+      'duration': duration,
       'isFavorite': isFavorite,
       'isDownloaded': isDownloaded,
       'tags': tags,
+      'trackNumber': trackNumber,
+      'dateAdded': dateAdded.toIso8601String(),
     };
   }
+
+  Map<String, dynamic> toJson() => toMap();
 }

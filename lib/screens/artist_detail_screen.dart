@@ -78,7 +78,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         _youtubeSongs = results.map((audio) => Song(
           id: 'youtube_${audio.id}',
           title: audio.title,
-          artist: audio.author,
+          artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
           album: 'YouTube',
           albumArtUrl: audio.thumbnailUrl,
           url: audio.audioUrl ?? '',
@@ -107,7 +107,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         _youtubeSongs.addAll(results.map((audio) => Song(
           id: 'youtube_${audio.id}',
           title: audio.title,
-          artist: audio.author,
+          artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
           album: 'YouTube',
           albumArtUrl: audio.thumbnailUrl,
           url: audio.audioUrl ?? '',

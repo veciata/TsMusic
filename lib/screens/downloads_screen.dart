@@ -187,7 +187,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No downloaded YouTube music yet',
+                  'No downloaded music yet',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),

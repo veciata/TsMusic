@@ -136,7 +136,7 @@ class StorageScanner {
       return Song(
         id: filePath, // Use file path as ID for local files
         title: title,
-        artist: 'Unknown Artist',
+        artists: ['Unknown Artist'],
         url: 'file://$filePath',
         source: 'local',
         duration: 0, // Will be updated later

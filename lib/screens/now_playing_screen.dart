@@ -235,30 +235,39 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ArtistDetailScreen(
-                          artistName: currentSong.artist,
-                          artistImageUrl: currentSong.albumArtUrl,
-                        ),
-                      ),
-                    );
-                  },
-                    child: Text(
-                      currentSong.artist,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.secondary.withOpacity(0.9),
-                        decoration: TextDecoration.underline,
-                        decorationColor: theme.colorScheme.secondary.withOpacity(0.5),
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+
+Wrap(
+  alignment: WrapAlignment.center,
+  children: currentSong.artists.map((artist) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ArtistDetailScreen(
+              artistName: artist,
+              artistImageUrl: currentSong.albumArtUrl,
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: Text(
+          artist,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.secondary.withOpacity(0.9),
+            decoration: TextDecoration.underline,
+            decorationColor: theme.colorScheme.secondary.withOpacity(0.5),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }).toList()
+)
+
                 ],
               ),
             ),

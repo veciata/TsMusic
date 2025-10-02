@@ -9,8 +9,9 @@ class SongSearchService {
     
     final queryLower = query.toLowerCase();
     return songs.where((song) {
+      final artistMatch = song.artists.any((artist) => artist.toLowerCase().contains(queryLower));
       return song.title.toLowerCase().contains(queryLower) ||
-          song.artist.toLowerCase().contains(queryLower) ||
+          artistMatch ||
           (song.album?.toLowerCase().contains(queryLower) ?? false);
     }).toList();
   }
@@ -25,7 +26,9 @@ class SongSearchService {
           compare = a.title.compareTo(b.title);
           break;
         case SongSortOption.artist:
-          compare = a.artist.compareTo(b.artist);
+          final artistA = a.artists.isNotEmpty ? a.artists.first : '';
+          final artistB = b.artists.isNotEmpty ? b.artists.first : '';
+          compare = artistA.compareTo(artistB);
           break;
         case SongSortOption.album:
           compare = (a.album ?? '').compareTo(b.album ?? '');
@@ -46,14 +49,16 @@ class SongSearchService {
   List<String> getUniqueArtists(List<Song> songs) {
     final artistSet = <String>{};
     for (final song in songs) {
-      if (song.artist.isNotEmpty && song.artist.toLowerCase() != 'unknown artist') {
-        artistSet.add(song.artist);
+      for (final artist in song.artists) {
+        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist') {
+          artistSet.add(artist);
+        }
       }
     }
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
   }
 
   List<Song> getSongsByArtist(List<Song> songs, String artistName) {
-    return songs.where((song) => song.artist == artistName).toList();
+    return songs.where((song) => song.artists.any((artist) => artist == artistName)).toList();
   }
 }
