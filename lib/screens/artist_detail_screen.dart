@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/new_music_provider.dart' as music_provider;
@@ -195,13 +196,70 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     );
   }
 
+  // Helper function to normalize file paths for comparison
+  String _normalizePath(String path) {
+    try {
+      // Convert to lowercase and remove any query parameters or fragments
+      String normalized = path.split('?')[0].split('#')[0].toLowerCase().trim();
+      
+      // Handle different path formats that point to the same location
+      const String emulatedPrefix = '/storage/emulated/0/';
+      const String sdcardPrefix = '/sdcard/';
+      
+      // Convert /storage/emulated/0/ to /sdcard/ for consistency
+      if (normalized.startsWith(emulatedPrefix)) {
+        normalized = '/sdcard/${normalized.substring(emulatedPrefix.length)}';
+      }
+      
+      // Remove any redundant path segments
+      final uri = Uri.file(normalized);
+      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+      
+      // Rebuild path with normalized segments
+      return '/${segments.join('/')}';
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error normalizing path "$path": $e');
+      }
+      return path.toLowerCase();
+    }
+  }
+
   Widget _buildLocalSongsTab(List<Song> songs, music_provider.NewMusicProvider musicProvider) {
     if (songs.isEmpty) return const Center(child: Text('No local songs found for this artist'));
 
+    // Use a map to ensure unique songs by their normalized path
+    final Map<String, Song> uniqueSongs = {};
+    final Set<String> seenPaths = {};
+    
+    for (final song in songs) {
+      try {
+        if (song.url.isEmpty) continue;
+        
+        final normalizedPath = _normalizePath(song.url);
+        if (normalizedPath.isEmpty) continue;
+        
+        if (!seenPaths.contains(normalizedPath)) {
+          seenPaths.add(normalizedPath);
+          uniqueSongs[song.id] = song;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error processing song ${song.id}: $e');
+        }
+      }
+    }
+    
+    final uniqueSongsList = uniqueSongs.values.toList();
+    
+    if (uniqueSongsList.isEmpty) {
+      return const Center(child: Text('No valid songs found for this artist'));
+    }
+
     return ListView.builder(
-      itemCount: songs.length,
+      itemCount: uniqueSongsList.length,
       itemBuilder: (context, index) {
-        final song = songs[index];
+        final song = uniqueSongsList[index];
         final isCurrentSong = musicProvider.currentSong?.id == song.id;
         final isPlaying = isCurrentSong && musicProvider.isPlaying;
 

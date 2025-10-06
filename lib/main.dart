@@ -11,11 +11,12 @@ import 'screens/settings_screen.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/sql_screen.dart';
 import 'screens/now_playing_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/search_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/new_music_provider.dart' as music_provider;
 import 'services/youtube_service.dart';
 import 'utils/package_info_utils.dart';
-
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
@@ -23,8 +24,10 @@ Future<void> main() async {
   await PackageInfoUtils.init();
 
   final youTubeService = YouTubeService();
-
-  runApp(MusicPlayerApp(youTubeService: youTubeService));
+  
+  runApp(MusicPlayerApp(
+    youTubeService: youTubeService,
+  ));
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
@@ -47,7 +50,10 @@ Future<void> main() async {
 class MusicPlayerApp extends StatelessWidget {
   final YouTubeService youTubeService;
 
-  const MusicPlayerApp({super.key, required this.youTubeService});
+  const MusicPlayerApp({
+    super.key, 
+    required this.youTubeService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +78,7 @@ class MusicPlayerApp extends StatelessWidget {
             theme: lightTheme.copyWith(textTheme: textTheme),
             darkTheme: darkTheme.copyWith(textTheme: textTheme),
             themeMode: themeProvider.themeMode,
-            home: MainNavigationScreen(key: mainNavKey),
+            home: const WelcomeScreen(),
           );
         },
       ),
@@ -127,6 +133,21 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
+  String _getTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return 'Home';
+      case 1:
+        return 'Downloads';
+      case 2:
+        return 'Settings';
+      case 3:
+        return 'Sql';
+      default:
+        return 'TS Music';
+    }
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -136,6 +157,22 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text(_getTitle()),
+        centerTitle: true,
+        actions: [
+          if (_selectedIndex == 0) // Sadece Home ekranında göster
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SearchScreen()),
+                );
+              },
+            ),
+        ],
+      ),
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),

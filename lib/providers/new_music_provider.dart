@@ -29,7 +29,7 @@ class NewMusicProvider extends ChangeNotifier {
   // Now Playing playlist ID
   int get nowPlayingPlaylistId => DatabaseHelper.nowPlayingPlaylistId;
   
-  // Load songs from database
+  // Load songs from database with optimized queries
   Future<void> _loadSongsFromDatabase() async {
     if (_songsMap.isNotEmpty) {
       _playlist = _cachedSongs;
@@ -37,45 +37,47 @@ class NewMusicProvider extends ChangeNotifier {
     }
     
     try {
-      final songs = await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
-      // Clear current playlist and add songs from database
-      _playlist.clear();
-      _songsMap.clear(); // Clear the map when reloading the playlist
+      // Get all songs in a single query
+      final db = await _databaseHelper.database;
       
-      // Convert database rows to Song objects
+      // Get all songs with their artists and genres in a single query
+      final songsQuery = '''
+        SELECT 
+          s.*,
+          GROUP_CONCAT(DISTINCT a.name, '|') as artist_names,
+          GROUP_CONCAT(DISTINCT g.name, '|') as genre_names
+        FROM ${DatabaseHelper.tableSongs} s
+        LEFT JOIN ${DatabaseHelper.tableSongArtist} sa ON s.id = sa.song_id
+        LEFT JOIN ${DatabaseHelper.tableArtists} a ON sa.artist_id = a.id
+        LEFT JOIN ${DatabaseHelper.tableSongGenre} sg ON s.id = sg.song_id
+        LEFT JOIN ${DatabaseHelper.tableGenres} g ON sg.genre_id = g.id
+        WHERE s.playlist_id = ?
+        GROUP BY s.id
+      ''';
+      
+      final songs = await db.rawQuery(songsQuery, [nowPlayingPlaylistId]);
+      
+      // Clear current data
+      _playlist.clear();
+      _songsMap.clear();
+      
+      // Process all songs in a single batch
       for (final songData in songs) {
         try {
-          // Get song artists
-          final db = await _databaseHelper.database;
-          final artistRows = await db.query(
-            '${DatabaseHelper.tableSongArtist} sa '
-            'JOIN ${DatabaseHelper.tableArtists} a ON sa.artist_id = a.${DatabaseHelper.columnId} ',
-            where: 'sa.song_id = ?',
-            whereArgs: [songData['id']],
-            columns: ['a.name'],
-          );
-          
-          final artists = artistRows
-              .map<String>((row) => row['name'] as String)
+          // Parse artists
+          final artistNames = (songData['artist_names'] as String? ?? '')
+              .split('|')
               .where((name) => name.isNotEmpty && name != 'Unknown Artist')
+              .toSet() // Remove duplicates
               .toList();
           
-          if (artists.isEmpty) {
-            artists.add('Unknown Artist');
-          }
+          final artists = artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
           
-          // Get song tags
-          final tagRows = await db.query(
-            '${DatabaseHelper.tableSongGenre} sg '
-            'JOIN ${DatabaseHelper.tableGenres} g ON sg.genre_id = g.${DatabaseHelper.columnId} ',
-            where: 'sg.song_id = ?',
-            whereArgs: [songData['id']],
-            columns: ['g.name'],
-          );
-          
-          final tags = tagRows
-              .map<String>((row) => row['name'] as String)
+          // Parse genres/tags
+          final tags = (songData['genre_names'] as String? ?? '')
+              .split('|')
               .where((tag) => tag.isNotEmpty)
+              .toSet() // Remove duplicates
               .toList();
           
           final song = Song(
@@ -95,7 +97,7 @@ class NewMusicProvider extends ChangeNotifier {
                 : DateTime.now(),
           );
           
-          // Only add if we don't already have this song (by file path)
+          // Use URL as key to prevent duplicates
           if (!_songsMap.containsKey(song.url)) {
             _songsMap[song.url] = song;
             _playlist.add(song);

@@ -371,18 +371,50 @@ class DatabaseHelper {
   }
 
   // Helper methods for songs
+  /// Checks if a song with the given file path already exists
+  /// Returns the song ID if it exists, otherwise returns -1
+  Future<int> findSongIdByPath(String filePath) async {
+    final db = await database;
+    final result = await db.query(
+      tableSongs,
+      columns: ['id'],
+      where: 'file_path = ?',
+      whereArgs: [filePath],
+    );
+    return result.isNotEmpty ? result.first['id'] as int : -1;
+  }
+
   Future<int> insertSong(Map<String, dynamic> song) async {
     final db = await database;
+    
+    // Check if song with this file path already exists
+    final existingId = await findSongIdByPath(song['file_path']);
+    if (existingId != -1) {
+      if (kDebugMode) {
+        print('Song already exists (ID: $existingId): ${song['file_path']}');
+      }
+      return -1; // Indicate that no new row was inserted
+    }
+    
+    // Add timestamps
+    final songWithTimestamps = Map<String, dynamic>.from(song)
+      ..['created_at'] = DateTime.now().toIso8601String()
+      ..['updated_at'] = DateTime.now().toIso8601String();
+    
     return await db.insert(
       tableSongs,
-      song,
+      songWithTimestamps,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
   Future<List<Map<String, dynamic>>> getSongs() async {
     final db = await database;
-    return await db.query(tableSongs, orderBy: 'title');
+    return await db.query(
+      tableSongs, 
+      orderBy: 'title',
+      distinct: true,  // Ensure we only get distinct songs
+    );
   }
 
   // Returns songs with a primary artist (first linked artist) to simplify UI
@@ -554,23 +586,52 @@ class DatabaseHelper {
     final db = await database;
     
     await db.transaction((txn) async {
-      // Insert or update song
-      final songData = {
-        'title': song.title,
-        'file_path': song.url,
-        'duration': song.duration,
-        'album': song.album,
-        'album_art_url': song.albumArtUrl,
-        'is_favorite': song.isFavorite ? 1 : 0,
-        'is_downloaded': song.isDownloaded ? 1 : 0,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-
-      final songId = await txn.insert(
+      // Check if song with this file path already exists
+      final existingSong = await txn.query(
         tableSongs,
-        songData,
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        where: 'file_path = ?',
+        whereArgs: [song.url],
       );
+
+      int songId;
+      
+      if (existingSong.isNotEmpty) {
+        // Song exists, update it
+        songId = existingSong.first['id'] as int;
+        await txn.update(
+          tableSongs,
+          {
+            'title': song.title,
+            'duration': song.duration,
+            'album': song.album,
+            'album_art_url': song.albumArtUrl,
+            'is_favorite': song.isFavorite ? 1 : 0,
+            'is_downloaded': song.isDownloaded ? 1 : 0,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [songId],
+        );
+      } else {
+        // Insert new song
+        final songData = {
+          'title': song.title,
+          'file_path': song.url,
+          'duration': song.duration,
+          'album': song.album,
+          'album_art_url': song.albumArtUrl,
+          'is_favorite': song.isFavorite ? 1 : 0,
+          'is_downloaded': song.isDownloaded ? 1 : 0,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        songId = await txn.insert(
+          tableSongs,
+          songData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
 
       // Process all artists (main and featured)
       for (final artist in song.artists) {

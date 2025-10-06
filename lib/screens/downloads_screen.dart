@@ -12,8 +12,7 @@ class DownloadsScreen extends StatefulWidget {
   State<DownloadsScreen> createState() => _DownloadsScreenState();
 }
 
-class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _DownloadsScreenState extends State<DownloadsScreen> {
   late YouTubeService _youTubeService;
   final Map<String, double> _downloadProgress = {};
   
@@ -26,8 +25,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    // Listen to YouTubeService changes to update the UI when downloads are removed
     _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     _youTubeService.addListener(_onDownloadsChanged);
   }
@@ -35,7 +32,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
   @override
   void dispose() {
     _youTubeService.removeListener(_onDownloadsChanged);
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -51,21 +47,62 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: const Text('Downloads'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Downloading'),
-            Tab(text: 'Downloaded'),
+      ),
+      body: _buildDownloadsList(),
+    );
+  }
+
+  Widget _buildDownloadsList() {
+    return Consumer2<YouTubeService, music_provider.NewMusicProvider>(
+      builder: (context, youTubeService, musicProvider, _) {
+        final activeDownloads = youTubeService.activeDownloads;
+        final downloadedSongs = musicProvider.youtubeSongs;
+        
+        if (activeDownloads.isEmpty && downloadedSongs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.music_off,
+                  size: 64,
+                  color: Theme.of(context).disabledColor,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No downloads yet',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Download songs from the search tab',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView(
+          children: [
+            if (activeDownloads.isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Downloading...', 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              ...activeDownloads.map((download) => _buildDownloadItem(download)).toList(),
+              const Divider(),
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Downloaded', 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+            ],
+            ...downloadedSongs.map((song) => _buildSongItem(song)).toList(),
           ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDownloadingTab(),
-          _buildDownloadedTab(),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -169,96 +206,134 @@ class _DownloadsScreenState extends State<DownloadsScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildDownloadedTab() {
-    return Consumer<music_provider.NewMusicProvider>(
-      builder: (context, musicProvider, _) {
-        // Filter songs by tsmusic tag
-        final downloadedSongs = musicProvider.youtubeSongs;
-        
-        if (downloadedSongs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildDownloadItem(dynamic download) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.downloading, size: 32),
+        title: Text(
+          download.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: download.cancelRequested
+            ? const Padding(
+                padding: EdgeInsets.only(right: 12.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                  ),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.cancel, color: Colors.red),
+                onPressed: () => _youTubeService.cancelDownload(download.videoId),
+                tooltip: 'Cancel download',
+              ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: download.progress,
+              minHeight: 4,
+              backgroundColor: Colors.grey[300],
+              valueColor: AlwaysStoppedAnimation<Color>(
+                download.cancelRequested 
+                    ? Colors.orange 
+                    : Theme.of(context).primaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.music_off,
-                  size: 64,
-                  color: Theme.of(context).disabledColor,
-                ),
-                const SizedBox(height: 16),
                 Text(
-                  'No downloaded music yet',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  '${(download.progress * 100).toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Download songs from the search tab',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                if (download.cancelRequested)
+                  Text(
+                    'Canceling...',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
               ],
             ),
-          );
-        }
-
-        return ListView.builder(
-          itemCount: downloadedSongs.length,
-          itemBuilder: (context, index) {
-            final song = downloadedSongs[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: ListTile(
-                leading: song.albumArtUrl?.isNotEmpty == true
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: CachedNetworkImage(
-                          imageUrl: song.albumArtUrl!,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey[300],
-                            child: const Center(child: CircularProgressIndicator()),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.music_note),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 50,
-                        height: 50,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.music_note),
-                      ),
-                title: Text(
-                  song.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+            if (download.error != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                download.error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
                 ),
-                subtitle: Text(
-                  song.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(song.formattedDuration),
-                onTap: () {
-                  final musicProvider = Provider.of<music_provider.NewMusicProvider>(
-                    context,
-                    listen: false,
-                  );
-                  musicProvider.playSong(song);
-                },
               ),
-            );
-          },
-        );
-      },
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSongItem(Song song) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        leading: song.albumArtUrl?.isNotEmpty == true
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: CachedNetworkImage(
+                  imageUrl: song.albumArtUrl!,
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    width: 50,
+                    height: 50,
+                    color: Colors.grey[300],
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    width: 50,
+                    height: 50,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.music_note),
+                  ),
+                ),
+              )
+            : Container(
+                width: 50,
+                height: 50,
+                color: Colors.grey[300],
+                child: const Icon(Icons.music_note),
+              ),
+        title: Text(
+          song.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(
+          song.artist,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Text(song.formattedDuration),
+        onTap: () {
+          final musicProvider = Provider.of<music_provider.NewMusicProvider>(
+            context,
+            listen: false,
+          );
+          musicProvider.playSong(song);
+        },
+      ),
     );
   }
 

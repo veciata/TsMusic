@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,17 +55,20 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final provider = context.read<music_provider.NewMusicProvider>();
       
-      // Load music from local storage
-      await provider.loadLocalMusic();
+      // Load music from local storage with a timeout
+      await provider.loadLocalMusic().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          if (mounted) {
+            setState(() {
+              _loadingError = 'Music loading is taking longer than expected. Please wait...';
+            });
+          }
+          return Future.value();
+        },
+      );
       
       if (mounted) {
-        // Check if we have any songs
-        if (provider.allSongs.isEmpty) {
-          // If no songs, try a full scan
-          await provider.loadLocalMusic();
-        }
-        
-        // Update UI
         setState(() {
           _isLoadingMusic = false;
           if (provider.allSongs.isEmpty) {
@@ -76,40 +80,123 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoadingMusic = false;
-          _loadingError = 'Failed to load music: $e';
+          _loadingError = 'Failed to load music: ${e.toString().split('\n').first}';
         });
       }
     }
   }
 
   List<Song> _getSortedSongs(music_provider.NewMusicProvider provider) {
-    final songs = List<Song>.from(provider.allSongs);
-
-    songs.sort((a, b) {
-      int compare;
-      switch (provider.currentSortOption) {
-        case SongSortOption.title:
-          compare = a.title.compareTo(b.title);
-          break;
-        case SongSortOption.artist:
-          final artistA = a.artists.join(' & ');
-          final artistB = b.artists.join(' & ');
-          compare = artistA.compareTo(artistB);
-          break;
-        case SongSortOption.album:
-          compare = (a.album ?? '').compareTo(b.album ?? '');
-          break;
-        case SongSortOption.duration:
-          compare = a.duration.compareTo(b.duration);
-          break;
-        case SongSortOption.dateAdded:
-          compare = (a.dateAdded ?? DateTime.now()).compareTo(b.dateAdded ?? DateTime.now());
-          break;
+    try {
+      // Use a case-insensitive map to track unique songs by their file path
+      final Map<String, Song> uniqueSongs = {};
+      
+      // Track seen file paths for duplicate detection
+      final Set<String> seenPaths = {};
+      
+      // Helper function to get a normalized file path for comparison
+      String getNormalizedPath(String filePath) {
+        try {
+          // Convert to lowercase and remove any query parameters or fragments
+          String path = filePath.split('?')[0].split('#')[0].toLowerCase().trim();
+          
+          // Handle different path formats that point to the same location
+          const String emulatedPrefix = '/storage/emulated/0/';
+          const String sdcardPrefix = '/sdcard/';
+          
+          // Convert /storage/emulated/0/ to /sdcard/ for consistency
+          if (path.startsWith(emulatedPrefix)) {
+            path = '/sdcard/${path.substring(emulatedPrefix.length)}';
+          }
+          
+          // Remove any redundant path segments
+          final uri = Uri.file(path);
+          final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+          
+          // Rebuild path with normalized segments
+          return '/${segments.join('/')}';
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error normalizing path "$filePath": $e');
+          }
+          return filePath.toLowerCase();
+        }
       }
-      return provider.sortAscending ? compare : -compare;
-    });
-
-    return songs;
+      
+      // Process each song
+      for (final song in provider.allSongs) {
+        try {
+          if (song.url.isEmpty) continue;
+          
+          final normalizedPath = getNormalizedPath(song.url);
+          if (normalizedPath.isEmpty) continue;
+          
+          // Skip if we've already seen this exact path
+          if (seenPaths.contains(normalizedPath)) {
+            if (kDebugMode) {
+              print('Skipping duplicate song by path: ${song.title} (${song.url})');
+            }
+            continue;
+          }
+          
+          // Add to our unique songs and seen paths
+          uniqueSongs[song.id] = song;
+          seenPaths.add(normalizedPath);
+          
+          if (kDebugMode) {
+            print('Adding song to UI: ${song.title} (${song.url})');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error processing song ${song.id}: $e');
+          }
+        }
+      }
+      
+      // Convert to list and sort
+      final songs = uniqueSongs.values.toList();
+      
+      songs.sort((a, b) {
+        int compare;
+        switch (provider.currentSortOption) {
+          case SongSortOption.title:
+            compare = a.title.compareTo(b.title);
+            break;
+          case SongSortOption.artist:
+            final artistA = a.artists.isNotEmpty ? a.artists.join(' & ') : '';
+            final artistB = b.artists.isNotEmpty ? b.artists.join(' & ') : '';
+            compare = artistA.compareTo(artistB);
+            break;
+          case SongSortOption.album:
+            compare = (a.album ?? '').compareTo(b.album ?? '');
+            break;
+          case SongSortOption.duration:
+            compare = a.duration.compareTo(b.duration);
+            break;
+          case SongSortOption.dateAdded:
+            compare = (a.dateAdded ?? DateTime.now()).compareTo(b.dateAdded ?? DateTime.now());
+            break;
+        }
+        return provider.sortAscending ? compare : -compare;
+      });
+      
+      if (kDebugMode) {
+        print('Displaying ${songs.length} unique songs in UI');
+        // Print first few songs for verification
+        final count = songs.length > 5 ? 5 : songs.length;
+        for (var i = 0; i < count; i++) {
+          print('Song ${i + 1}: ${songs[i].title} (${songs[i].url})');
+        }
+      }
+      
+      return songs;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error in _getSortedSongs: $e');
+      }
+      // Return empty list on error to prevent crashes
+      return [];
+    }
   }
 
   String _getArtistsText(List<String> artists) {
@@ -197,15 +284,6 @@ class _HomeScreenState extends State<HomeScreen> {
     
     if (sortedSongs.isEmpty) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Music Player'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: widget.onSettingsTap,
-            ),
-          ],
-        ),
         body: _buildNoMusicFound(),
       );
     }
@@ -228,47 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('TS Music'),
-        centerTitle: true,
-        actions: [
-          PopupMenuButton<SongSortOption>(
-            icon: const Icon(Icons.sort),
-            onSelected: (option) {
-              final isSameOption = musicProvider.currentSortOption == option;
-              musicProvider.sortSongs(
-                sortBy: option,
-                ascending: isSameOption ? !musicProvider.sortAscending : true,
-              );
-            },
-            itemBuilder: (context) => SongSortOption.values.map((option) {
-              final isSelected = musicProvider.currentSortOption == option;
-              final label = option.name[0].toUpperCase() + option.name.substring(1);
-              return CheckedPopupMenuItem(
-                value: option,
-                checked: isSelected,
-                child: Row(
-                  children: [
-                    Text(label),
-                    if (isSelected)
-                      Icon(
-                        musicProvider.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                        size: 16,
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen()));
-            },
-          ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadMusic),
-        ],
-      ),
+      // AppBar kaldırıldı, arama butonu MainNavigationScreen'de
       body: Stack(
         children: [
           if (musicProvider.isLoading)

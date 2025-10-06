@@ -104,43 +104,137 @@ class ThemeProvider with ChangeNotifier {
   // Get the current theme data
   ThemeData getLightTheme() {
     final baseTheme = ThemeData.light();
+    final colorScheme = ColorScheme.light(
+      primary: _primaryColor,
+      primaryContainer: _primaryColor.withOpacity(0.8),
+      secondary: _primaryColor.withOpacity(0.6),
+      surface: Colors.white,
+      background: Colors.grey[50]!,
+      onPrimary: Colors.white,
+      onSurface: Colors.black87,
+      brightness: Brightness.light,
+    );
+
     return baseTheme.copyWith(
-      colorScheme: ColorScheme.light(
-        primary: _primaryColor,
-        secondary: _primaryColor.withOpacity(0.8),
-        brightness: Brightness.light,
-      ),
+      colorScheme: colorScheme,
       useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: _primaryColor,
-      scaffoldBackgroundColor: Colors.grey[50],
-      cardColor: Colors.white,
+      scaffoldBackgroundColor: colorScheme.background,
+      cardColor: colorScheme.surface,
       dividerColor: Colors.grey[300],
-      // Ensure text themes are properly inherited
-      textTheme: baseTheme.textTheme,
-      primaryTextTheme: baseTheme.primaryTextTheme,
-      iconTheme: baseTheme.iconTheme,
+      
+      // Text Themes
+      textTheme: TextTheme(
+        titleLarge: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.8)),
+        bodyLarge: TextStyle(color: colorScheme.onSurface.withOpacity(0.8)),
+        bodyMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.8)),
+      ),
+      
+      // Button Themes
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          foregroundColor: colorScheme.onPrimary,
+          backgroundColor: colorScheme.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: colorScheme.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      
+      iconTheme: IconThemeData(
+        color: colorScheme.onSurface.withOpacity(0.8),
+      ),
+      
+      appBarTheme: AppBarTheme(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+      ),
     );
   }
   
   ThemeData getDarkTheme() {
     final baseTheme = ThemeData.dark();
+    final colorScheme = ColorScheme.dark(
+      primary: _primaryColor,
+      primaryContainer: _primaryColor.withOpacity(0.8),
+      secondary: _primaryColor.withOpacity(0.6),
+      surface: Colors.grey[850]!,
+      background: Colors.grey[900]!,
+      onPrimary: Colors.white,
+      onSurface: Colors.white,
+      brightness: Brightness.dark,
+    );
+
     return baseTheme.copyWith(
-      colorScheme: ColorScheme.dark(
-        primary: _primaryColor,
-        secondary: _primaryColor.withOpacity(0.8),
-        brightness: Brightness.dark,
-      ),
+      colorScheme: colorScheme,
       useMaterial3: true,
       brightness: Brightness.dark,
       primaryColor: _primaryColor,
-      scaffoldBackgroundColor: Colors.grey[900],
-      cardColor: Colors.grey[850],
+      scaffoldBackgroundColor: colorScheme.background,
+      cardColor: colorScheme.surface,
       dividerColor: Colors.grey[700],
-      // Ensure text themes are properly inherited
-      textTheme: baseTheme.textTheme,
-      primaryTextTheme: baseTheme.primaryTextTheme,
-      iconTheme: baseTheme.iconTheme,
+      
+      // Text Themes
+      textTheme: TextTheme(
+        titleLarge: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.9)),
+        bodyLarge: TextStyle(color: colorScheme.onSurface.withOpacity(0.9)),
+        bodyMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.9)),
+      ),
+      
+      // Button Themes
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          foregroundColor: colorScheme.onPrimary,
+          backgroundColor: colorScheme.primary,
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: colorScheme.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorScheme.primary,
+          side: BorderSide(color: colorScheme.primary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      
+      iconTheme: IconThemeData(
+        color: colorScheme.onSurface.withOpacity(0.9),
+      ),
+      
+      appBarTheme: AppBarTheme(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+      ),
+      
+      // Using copyWith to ensure we're working with the correct CardThemeData type
+      cardTheme: baseTheme.cardTheme.copyWith(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        color: colorScheme.surface,
+        surfaceTintColor: colorScheme.surfaceTint,
+        shadowColor: Colors.black.withOpacity(0.1),
+      ),
     );
   }
 }

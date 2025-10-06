@@ -69,15 +69,42 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   }
 
   Widget _buildDefaultArt(ThemeData theme) {
+    final bool isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    
     return Container(
+      width: 240,
+      height: 240,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: theme.colorScheme.primary.withOpacity(0.1),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  colorScheme.primaryContainer,
+                  colorScheme.secondaryContainer,
+                ]
+              : [
+                  colorScheme.primary.withOpacity(0.2),
+                  colorScheme.secondary.withOpacity(0.2),
+                ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Icon(
-        Icons.music_note,
+        Icons.music_note_rounded,
         size: 80,
-        color: theme.colorScheme.onPrimary.withOpacity(0.8),
+        color: isDark 
+            ? colorScheme.onPrimaryContainer.withOpacity(0.8)
+            : colorScheme.primary.withOpacity(0.8),
       ),
     );
   }
@@ -138,16 +165,22 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0, top: 8.0),
           child: CircleAvatar(
-            backgroundColor: Colors.black26,
+            backgroundColor: theme.colorScheme.onBackground.withOpacity(0.1),
             child: IconButton(
-              icon: const Icon(Icons.arrow_downward_rounded, color: Colors.white),
+              icon: Icon(
+                Icons.arrow_downward_rounded, 
+                color: theme.colorScheme.onBackground.withOpacity(0.8),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
+            icon: Icon(
+              Icons.more_vert, 
+              color: theme.colorScheme.onBackground.withOpacity(0.8),
+            ),
             onPressed: _showSongOptions,
           ),
         ],
@@ -158,8 +191,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.9),
-              theme.colorScheme.primary.withOpacity(0.7),
+              theme.colorScheme.primary.withOpacity(0.1),
+              theme.colorScheme.secondary.withOpacity(0.05),
               theme.colorScheme.background,
               theme.colorScheme.background,
             ],
@@ -175,8 +208,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
+                    color: theme.colorScheme.onBackground.withOpacity(0.2),
+                    blurRadius: 25,
+                    spreadRadius: 2,
                     offset: const Offset(0, 10),
                   ),
                 ],
@@ -194,8 +228,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                           height: 280,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.black12,
-                            border: Border.all(color: Colors.white24, width: 12),
+                            color: theme.colorScheme.surface.withOpacity(0.3),
+                            border: Border.all(
+                              color: theme.colorScheme.onSurface.withOpacity(0.1), 
+                              width: 12
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.3),
@@ -387,36 +424,33 @@ Wrap(
             Padding(
               padding: const EdgeInsets.only(bottom: 32.0, left: 32.0, right: 32.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      musicProvider.isFavorite(currentSong.id)
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      color: musicProvider.isFavorite(currentSong.id)
-                          ? Colors.red
-                          : theme.colorScheme.onPrimary.withOpacity(0.7),
-                      size: 28,
+                  // Queue Button
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.colorScheme.onSurface.withOpacity(0.1),
+                        width: 1,
+                      ),
                     ),
-                    onPressed: () {
-                      musicProvider.toggleFavorite(currentSong.id);
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.queue_music_rounded,
-                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
-                      size: 28,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.queue_music_rounded,
+                        color: theme.colorScheme.onSurface.withOpacity(0.9),
+                        size: 28,
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const QueueScreen(),
+                          ),
+                        );
+                      },
                     ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const QueueScreen(),
-                        ),
-                      );
-                    },
                   ),
                 ],
               ),
