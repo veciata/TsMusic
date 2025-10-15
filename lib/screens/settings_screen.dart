@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../utils/package_info_utils.dart';
-import '../providers/new_music_provider.dart' as music_provider;
 
 class SettingsSection extends StatelessWidget {
   final String title;
-  final List<Widget> children;
   final IconData? icon;
+  final List<Widget> children;
 
   const SettingsSection({
     super.key,
@@ -158,7 +157,6 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // Appearance Section
           SettingsSection(
             title: 'Appearance',
             icon: Icons.palette,
@@ -173,22 +171,22 @@ class SettingsScreen extends StatelessWidget {
                 },
                 secondary: const Icon(Icons.dark_mode),
               ),
-if (kDebugMode) ...[
-  const Divider(height: 1),
-  ListTile(
-    title: const Text('Player Style'),
-    leading: const Icon(Icons.style),
-    trailing: Text(
-      themeProvider.getPlayerStyleName(themeProvider.playerStyle),
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    ),
-    onTap: () {
-      _showPlayerStyleDialog(context, themeProvider);
-    },
-  ),
-],
+              if (kDebugMode) ...[
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Player Style'),
+                  leading: const Icon(Icons.style),
+                  trailing: Text(
+                    themeProvider.getPlayerStyleName(themeProvider.playerStyle),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  onTap: () {
+                    _showPlayerStyleDialog(context, themeProvider);
+                  },
+                ),
+              ],
               const Divider(height: 1),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -210,7 +208,6 @@ if (kDebugMode) ...[
               ),
             ],
           ),
-          // About Section
           SettingsSection(
             title: 'About',
             icon: Icons.info_outline,
@@ -218,7 +215,6 @@ if (kDebugMode) ...[
               ListTile(
                 title: const Text('Version'),
                 subtitle: Text(PackageInfoUtils.version),
-
                 leading: const Icon(Icons.info_outline),
                 onTap: () {
                   showAboutDialog(
@@ -239,9 +235,7 @@ if (kDebugMode) ...[
                 title: const Text('Help & Support'),
                 leading: const Icon(Icons.help_outline),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Show help & support
-                },
+                onTap: () {},
               ),
             ],
           ),

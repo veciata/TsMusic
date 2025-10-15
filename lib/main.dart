@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform, exit;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' as sqflite_ffi;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:google_fonts/google_fonts.dart';
@@ -14,14 +15,25 @@ import 'screens/now_playing_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/search_screen.dart';
 import 'providers/theme_provider.dart';
-import 'providers/new_music_provider.dart' as music_provider;
+import 'providers/music_provider.dart' as music_provider;
 import 'services/youtube_service.dart';
 import 'utils/package_info_utils.dart';
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
+  // Initialize FFI for Linux
+  if (Platform.isLinux) {
+    sqflite_ffi.sqfliteFfiInit();
+    sqflite_ffi.databaseFactory = sqflite_ffi.databaseFactoryFfi;
+  }
+
   WidgetsFlutterBinding.ensureInitialized();
   await PackageInfoUtils.init();
+
+  // Request storage permission (skipping on Linux)
+  if (!Platform.isLinux) {
+    await Permission.storage.request();
+  }
 
   final youTubeService = YouTubeService();
   
@@ -60,7 +72,7 @@ class MusicPlayerApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
-        ChangeNotifierProvider(create: (_) => music_provider.NewMusicProvider()),
+        ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
         ChangeNotifierProvider(create: (_) => youTubeService),
       ],
       child: Consumer<ThemeProvider>(
@@ -110,7 +122,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
     _requestNotificationPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final musicProv =
-          Provider.of<music_provider.NewMusicProvider>(context, listen: false);
+          Provider.of<music_provider.MusicProvider>(context, listen: false);
       if (musicProv.songs.isEmpty) {
         musicProv.loadSongsFromStorage();
       }
@@ -202,7 +214,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
         ],
       ),
-      bottomSheet: Consumer<music_provider.NewMusicProvider>(
+      bottomSheet: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProv, _) {
           final currentSong = musicProv.currentSong;
           return GestureDetector(

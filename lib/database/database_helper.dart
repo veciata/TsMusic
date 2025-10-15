@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite/sqlite_api.dart';
 import 'package:path/path.dart';
 import 'package:tsmusic/models/song.dart';
-import 'package:tsmusic/providers/new_music_provider.dart';
+import 'package:tsmusic/providers/music_provider.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -543,8 +543,8 @@ class DatabaseHelper {
     ''', [songId]);
   }
 
-  /// Fetches music data from NewMusicProvider and stores it in the database
-  Future<void> syncMusicLibrary(NewMusicProvider musicProvider) async {
+  /// Fetches music data from MusicProvider and stores it in the database
+  Future<void> syncMusicLibrary(MusicProvider musicProvider) async {
     try {
       // Clear existing data to avoid duplicates
       await _clearExistingMusicData();

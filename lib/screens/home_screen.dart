@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
-import 'package:tsmusic/providers/new_music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/theme_provider.dart' as theme_provider;
 import 'search_screen.dart';
 
@@ -20,17 +20,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final DraggableScrollableController _playerSheetController = DraggableScrollableController();
-  double _playerSize = 0.12;
   bool _showWelcome = true;
   bool _welcomeChecked = false;
   bool _isLoadingMusic = false;
   String? _loadingError;
+  int _visibleSongs = 5;
+  int _visibleArtists = 5;
 
   @override
   void initState() {
     super.initState();
-    _initFirstLaunchAndLoad();
+_initFirstLaunchAndLoad();
   }
 
   Future<void> _initFirstLaunchAndLoad() async {
@@ -53,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final provider = context.read<music_provider.NewMusicProvider>();
+      final provider = context.read<music_provider.MusicProvider>();
       
       // Load music from local storage with a timeout
       await provider.loadLocalMusic().timeout(
@@ -86,7 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<Song> _getSortedSongs(music_provider.NewMusicProvider provider) {
+  // Get top played songs
+  List<Song> _getTopPlayedSongs(music_provider.MusicProvider provider) {
     try {
       // Use a case-insensitive map to track unique songs by their file path
       final Map<String, Song> uniqueSongs = {};
@@ -242,8 +243,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = context.watch<music_provider.NewMusicProvider>();
-    final sortedSongs = _getSortedSongs(musicProvider);
+    final musicProvider = context.watch<music_provider.MusicProvider>();
+    final sortedSongs = _getTopPlayedSongs(musicProvider);
 
     if (!_welcomeChecked || _isLoadingMusic) {
       return const Scaffold(
@@ -333,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
           else
             ListView.builder(
               itemCount: sortedSongs.length,
-              padding: const EdgeInsets.only(bottom: 120),
+              padding: const EdgeInsets.only(bottom: 16),
               itemBuilder: (context, index) {
                 final song = sortedSongs[index];
                 return ListTile(
@@ -379,120 +380,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-          Consumer<music_provider.NewMusicProvider>(
-            builder: (context, provider, _) {
-              final song = provider.currentSong;
-              if (song == null) return const SizedBox.shrink();
-
-              return NotificationListener<DraggableScrollableNotification>(
-                onNotification: (notification) {
-                  setState(() => _playerSize = notification.extent);
-                  return false;
-                },
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: DraggableScrollableSheet(
-                    controller: _playerSheetController,
-                    initialChildSize: 0.12,
-                    minChildSize: 0.12,
-                    maxChildSize: 1.0,
-                    snap: true,
-                    snapSizes: const [0.12, 0.5, 1.0],
-                    builder: (context, scrollController) {
-                      final theme = Theme.of(context);
-                      final tProvider = context.watch<theme_provider.ThemeProvider>();
-                      final style = tProvider.playerStyle;
-                      final bool showSlider = style != theme_provider.PlayerStyle.minimal;
-                      final double artworkSize = style == theme_provider.PlayerStyle.compact ? 40 : 48;
-                      final EdgeInsets contentPadding = style == theme_provider.PlayerStyle.compact
-                          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
-                          : const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
-
-                      final bool isMini = _playerSize <= 0.15;
-
-                      return Material(
-                        elevation: 12,
-                        color: theme.colorScheme.surface,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                        child: Container(
-                          padding: contentPadding,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Center(
-                                child: Container(
-                                  width: 36,
-                                  height: 4,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  decoration: BoxDecoration(
-                                    color: theme.dividerColor,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () {
-                                  if (_playerSheetController.size <= 0.15) {
-                                    _playerSheetController.animateTo(
-                                      0.5,
-                                      duration: const Duration(milliseconds: 220),
-                                      curve: Curves.easeOut,
-                                    );
-                                  }
-                                },
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: artworkSize,
-                                      height: artworkSize,
-                                      decoration: BoxDecoration(
-                                        color: theme.primaryColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(Icons.music_note),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                          if (style != theme_provider.PlayerStyle.minimal)
-                                            Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(provider.isPlaying ? Icons.pause : Icons.play_arrow),
-                                      onPressed: () => provider.isPlaying ? provider.pause() : provider.play(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (showSlider && provider.duration.inSeconds > 0)
-                                Slider(
-                                  value: provider.position.inSeconds.toDouble().clamp(0.0, provider.duration.inSeconds.toDouble()),
-                                  max: provider.duration.inSeconds.toDouble(),
-                                  onChanged: (v) => provider.seek(Duration(seconds: v.toInt())),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
+          // Music player has been removed as requested
         ],
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _playerSheetController.dispose();
-    super.dispose();
-  }
 }

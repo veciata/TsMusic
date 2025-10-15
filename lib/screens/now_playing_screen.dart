@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
-import '../providers/new_music_provider.dart';
+import '../providers/music_provider.dart';
 import 'artist_detail_screen.dart';
 import 'queue_screen.dart';
 
@@ -34,7 +34,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final musicProvider = context.watch<NewMusicProvider>();
+    final musicProvider = context.watch<MusicProvider>();
     _positionSubscription?.cancel();
     _positionSubscription = musicProvider.positionStream.listen((_) {
       if (!_isDragging) {
@@ -46,7 +46,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   }
 
   void _startOrStopAnimation() {
-    final musicProvider = context.read<NewMusicProvider>();
+    final musicProvider = context.read<MusicProvider>();
     if (musicProvider.isPlaying) {
       _animationController.repeat();
     } else {
@@ -147,7 +147,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final musicProvider = context.watch<NewMusicProvider>();
+    final musicProvider = context.watch<MusicProvider>();
     final currentSong = musicProvider.currentSong;
     if (currentSong == null) {
       return const Scaffold(

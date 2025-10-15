@@ -19,7 +19,7 @@ dependencies:
   # Audio
   just_audio: ^0.9.40
   audio_session: ^0.1.21
-  just_audio_background: ^0.0.1-beta.14
+  just_audio_background: ^0.0.1-beta.17
   audio_service: ^0.18.17
 
   # File Access
@@ -47,6 +47,7 @@ dependencies:
 
   # Desktop
   window_manager: ^0.3.9
+  sqflite_common_ffi: ^2.3.2
 
   # UI components
 

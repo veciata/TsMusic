@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:provider/provider.dart';
-import 'package:tsmusic/providers/new_music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 
 class SqlScreen extends StatefulWidget {
   const SqlScreen({super.key});
@@ -79,7 +79,7 @@ class _SqlScreenState extends State<SqlScreen> {
             tooltip: 'Sync from Library',
             onPressed: () async {
               try {
-                final mp = context.read<music_provider.NewMusicProvider>();
+                final mp = context.read<music_provider.MusicProvider>();
                 // Ensure songs are loaded
                 if (mp.songs.isEmpty) {
                   await mp.loadSongsFromStorage();

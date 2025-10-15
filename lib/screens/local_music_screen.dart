@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:permission_handler/permission_handler.dart';
-import '../providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart';
 
 class LocalMusicScreen extends StatelessWidget {
@@ -11,7 +11,7 @@ class LocalMusicScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -23,7 +23,7 @@ class LocalMusicScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Consumer<music_provider.NewMusicProvider>(
+      body: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProvider, _) {
           // Load music when the screen is first built
           if (musicProvider.songs.isEmpty && !musicProvider.isLoading && musicProvider.error == null) {

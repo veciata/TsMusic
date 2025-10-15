@@ -21,18 +21,48 @@ extension StringExtension on String {
   String trimAll() => trim().replaceAll(RegExp(r'\s+'), ' ');
 }
 
-class NewMusicProvider extends ChangeNotifier {
+class MusicProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final MetadataEnrichmentService _enrichment = MetadataEnrichmentService();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  
+  // Search indexes
+  final Map<String, List<Song>> _titleIndex = {};
+  final Map<String, List<Song>> _artistIndex = {};
+  final Map<String, List<Song>> _albumIndex = {};
   
   // Now Playing playlist ID
   int get nowPlayingPlaylistId => DatabaseHelper.nowPlayingPlaylistId;
   
   // Load songs from database with optimized queries
+  void _indexSong(Song song) {
+    final titleKey = song.title.toLowerCase();
+    _titleIndex.putIfAbsent(titleKey, () => []).add(song);
+
+    for (final artist in song.artists) {
+      final artistKey = artist.toLowerCase();
+      _artistIndex.putIfAbsent(artistKey, () => []).add(song);
+    }
+
+    if (song.album != null) {
+      final albumKey = song.album!.toLowerCase();
+      _albumIndex.putIfAbsent(albumKey, () => []).add(song);
+    }
+  }
+
+  void _indexAllSongs() {
+    _titleIndex.clear();
+    _artistIndex.clear();
+    _albumIndex.clear();
+    for (final song in _playlist) {
+      _indexSong(song);
+    }
+  }
+
   Future<void> _loadSongsFromDatabase() async {
     if (_songsMap.isNotEmpty) {
       _playlist = _cachedSongs;
+      _indexAllSongs();
       return;
     }
     
@@ -254,7 +284,7 @@ class NewMusicProvider extends ChangeNotifier {
   ValueNotifier<bool> get loadingNotifier => _loadingNotifier;
   String? get error => _error;
 
-  NewMusicProvider() {
+  MusicProvider() {
     _positionSubscription = _audioPlayer.positionStream.listen((_) => notifyListeners());
     AudioNotificationService.init(
       player: _audioPlayer,
@@ -624,6 +654,7 @@ class NewMusicProvider extends ChangeNotifier {
     if (!_songsMap.containsKey(song.url)) {
       _songsMap[song.url] = song;
       _playlist.add(song);
+      _indexSong(song);
     }
   }
 
@@ -861,8 +892,10 @@ class NewMusicProvider extends ChangeNotifier {
   Future<void> updateSong(Song updatedSong) async {
     final index = _playlist.indexWhere((song) => song.id == updatedSong.id);
     if (index != -1) {
+      final oldSong = _playlist[index];
       _playlist[index] = updatedSong;
       _displayedSongs = List.from(_playlist);
+      _updateSongInIndexes(oldSong, updatedSong);
       await _saveSongsToStorage();
       await _updateNowPlayingPlaylist();
       notifyListeners();
@@ -870,13 +903,47 @@ class NewMusicProvider extends ChangeNotifier {
   }
 
   Future<void> _saveSongsToStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_songsKey, jsonEncode(_playlist.map((s) => s.toJson()).toList()));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final songsJson = jsonEncode(_playlist.map((song) => song.toJson()).toList());
+      await prefs.setString('cached_songs', songsJson);
+    } catch (e) {
+      debugPrint('Error saving songs to storage: $e');
+    }
+  }
+  
+  // Helper method to update indexes when a song is updated
+  void _updateSongInIndexes(Song oldSong, Song newSong) {
+    // Remove old entries
+    final titleKey = oldSong.title.toLowerCase();
+    _titleIndex[titleKey]?.remove(oldSong);
+    if (_titleIndex[titleKey]?.isEmpty ?? false) {
+      _titleIndex.remove(titleKey);
+    }
+    
+    for (final artist in oldSong.artists) {
+      final artistKey = artist.toLowerCase();
+      _artistIndex[artistKey]?.remove(oldSong);
+      if (_artistIndex[artistKey]?.isEmpty ?? false) {
+        _artistIndex.remove(artistKey);
+      }
+    }
+    
+    if (oldSong.album != null) {
+      final albumKey = oldSong.album!.toLowerCase();
+      _albumIndex[albumKey]?.remove(oldSong);
+      if (_albumIndex[albumKey]?.isEmpty ?? false) {
+        _albumIndex.remove(albumKey);
+      }
+    }
+    
+    // Add new entries
+    _indexSong(newSong);
   }
 
   Future<void> loadSongsFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
-    final songsJson = prefs.getString(_songsKey);
+    final songsJson = prefs.getString('cached_songs');
     if (songsJson != null) {
       final List<dynamic> jsonList = jsonDecode(songsJson);
       _playlist = jsonList.map((json) => Song.fromJson(json)).toList();
@@ -909,6 +976,7 @@ class NewMusicProvider extends ChangeNotifier {
       else await audioHandler.pause();
     }
   }
+
 
   Future<void> next() async {
     if (_playlist.isEmpty) return;
@@ -1030,32 +1098,33 @@ class NewMusicProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    
+
     try {
       // First try database search for more accurate results
       final results = await _databaseHelper.searchSongs(query);
       if (results.isNotEmpty) {
         _displayedSongs = results.map((e) => Song.fromJson(e)).toList();
       } else {
-        // Fallback to in-memory search if no results from database
-        final lowerQuery = query.toLowerCase();
-        _displayedSongs = _playlist.where((song) {
-          return song.title.toLowerCase().contains(lowerQuery) ||
-                 song.artists.any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-                 (song.album?.toLowerCase().contains(lowerQuery) ?? false);
-        }).toList();
+        // Fallback to indexed search
+        final key = query.toLowerCase();
+        final titleMatches = _titleIndex[key] ?? [];
+        final artistMatches = _artistIndex[key] ?? [];
+        final albumMatches = _albumIndex[key] ?? [];
+
+        final resultSet = {...titleMatches, ...artistMatches, ...albumMatches};
+        _displayedSongs = resultSet.toList();
       }
     } catch (e) {
       debugPrint('Error searching songs: $e');
-      // Fallback to in-memory search on error
-      final lowerQuery = query.toLowerCase();
-      _displayedSongs = _playlist.where((song) {
-        return song.title.toLowerCase().contains(lowerQuery) ||
-               song.artists.any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-               (song.album?.toLowerCase().contains(lowerQuery) ?? false);
-      }).toList();
+      // Fallback to indexed search on error
+      final key = query.toLowerCase();
+      final titleMatches = _titleIndex[key] ?? [];
+      final artistMatches = _artistIndex[key] ?? [];
+      final albumMatches = _albumIndex[key] ?? [];
+
+      final resultSet = {...titleMatches, ...artistMatches, ...albumMatches};
+      _displayedSongs = resultSet.toList();
     }
-    
     notifyListeners();
   }
 }

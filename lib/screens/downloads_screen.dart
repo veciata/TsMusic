@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart';
 import '../services/youtube_service.dart';
 
@@ -53,7 +53,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Widget _buildDownloadsList() {
-    return Consumer2<YouTubeService, music_provider.NewMusicProvider>(
+    return Consumer2<YouTubeService, music_provider.MusicProvider>(
       builder: (context, youTubeService, musicProvider, _) {
         final activeDownloads = youTubeService.activeDownloads;
         final downloadedSongs = musicProvider.youtubeSongs;
@@ -327,7 +327,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ),
         trailing: Text(song.formattedDuration),
         onTap: () {
-          final musicProvider = Provider.of<music_provider.NewMusicProvider>(
+          final musicProvider = Provider.of<music_provider.MusicProvider>(
             context,
             listen: false,
           );

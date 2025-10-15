@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/main.dart';
-import 'package:tsmusic/providers/new_music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/utils/permission_helper.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -58,7 +58,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> _startMusicScan() async {
     try {
-      final musicProvider = Provider.of<music_provider.NewMusicProvider>(
+      final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
         listen: false,
       );
@@ -81,7 +81,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
 
     return Scaffold(
       body: Center(
