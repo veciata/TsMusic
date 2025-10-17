@@ -25,15 +25,15 @@ class MusicProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final MetadataEnrichmentService _enrichment = MetadataEnrichmentService();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
-  
+
   // Search indexes
   final Map<String, List<Song>> _titleIndex = {};
   final Map<String, List<Song>> _artistIndex = {};
   final Map<String, List<Song>> _albumIndex = {};
-  
+
   // Now Playing playlist ID
   int get nowPlayingPlaylistId => DatabaseHelper.nowPlayingPlaylistId;
-  
+
   // Load songs from database with optimized queries
   void _indexSong(Song song) {
     final titleKey = song.title.toLowerCase();
@@ -65,11 +65,11 @@ class MusicProvider extends ChangeNotifier {
       _indexAllSongs();
       return;
     }
-    
+
     try {
       // Get all songs in a single query
       final db = await _databaseHelper.database;
-      
+
       // Get all songs with their artists and genres in a single query
       final songsQuery = '''
         SELECT 
@@ -84,13 +84,13 @@ class MusicProvider extends ChangeNotifier {
         WHERE s.playlist_id = ?
         GROUP BY s.id
       ''';
-      
+
       final songs = await db.rawQuery(songsQuery, [nowPlayingPlaylistId]);
-      
+
       // Clear current data
       _playlist.clear();
       _songsMap.clear();
-      
+
       // Process all songs in a single batch
       for (final songData in songs) {
         try {
@@ -100,16 +100,17 @@ class MusicProvider extends ChangeNotifier {
               .where((name) => name.isNotEmpty && name != 'Unknown Artist')
               .toSet() // Remove duplicates
               .toList();
-          
-          final artists = artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
-          
+
+          final artists =
+              artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
+
           // Parse genres/tags
           final tags = (songData['genre_names'] as String? ?? '')
               .split('|')
               .where((tag) => tag.isNotEmpty)
               .toSet() // Remove duplicates
               .toList();
-          
+
           final song = Song(
             id: songData['id'].toString(),
             title: songData['title'] as String? ?? 'Unknown Title',
@@ -122,11 +123,11 @@ class MusicProvider extends ChangeNotifier {
             isDownloaded: songData['is_downloaded'] == 1,
             tags: tags,
             trackNumber: songData['track_number'] as int?,
-            dateAdded: songData['created_at'] != null 
+            dateAdded: songData['created_at'] != null
                 ? DateTime.parse(songData['created_at'] as String)
                 : DateTime.now(),
           );
-          
+
           // Use URL as key to prevent duplicates
           if (!_songsMap.containsKey(song.url)) {
             _songsMap[song.url] = song;
@@ -136,7 +137,7 @@ class MusicProvider extends ChangeNotifier {
           debugPrint('Error loading song from database: $e');
         }
       }
-      
+
       _displayedSongs = List.from(_playlist);
       notifyListeners();
     } catch (e) {
@@ -144,11 +145,12 @@ class MusicProvider extends ChangeNotifier {
       rethrow;
     }
   }
-  
+
   // Load Now Playing playlist from database
   Future<void> _loadNowPlayingPlaylist() async {
     try {
-      final songs = await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
+      final songs =
+          await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
       // Clear current playlist and add songs from database
       _playlist.clear();
       _songsMap.clear(); // Clear the map when reloading the playlist
@@ -164,11 +166,14 @@ class MusicProvider extends ChangeNotifier {
       }
     }
   }
-  
+
   // Update Now Playing playlist in database
   Future<void> _updateNowPlayingPlaylist() async {
     try {
-      final songIds = _playlist.map((song) => int.tryParse(song.id) ?? 0).where((id) => id > 0).toList();
+      final songIds = _playlist
+          .map((song) => int.tryParse(song.id) ?? 0)
+          .where((id) => id > 0)
+          .toList();
       await _databaseHelper.updateNowPlayingPlaylist(songIds);
     } catch (e) {
       if (kDebugMode) {
@@ -177,21 +182,31 @@ class MusicProvider extends ChangeNotifier {
     }
   }
 
-  static const List<String> audioExtensions = ['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.opus', '.m4b', '.mp4'];
+  static const List<String> audioExtensions = [
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.flac',
+    '.aac',
+    '.ogg',
+    '.opus',
+    '.m4b',
+    '.mp4'
+  ];
   static const String _songsKey = 'cached_songs';
-  
+
   bool _isLoading = false;
   final ValueNotifier<bool> _loadingNotifier = ValueNotifier<bool>(false);
   List<Song> _playlist = [];
   List<Song> _displayedSongs = [];
-  List<Song> _filteredSongs = [];
+  final List<Song> _filteredSongs = [];
   int _currentIndex = 0;
   String? _error;
   SongSortOption _currentSortOption = SongSortOption.title;
   bool _sortAscending = true;
   StreamSubscription<Duration>? _positionSubscription;
-  bool _isEnriching = false;
-  int _enrichedCount = 0;
+  final bool _isEnriching = false;
+  final int _enrichedCount = 0;
   bool _shuffleEnabled = false;
   LoopMode _loopMode = LoopMode.off;
 
@@ -206,14 +221,16 @@ class MusicProvider extends ChangeNotifier {
   bool get isPlaying => _audioPlayer.playing;
   Duration get position => _audioPlayer.position;
   Duration get duration => _audioPlayer.duration ?? Duration.zero;
-  Song? get currentSong =>
-      _playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length
-          ? _playlist[_currentIndex]
-          : null;
-  int? get currentIndex =>
-      (_playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length)
-          ? _currentIndex
-          : null;
+  Song? get currentSong => _playlist.isNotEmpty &&
+          _currentIndex >= 0 &&
+          _currentIndex < _playlist.length
+      ? _playlist[_currentIndex]
+      : null;
+  int? get currentIndex => (_playlist.isNotEmpty &&
+          _currentIndex >= 0 &&
+          _currentIndex < _playlist.length)
+      ? _currentIndex
+      : null;
   List<Song> get queue => List.unmodifiable(_playlist);
   List<Song> get allSongs => _songsMap.values.toList();
   List<Song> get youtubeSongs =>
@@ -222,7 +239,9 @@ class MusicProvider extends ChangeNotifier {
   List<String> get albums {
     final albumSet = <String>{};
     for (final song in _playlist) {
-      if (song.album != null && song.album!.isNotEmpty && song.album!.toLowerCase() != 'unknown album') {
+      if (song.album != null &&
+          song.album!.isNotEmpty &&
+          song.album!.toLowerCase() != 'unknown album') {
         albumSet.add(song.album!);
       }
     }
@@ -233,7 +252,9 @@ class MusicProvider extends ChangeNotifier {
     final artistSet = <String>{};
     for (final song in _playlist) {
       for (final artist in song.artists) {
-        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist') artistSet.add(artist);
+        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist') {
+          artistSet.add(artist);
+        }
       }
     }
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
@@ -249,8 +270,9 @@ class MusicProvider extends ChangeNotifier {
 
   String? getAlbumArtUrl(String albumName, {String? artistName}) {
     for (final song in _playlist) {
-      if (song.album == albumName && 
-          (artistName == null || song.artists.any((artist) => artist == artistName))) {
+      if (song.album == albumName &&
+          (artistName == null ||
+              song.artists.any((artist) => artist == artistName))) {
         return song.albumArtUrl;
       }
     }
@@ -258,20 +280,26 @@ class MusicProvider extends ChangeNotifier {
   }
 
   List<Song> getSongsByArtist(String artistName) {
-    return _playlist.where((song) => song.artists.any((artist) => artist == artistName)).toList();
+    return _playlist
+        .where((song) => song.artists.any((artist) => artist == artistName))
+        .toList();
   }
 
   List<Song> getSongsByAlbum(String albumName, {String? artistName}) {
-    return _playlist.where((song) => 
-      song.album == albumName && 
-      (artistName == null || song.artists.any((artist) => artist == artistName))
-    ).toList();
+    return _playlist
+        .where((song) =>
+            song.album == albumName &&
+            (artistName == null ||
+                song.artists.any((artist) => artist == artistName)))
+        .toList();
   }
 
   List<String> getAlbumsByArtist(String artistName) {
     final albumSet = <String>{};
     for (final song in _playlist) {
-      if (song.artists.any((artist) => artist == artistName) && song.album != null && song.album!.isNotEmpty) {
+      if (song.artists.any((artist) => artist == artistName) &&
+          song.album != null &&
+          song.album!.isNotEmpty) {
         albumSet.add(song.album!);
       }
     }
@@ -285,7 +313,8 @@ class MusicProvider extends ChangeNotifier {
   String? get error => _error;
 
   MusicProvider() {
-    _positionSubscription = _audioPlayer.positionStream.listen((_) => notifyListeners());
+    _positionSubscription =
+        _audioPlayer.positionStream.listen((_) => notifyListeners());
     AudioNotificationService.init(
       player: _audioPlayer,
       onCurrentSongChanged: (_) => notifyListeners(),
@@ -308,13 +337,17 @@ class MusicProvider extends ChangeNotifier {
           await _audioPlayer.seek(Duration.zero);
           await _audioPlayer.play();
         } else if (_loopMode == LoopMode.all) {
-          if (_currentIndex == _playlist.length - 1) _currentIndex = 0;
-          else _currentIndex++;
+          if (_currentIndex == _playlist.length - 1) {
+            _currentIndex = 0;
+          } else {
+            _currentIndex++;
+          }
           await _setAudioSource(_playlist[_currentIndex]);
           await _audioPlayer.play();
           await _updateNotification();
           notifyListeners();
-        } else if (_playlist.length > 1 && _currentIndex < _playlist.length - 1) {
+        } else if (_playlist.length > 1 &&
+            _currentIndex < _playlist.length - 1) {
           await next();
         }
       }
@@ -335,7 +368,7 @@ class MusicProvider extends ChangeNotifier {
   Future<void> _initialize() async {
     // Load Now Playing playlist first to show something immediately
     await _loadNowPlayingPlaylist();
-    
+
     // Then load songs in the background
     loadLocalMusic().catchError((e) {
       debugPrint('Error during initialization: $e');
@@ -445,7 +478,8 @@ class MusicProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<int> _getOrCreateArtist(DatabaseExecutor txn, String artistName) async {
+  Future<int> _getOrCreateArtist(
+      DatabaseExecutor txn, String artistName) async {
     final existingArtist = await txn.query(
       DatabaseHelper.tableArtists,
       where: '${DatabaseHelper.columnName} = ?',
@@ -498,7 +532,10 @@ class MusicProvider extends ChangeNotifier {
   }
 
   void moveInQueue(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _playlist.length || newIndex < 0 || newIndex >= _playlist.length) {
+    if (oldIndex < 0 ||
+        oldIndex >= _playlist.length ||
+        newIndex < 0 ||
+        newIndex >= _playlist.length) {
       return;
     }
     final song = _playlist.removeAt(oldIndex);
@@ -534,7 +571,8 @@ class MusicProvider extends ChangeNotifier {
       final audioPlayer = AudioPlayer();
       try {
         await audioPlayer.setFilePath(filePath);
-        await Future.delayed(const Duration(milliseconds: 50)); // Small delay to allow metadata to load
+        await Future.delayed(const Duration(
+            milliseconds: 50)); // Small delay to allow metadata to load
         return audioPlayer.duration ?? Duration.zero;
       } finally {
         await audioPlayer.dispose();
@@ -546,9 +584,10 @@ class MusicProvider extends ChangeNotifier {
   }
 
   // Cache for songs to avoid repeated database queries
-  static final Map<String, Song> _songsMap = {}; // Using map to prevent duplicates by file path
+  static final Map<String, Song> _songsMap =
+      {}; // Using map to prevent duplicates by file path
   static List<Song> get _cachedSongs => _songsMap.values.toList();
-  
+
   // Track if database has been initialized
   bool _isDatabaseInitialized = false;
 
@@ -560,16 +599,16 @@ class MusicProvider extends ChangeNotifier {
       _addSongIfNotExists(song);
     }
   }
-  
+
   /// Loads music from database first, then checks for new music in background
   /// Refreshes the music library, checking for new and deleted files
   Future<void> refreshLibrary() async {
     await loadLocalMusic(forceRescan: true);
   }
-  
+
   Future<void> loadLocalMusic({bool forceRescan = false}) async {
     if (_isLoading) return;
-    
+
     try {
       _isLoading = true;
       _loadingNotifier.value = true;
@@ -579,7 +618,7 @@ class MusicProvider extends ChangeNotifier {
       // Clear current lists
       _playlist.clear();
       _displayedSongs.clear();
-      
+
       // If we have cached songs and not forcing rescan, use them
       if (_songsMap.isNotEmpty && !forceRescan) {
         _playlist = _cachedSongs;
@@ -589,30 +628,29 @@ class MusicProvider extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      
+
       // First try to load from database
       await _loadSongsFromDatabase();
-      
+
       // If we have songs, update UI
       if (_playlist.isNotEmpty) {
         _displayedSongs = List.from(_playlist);
         _isLoading = false;
         _loadingNotifier.value = false;
         notifyListeners();
-        
+
         // Check for new music in background
         _checkForNewMusicInBackground();
       } else {
         // If no songs in database, do a full scan
         await _scanLocalStorageForMusic();
       }
-      
     } catch (e) {
       _error = 'Error loading music: $e';
       _isLoading = false;
       _loadingNotifier.value = false;
       notifyListeners();
-      
+
       // Try to recover by forcing a rescan
       if (_playlist.isEmpty) {
         await _scanLocalStorageForMusic();
@@ -623,21 +661,21 @@ class MusicProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Checks for new music files in the background without blocking the UI
   Future<void> _checkForNewMusicInBackground() async {
     try {
       // Skip if we just did a full scan
       if (_isDatabaseInitialized) return;
-      
+
       _isDatabaseInitialized = true;
-      
+
       // Check if we need to rescan for new music (e.g., first run or after a while)
       final prefs = await SharedPreferences.getInstance();
       final lastScanTime = prefs.getInt('last_music_scan') ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
       const oneDayInMs = 24 * 60 * 60 * 1000;
-      
+
       if (now - lastScanTime > oneDayInMs || _cachedSongs.isEmpty) {
         // Do a background scan for new music
         await _scanLocalStorageForMusic(background: true);
@@ -647,7 +685,6 @@ class MusicProvider extends ChangeNotifier {
       debugPrint('Background music check failed: $e');
     }
   }
-
 
   // Helper method to add a song only if it doesn't exist
   void _addSongIfNotExists(Song song) {
@@ -665,20 +702,20 @@ class MusicProvider extends ChangeNotifier {
       _error = 'Scanning for music...';
       notifyListeners();
     }
-    
+
     try {
       // Clear current data
       _playlist.clear();
       _songsMap.clear();
       _displayedSongs.clear();
-      
+
       // First, check for deleted files
       final db = await _databaseHelper.database;
       final allSongs = await db.query('songs');
-      
+
       // Create a list to store IDs of songs that no longer exist
       final List<int> songsToRemove = [];
-      
+
       // Check each song if it still exists on the device
       for (final songData in allSongs) {
         final file = File(songData['url'] as String);
@@ -686,7 +723,7 @@ class MusicProvider extends ChangeNotifier {
           songsToRemove.add(songData['id'] as int);
         }
       }
-      
+
       // Remove deleted songs from the database
       if (songsToRemove.isNotEmpty) {
         await db.delete(
@@ -694,11 +731,12 @@ class MusicProvider extends ChangeNotifier {
           where: 'id IN (${List.filled(songsToRemove.length, '?').join(',')})',
           whereArgs: songsToRemove,
         );
-        
+
         // Also remove from playlist_songs
         await db.delete(
           'playlist_songs',
-          where: 'song_id IN (${List.filled(songsToRemove.length, '?').join(',')})',
+          where:
+              'song_id IN (${List.filled(songsToRemove.length, '?').join(',')})',
           whereArgs: songsToRemove,
         );
       }
@@ -706,7 +744,7 @@ class MusicProvider extends ChangeNotifier {
       debugPrint('Error checking for deleted files: $e');
       // Continue with normal scanning even if there was an error
     }
-    
+
     bool hasPermission = false;
     if (Platform.isAndroid) {
       final androidInfo = await DeviceInfoPlugin().androidInfo;
@@ -719,7 +757,9 @@ class MusicProvider extends ChangeNotifier {
         var status = await Permission.storage.status;
         if (!status.isGranted) status = await Permission.storage.request();
         hasPermission = status.isGranted;
-        if (hasPermission && sdkInt >= 30) await Permission.manageExternalStorage.request();
+        if (hasPermission && sdkInt >= 30) {
+          await Permission.manageExternalStorage.request();
+        }
       }
     } else {
       var status = await Permission.storage.status;
@@ -770,7 +810,8 @@ class MusicProvider extends ChangeNotifier {
           await for (final entity in stream) {
             if (entity is File) {
               final ext = path.extension(entity.path).toLowerCase();
-              if (audioExtensions.contains(ext) && !processedPaths.contains(entity.path)) {
+              if (audioExtensions.contains(ext) &&
+                  !processedPaths.contains(entity.path)) {
                 try {
                   final stat = await entity.stat();
                   if (stat.size > 10 * 1024) {
@@ -805,9 +846,18 @@ class MusicProvider extends ChangeNotifier {
       try {
         String cleanFileName(String fileName) {
           return fileName
-              .replaceAll(RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false), '')
-              .replaceAll(RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps', caseSensitive: false), '')
-              .replaceAll(RegExp(r'\b(official|music|video|lyrics|hd|clear)\b', caseSensitive: false), '')
+              .replaceAll(
+                  RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}',
+                      caseSensitive: false),
+                  '')
+              .replaceAll(
+                  RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
+                      caseSensitive: false),
+                  '')
+              .replaceAll(
+                  RegExp(r'\b(official|music|video|lyrics|hd|clear)\b',
+                      caseSensitive: false),
+                  '')
               .replaceAll(RegExp(r'\s{2,}'), ' ')
               .trim();
         }
@@ -826,7 +876,9 @@ class MusicProvider extends ChangeNotifier {
           artistsList = [mainArtist];
 
           String? featuredArtists;
-          final featPattern = RegExp(r'^(.*?)\s*(?:ft\.?|feat\.?|featuring)\s+(.+)$', caseSensitive: false);
+          final featPattern = RegExp(
+              r'^(.*?)\s*(?:ft\.?|feat\.?|featuring)\s+(.+)$',
+              caseSensitive: false);
           final featMatch = featPattern.firstMatch(rawTitle);
 
           if (featMatch != null) {
@@ -845,23 +897,32 @@ class MusicProvider extends ChangeNotifier {
           artistsList.addAll(featuredList);
 
           title = rawTitle
-              .replaceAll(RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false), '')
-              .replaceAll(RegExp(r'(?:ft\.?|feat\.?|featuring)\s+.+$', caseSensitive: false), '')
-              .replaceAll(RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps', caseSensitive: false), '')
+              .replaceAll(
+                  RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}',
+                      caseSensitive: false),
+                  '')
+              .replaceAll(
+                  RegExp(r'(?:ft\.?|feat\.?|featuring)\s+.+$',
+                      caseSensitive: false),
+                  '')
+              .replaceAll(
+                  RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
+                      caseSensitive: false),
+                  '')
               .replaceAll(RegExp(r'\s{2,}'), ' ')
               .trim();
         }
 
         // Get duration without blocking the main thread
         final duration = await _getAudioDuration(file.path);
-        
+
         // Check if this song is already in the playlist (from database)
         final existingIndex = _playlist.indexWhere((s) => s.url == file.path);
-        
+
         if (existingIndex == -1) {
           // Check if the song is in the music/tsmusic directory
           final isTSMusic = file.path.toLowerCase().contains('music/tsmusic');
-          
+
           final song = Song(
             id: '${file.path}_${(await file.lastModified()).millisecondsSinceEpoch}',
             title: title,
@@ -905,13 +966,14 @@ class MusicProvider extends ChangeNotifier {
   Future<void> _saveSongsToStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final songsJson = jsonEncode(_playlist.map((song) => song.toJson()).toList());
+      final songsJson =
+          jsonEncode(_playlist.map((song) => song.toJson()).toList());
       await prefs.setString('cached_songs', songsJson);
     } catch (e) {
       debugPrint('Error saving songs to storage: $e');
     }
   }
-  
+
   // Helper method to update indexes when a song is updated
   void _updateSongInIndexes(Song oldSong, Song newSong) {
     // Remove old entries
@@ -920,7 +982,7 @@ class MusicProvider extends ChangeNotifier {
     if (_titleIndex[titleKey]?.isEmpty ?? false) {
       _titleIndex.remove(titleKey);
     }
-    
+
     for (final artist in oldSong.artists) {
       final artistKey = artist.toLowerCase();
       _artistIndex[artistKey]?.remove(oldSong);
@@ -928,7 +990,7 @@ class MusicProvider extends ChangeNotifier {
         _artistIndex.remove(artistKey);
       }
     }
-    
+
     if (oldSong.album != null) {
       final albumKey = oldSong.album!.toLowerCase();
       _albumIndex[albumKey]?.remove(oldSong);
@@ -936,7 +998,7 @@ class MusicProvider extends ChangeNotifier {
         _albumIndex.remove(albumKey);
       }
     }
-    
+
     // Add new entries
     _indexSong(newSong);
   }
@@ -963,29 +1025,40 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> _setAudioSource(Song song) async {
-    if (song.url.startsWith('http')) await _audioPlayer.setUrl(song.url);
-    else await _audioPlayer.setFilePath(song.url);
+    if (song.url.startsWith('http')) {
+      await _audioPlayer.setUrl(song.url);
+    } else {
+      await _audioPlayer.setFilePath(song.url);
+    }
     await _updateNotification();
   }
 
   Future<void> _updateNotification() async {
     final audioHandler = AudioNotificationService.audioHandler;
     if (audioHandler != null && currentSong != null) {
-      await audioHandler.setAudioSource(AudioSource.uri(Uri.parse(currentSong!.url)), song: currentSong);
-      if (_audioPlayer.playing) await audioHandler.play();
-      else await audioHandler.pause();
+      await audioHandler.setAudioSource(
+          AudioSource.uri(Uri.parse(currentSong!.url)),
+          song: currentSong);
+      if (_audioPlayer.playing) {
+        await audioHandler.play();
+      } else {
+        await audioHandler.pause();
+      }
     }
   }
-
 
   Future<void> next() async {
     if (_playlist.isEmpty) return;
     if (_shuffleEnabled) {
       int nextIndex = _currentIndex;
       final random = Random();
-      while (nextIndex == _currentIndex && _playlist.length > 1) nextIndex = random.nextInt(_playlist.length);
+      while (nextIndex == _currentIndex && _playlist.length > 1) {
+        nextIndex = random.nextInt(_playlist.length);
+      }
       _currentIndex = nextIndex;
-    } else _currentIndex = (_currentIndex + 1) % _playlist.length;
+    } else {
+      _currentIndex = (_currentIndex + 1) % _playlist.length;
+    }
     await _setAudioSource(_playlist[_currentIndex]);
     await _audioPlayer.play();
     await _updateNotification();
@@ -1005,8 +1078,11 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause() async {
-    if (_audioPlayer.playing) await _audioPlayer.pause();
-    else await _audioPlayer.play();
+    if (_audioPlayer.playing) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.play();
+    }
     await _updateNotification();
     await _updateNowPlayingPlaylist();
     notifyListeners();
@@ -1024,39 +1100,38 @@ class MusicProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sortSongs({required SongSortOption sortBy, bool ascending = true}) async {
+  Future<void> sortSongs(
+      {required SongSortOption sortBy, bool ascending = true}) async {
     try {
       _currentSortOption = sortBy;
       _sortAscending = ascending;
-      
+
       // Sort the songs
-      final sortedSongs = _songsMap.values.toList()..sort((a, b) {
-        int compare;
-        switch (sortBy) {
-          case SongSortOption.title:
+      final sortedSongs = _songsMap.values.toList()
+        ..sort((a, b) {
+          int compare;
+          if (sortBy == SongSortOption.title) {
             compare = a.title.compareTo(b.title);
-            break;
-          case SongSortOption.artist:
+          } else if (sortBy == SongSortOption.artist) {
             final artistA = a.artists.isNotEmpty ? a.artists.first : '';
             final artistB = b.artists.isNotEmpty ? b.artists.first : '';
             compare = artistA.compareTo(artistB);
-            break;
-          case SongSortOption.album:
+          } else if (sortBy == SongSortOption.album) {
             compare = (a.album ?? '').compareTo(b.album ?? '');
-            break;
-          case SongSortOption.duration:
+          } else if (sortBy == SongSortOption.duration) {
             compare = a.duration.compareTo(b.duration);
-            break;
-          case SongSortOption.dateAdded:
-            compare = (a.dateAdded ?? DateTime.now()).compareTo(b.dateAdded ?? DateTime.now());
-            break;
-        }
-        return ascending ? compare : -compare;
-      });
-      
+          } else if (sortBy == SongSortOption.dateAdded) {
+            compare = (a.dateAdded ?? DateTime.now())
+                .compareTo(b.dateAdded ?? DateTime.now());
+          } else {
+            compare = 0;
+          }
+          return ascending ? compare : -compare;
+        });
+
       // Update the playlist with sorted songs
       _playlist = sortedSongs;
-      
+
       // Update the database in the background
       try {
         final db = await _databaseHelper.database;
@@ -1067,7 +1142,7 @@ class MusicProvider extends ChangeNotifier {
             where: 'playlist_id = ?',
             whereArgs: [nowPlayingPlaylistId],
           );
-          
+
           // Re-add all songs in the new order
           for (int i = 0; i < _playlist.length; i++) {
             await txn.insert(
@@ -1084,7 +1159,7 @@ class MusicProvider extends ChangeNotifier {
         debugPrint('Error saving sort order: $e');
         // Don't rethrow, as the in-memory sort still worked
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error sorting songs: $e');

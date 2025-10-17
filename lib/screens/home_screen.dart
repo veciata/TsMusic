@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-import 'package:tsmusic/providers/theme_provider.dart' as theme_provider;
 import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,13 +23,13 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _welcomeChecked = false;
   bool _isLoadingMusic = false;
   String? _loadingError;
-  int _visibleSongs = 5;
-  int _visibleArtists = 5;
+  final int _visibleSongs = 5;
+  final int _visibleArtists = 5;
 
   @override
   void initState() {
     super.initState();
-_initFirstLaunchAndLoad();
+    _initFirstLaunchAndLoad();
   }
 
   Future<void> _initFirstLaunchAndLoad() async {
@@ -54,25 +53,27 @@ _initFirstLaunchAndLoad();
 
     try {
       final provider = context.read<music_provider.MusicProvider>();
-      
+
       // Load music from local storage with a timeout
       await provider.loadLocalMusic().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           if (mounted) {
             setState(() {
-              _loadingError = 'Music loading is taking longer than expected. Please wait...';
+              _loadingError =
+                  'Music loading is taking longer than expected. Please wait...';
             });
           }
           return Future.value();
         },
       );
-      
+
       if (mounted) {
         setState(() {
           _isLoadingMusic = false;
           if (provider.allSongs.isEmpty) {
-            _loadingError = 'No music found. Try adding some music to your device.';
+            _loadingError =
+                'No music found. Try adding some music to your device.';
           }
         });
       }
@@ -80,7 +81,8 @@ _initFirstLaunchAndLoad();
       if (mounted) {
         setState(() {
           _isLoadingMusic = false;
-          _loadingError = 'Failed to load music: ${e.toString().split('\n').first}';
+          _loadingError =
+              'Failed to load music: ${e.toString().split('\n').first}';
         });
       }
     }
@@ -91,29 +93,30 @@ _initFirstLaunchAndLoad();
     try {
       // Use a case-insensitive map to track unique songs by their file path
       final Map<String, Song> uniqueSongs = {};
-      
+
       // Track seen file paths for duplicate detection
       final Set<String> seenPaths = {};
-      
+
       // Helper function to get a normalized file path for comparison
       String getNormalizedPath(String filePath) {
         try {
           // Convert to lowercase and remove any query parameters or fragments
-          String path = filePath.split('?')[0].split('#')[0].toLowerCase().trim();
-          
+          String path =
+              filePath.split('?')[0].split('#')[0].toLowerCase().trim();
+
           // Handle different path formats that point to the same location
           const String emulatedPrefix = '/storage/emulated/0/';
           const String sdcardPrefix = '/sdcard/';
-          
+
           // Convert /storage/emulated/0/ to /sdcard/ for consistency
           if (path.startsWith(emulatedPrefix)) {
             path = '/sdcard/${path.substring(emulatedPrefix.length)}';
           }
-          
+
           // Remove any redundant path segments
           final uri = Uri.file(path);
           final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-          
+
           // Rebuild path with normalized segments
           return '/${segments.join('/')}';
         } catch (e) {
@@ -123,27 +126,28 @@ _initFirstLaunchAndLoad();
           return filePath.toLowerCase();
         }
       }
-      
+
       // Process each song
       for (final song in provider.allSongs) {
         try {
           if (song.url.isEmpty) continue;
-          
+
           final normalizedPath = getNormalizedPath(song.url);
           if (normalizedPath.isEmpty) continue;
-          
+
           // Skip if we've already seen this exact path
           if (seenPaths.contains(normalizedPath)) {
             if (kDebugMode) {
-              print('Skipping duplicate song by path: ${song.title} (${song.url})');
+              print(
+                  'Skipping duplicate song by path: ${song.title} (${song.url})');
             }
             continue;
           }
-          
+
           // Add to our unique songs and seen paths
           uniqueSongs[song.id] = song;
           seenPaths.add(normalizedPath);
-          
+
           if (kDebugMode) {
             print('Adding song to UI: ${song.title} (${song.url})');
           }
@@ -153,34 +157,31 @@ _initFirstLaunchAndLoad();
           }
         }
       }
-      
+
       // Convert to list and sort
       final songs = uniqueSongs.values.toList();
-      
+
       songs.sort((a, b) {
         int compare;
-        switch (provider.currentSortOption) {
-          case SongSortOption.title:
-            compare = a.title.compareTo(b.title);
-            break;
-          case SongSortOption.artist:
-            final artistA = a.artists.isNotEmpty ? a.artists.join(' & ') : '';
-            final artistB = b.artists.isNotEmpty ? b.artists.join(' & ') : '';
-            compare = artistA.compareTo(artistB);
-            break;
-          case SongSortOption.album:
-            compare = (a.album ?? '').compareTo(b.album ?? '');
-            break;
-          case SongSortOption.duration:
-            compare = a.duration.compareTo(b.duration);
-            break;
-          case SongSortOption.dateAdded:
-            compare = (a.dateAdded ?? DateTime.now()).compareTo(b.dateAdded ?? DateTime.now());
-            break;
+        if (provider.currentSortOption == SongSortOption.title) {
+          compare = a.title.compareTo(b.title);
+        } else if (provider.currentSortOption == SongSortOption.artist) {
+          final artistA = a.artists.isNotEmpty ? a.artists.join(' & ') : '';
+          final artistB = b.artists.isNotEmpty ? b.artists.join(' & ') : '';
+          compare = artistA.compareTo(artistB);
+        } else if (provider.currentSortOption == SongSortOption.album) {
+          compare = (a.album ?? '').compareTo(b.album ?? '');
+        } else if (provider.currentSortOption == SongSortOption.duration) {
+          compare = a.duration.compareTo(b.duration);
+        } else if (provider.currentSortOption == SongSortOption.dateAdded) {
+          compare = (a.dateAdded ?? DateTime.now())
+              .compareTo(b.dateAdded ?? DateTime.now());
+        } else {
+          compare = 0;
         }
         return provider.sortAscending ? compare : -compare;
       });
-      
+
       if (kDebugMode) {
         print('Displaying ${songs.length} unique songs in UI');
         // Print first few songs for verification
@@ -189,7 +190,7 @@ _initFirstLaunchAndLoad();
           print('Song ${i + 1}: ${songs[i].title} (${songs[i].url})');
         }
       }
-      
+
       return songs;
     } catch (e) {
       if (kDebugMode) {
@@ -253,7 +254,7 @@ _initFirstLaunchAndLoad();
         ),
       );
     }
-    
+
     if (_loadingError != null) {
       return Scaffold(
         body: Center(
@@ -282,7 +283,7 @@ _initFirstLaunchAndLoad();
         ),
       );
     }
-    
+
     if (sortedSongs.isEmpty) {
       return Scaffold(
         body: _buildNoMusicFound(),
@@ -319,9 +320,11 @@ _initFirstLaunchAndLoad();
                 children: [
                   const Icon(Icons.music_off, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  Text('No music found', style: Theme.of(context).textTheme.titleMedium),
+                  Text('No music found',
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Text('Add some music files and refresh', style: Theme.of(context).textTheme.bodyMedium),
+                  Text('Add some music files and refresh',
+                      style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: _loadMusic,
@@ -342,17 +345,28 @@ _initFirstLaunchAndLoad();
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Icon(Icons.music_note),
                   ),
-                  title: Text(song.title.isNotEmpty ? song.title : 'Unknown Title', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  title: Text(
+                      song.title.isNotEmpty ? song.title : 'Unknown Title',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   subtitle: Text(
                     _getArtistsText(song.artists),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7)),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.color
+                            ?.withOpacity(0.7)),
                   ),
                   trailing: Text(_formatDuration(song.duration)),
                   onTap: () => musicProvider.playSong(song),
@@ -385,5 +399,4 @@ _initFirstLaunchAndLoad();
       ),
     );
   }
-
 }

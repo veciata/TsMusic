@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart' as model;
+import '../models/youtube_audio.dart';
 import '../services/youtube_service.dart';
 import '../main.dart';
 import 'downloads_screen.dart';
+import 'youtube_video_player_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -19,7 +21,7 @@ class _SearchScreenState extends State<SearchScreen> {
   // Helper method to navigate to downloads screen
   void _navigateToDownloads() {
     if (!mounted) return;
-    
+
     // Navigate directly to DownloadsScreen
     Navigator.push(
       context,
@@ -28,6 +30,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late final YouTubeService _youTubeService;
@@ -45,13 +48,26 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _youTubeService = context.read<YouTubeService>();
+    _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     _searchFocusNode.requestFocus();
+    _setupScrollController();
   }
 
   void _setupScrollController() {
     _scrollController.addListener(_onScroll);
     _searchScrollController.addListener(_onScroll);
+  }
+
+  void _onSearchTextChanged(String query) {
+    // Cancel any previous debounce timer
+    _debounceTimer?.cancel();
+
+    // Set a new timer to perform the search after a delay
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _searchYouTube(query);
+      }
+    });
   }
 
   @override
@@ -66,13 +82,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _playAudio(YouTubeAudio audio) async {
     if (!mounted) return;
-    
+
     setState(() => _loadingYouTubeId = audio.id);
-    
+
     try {
       // YouTube servisi üzerinden sadece sesi çal
       await _youTubeService.playAudio(audio);
-      
+
       if (mounted) {
         setState(() {
           _loadingYouTubeId = null;
@@ -80,10 +96,10 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     } catch (e) {
       debugPrint('Error playing audio: $e');
-      
+
       if (mounted) {
         setState(() => _loadingYouTubeId = null);
-        
+
         // Kullanıcıya hata mesajı göster
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -99,8 +115,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
+    final downloadService =
+        Provider.of<YoutubeDownloadService>(context, listen: false);
     final isDownloading =
-        _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
+        downloadService.activeDownloads.any((d) => d.videoId == audio.id);
+
     if (isDownloading && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Download already in progress')),
@@ -109,10 +128,18 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
-      await _youTubeService.downloadAudio(audio.id, context: context);
+      await downloadService.downloadAudio(
+        videoId: audio.id,
+        context: context,
+        onProgress: (progress) {
+          // Update UI with download progress if needed
+          debugPrint(
+              'Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+        },
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download started: ${audio.title}')),
+          const SnackBar(content: Text('Download completed')),
         );
       }
     } catch (e) {
@@ -125,6 +152,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
+
     if (query.isEmpty) {
       if (mounted) {
         setState(() {
@@ -136,12 +164,15 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    if (loadMore && (_isSearchingYouTube || !_hasMoreYouTubeResults)) return;
+    if (loadMore && (_isSearchingYouTube || !_hasMoreYouTubeResults)) {
+      return;
+    }
 
     if (mounted) setState(() => _isSearchingYouTube = true);
 
     try {
-      final List<YouTubeAudio> response = await _youTubeService.searchAudio(query);
+      final List<YouTubeAudio> response =
+          await _youTubeService.searchAudio(query);
 
       if (mounted) {
         setState(() {
@@ -176,7 +207,8 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final List<YouTubeAudio> more = await _youTubeService.searchAudioNextPage(_lastQuery);
+      final List<YouTubeAudio> more =
+          await _youTubeService.searchAudioNextPage();
       if (!mounted) return;
 
       if (more.isEmpty) {
@@ -217,8 +249,18 @@ class _SearchScreenState extends State<SearchScreen> {
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 
-  Widget _buildSearchResults(List<model.Song> localSongs, music_provider.MusicProvider provider, 
-      model.Song? currentSong, bool isPlaying) {
+  // Helper method to get first element or null
+  T? _firstOrNull<T>(Iterable<T> items) {
+    if (items.isEmpty) return null;
+    return items.first;
+  }
+
+  Widget _buildSearchResults(
+      List<model.Song> localSongs,
+      music_provider.MusicProvider provider,
+      model.Song? currentSong,
+      bool isPlaying) {
+
     if (_searchController.text.isEmpty) {
       return const Center(
         child: Text('Search for songs...'),
@@ -253,13 +295,15 @@ class _SearchScreenState extends State<SearchScreen> {
           ...filteredLocalSongs.map((song) {
             final isCurrent = provider.currentSong?.id == song.id;
             final isSongPlaying = provider.isPlaying && isCurrent;
-            
+
             return ListTile(
               leading: const Icon(Icons.music_note),
               title: Text(song.title),
               subtitle: Text(song.artist),
               trailing: IconButton(
-                icon: Icon(isCurrent && isSongPlaying ? Icons.pause : Icons.play_arrow),
+                icon: Icon(isCurrent && isSongPlaying
+                    ? Icons.pause
+                    : Icons.play_arrow),
                 onPressed: () {
                   if (isCurrent) {
                     if (isSongPlaying) {
@@ -284,14 +328,14 @@ class _SearchScreenState extends State<SearchScreen> {
                 }
               },
             );
-          }).toList(),
+          }),
           const Divider(height: 1),
         ],
-        
+
         // YouTube results section
         if (isLoadingYouTube) ...[
           const Center(child: CircularProgressIndicator()),
-        ] else if (hasYouTubeResults) ...[
+        ] else if (_youtubeResults.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -302,8 +346,16 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-          ..._youtubeResults.map((audio) => _buildYouTubeResultItem(audio)).toList(),
-        ] else if (_searchController.text.isNotEmpty && filteredLocalSongs.isEmpty) ...[
+          ..._youtubeResults.map((audio) {
+            return _buildYouTubeResultItem(audio);
+          }),
+          if (_isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+        ] else if (_searchController.text.isNotEmpty &&
+            filteredLocalSongs.isEmpty) ...[
           const Center(
             child: Padding(
               padding: EdgeInsets.all(16.0),
@@ -320,15 +372,15 @@ class _SearchScreenState extends State<SearchScreen> {
     final isCurrent = youTubeService.currentAudio?.id == audio.id;
     final isPlaying = youTubeService.isPlaying && isCurrent;
     final isLoading = _loadingYouTubeId == audio.id;
-    
-    // Check if this audio is in the download queue
-    final downloadProgress = youTubeService.activeDownloads
-        .where((d) => d.videoId == audio.id)
-        .firstOrNull;
 
-    final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
-    final isDownloaded = musicProvider.songs
-        .any((s) => s.id == audio.id && s.isDownloaded);
+    // Check if this audio is in the download queue
+    final downloadProgress = _firstOrNull(
+        youTubeService.activeDownloads.where((d) => d.videoId == audio.id));
+
+    final musicProvider =
+        Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final isDownloaded =
+        musicProvider.songs.any((s) => s.id == audio.id && s.isDownloaded);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -361,9 +413,9 @@ class _SearchScreenState extends State<SearchScreen> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(audio.artists.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (isCurrent && isPlaying)
-              const LinearProgressIndicator(),
+            Text(audio.artists.join(', '),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (isCurrent && isPlaying) const LinearProgressIndicator(),
             if (downloadProgress != null)
               LinearProgressIndicator(value: downloadProgress.progress),
             if (isDownloaded) const Text('Downloaded'),
@@ -387,7 +439,9 @@ class _SearchScreenState extends State<SearchScreen> {
               icon: Icon(
                 isDownloaded
                     ? Icons.check_circle
-                    : (downloadProgress != null ? Icons.downloading : Icons.download),
+                    : (downloadProgress != null
+                        ? Icons.downloading
+                        : Icons.download),
               ),
               onPressed: () async {
                 if (isDownloaded) {
@@ -403,6 +457,17 @@ class _SearchScreenState extends State<SearchScreen> {
                 if (mounted) {
                   _navigateToDownloads();
                 }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.video_library),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => YouTubeVideoPlayerScreen(audio: audio),
+                  ),
+                );
               },
             ),
           ],
@@ -430,25 +495,12 @@ class _SearchScreenState extends State<SearchScreen> {
           title: TextField(
             controller: _searchController,
             focusNode: _searchFocusNode,
+            onChanged: _onSearchTextChanged,
             autofocus: true,
             decoration: const InputDecoration(
               hintText: 'Search songs...',
               border: InputBorder.none,
             ),
-            onChanged: (value) {
-              _debounceTimer?.cancel();
-              if (value.isNotEmpty) {
-                setState(() => _isSearchingYouTube = true);
-                _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-                  _searchYouTube(value);
-                });
-              } else {
-                setState(() {
-                  _youtubeResults.clear();
-                  _isSearchingYouTube = false;
-                });
-              }
-            },
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -463,7 +515,8 @@ class _SearchScreenState extends State<SearchScreen> {
         body: Column(
           children: [
             Expanded(
-              child: _buildSearchResults(localSongs, musicProvider, currentSong, isPlaying),
+              child: _buildSearchResults(
+                  localSongs, musicProvider, currentSong, isPlaying),
             ),
             if (currentSong != null && currentSong.id.startsWith('temp_'))
               Container(
@@ -502,10 +555,12 @@ class _SearchScreenState extends State<SearchScreen> {
                                   height: 24,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
                                   ),
                                 )
-                              : Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                              : Icon(
+                                  isPlaying ? Icons.pause : Icons.play_arrow),
                           onPressed: () async {
                             if (isLoading) return;
                             if (isPlaying) {
@@ -513,13 +568,17 @@ class _SearchScreenState extends State<SearchScreen> {
                             } else {
                               // Find the YouTubeAudio from search results
                               final youtubeAudio = _youtubeResults.firstWhere(
-                                (audio) => audio.id == currentSong.id.replaceFirst('temp_', ''),
-                                orElse: () => YouTubeAudio(
-                                  id: currentSong.id.replaceFirst('temp_', ''),
-                                  title: currentSong.title,
-                                  author: currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist',
-                                  artists: currentSong.artists.isNotEmpty ? currentSong.artists : ['Unknown Artist'],
-                                  duration: Duration(milliseconds: currentSong.duration),
+                                (audio) =>
+                                    audio.id ==
+                                    currentSong.id.replaceFirst('temp_', ''),
+                                 orElse: () => YouTubeAudio(
+                                   id: currentSong.id.replaceFirst('temp_', ''),
+                                   title: currentSong.title,
+                                   artists: currentSong.artists.isNotEmpty
+                                       ? currentSong.artists
+                                       : ['Unknown Artist'],
+                                  duration: Duration(
+                                      milliseconds: currentSong.duration),
                                   thumbnailUrl: currentSong.albumArtUrl,
                                   audioUrl: currentSong.url,
                                 ),

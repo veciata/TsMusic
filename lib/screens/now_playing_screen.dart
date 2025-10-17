@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
@@ -71,7 +70,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   Widget _buildDefaultArt(ThemeData theme) {
     final bool isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       width: 240,
       height: 240,
@@ -102,7 +101,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       child: Icon(
         Icons.music_note_rounded,
         size: 80,
-        color: isDark 
+        color: isDark
             ? colorScheme.onPrimaryContainer.withOpacity(0.8)
             : colorScheme.primary.withOpacity(0.8),
       ),
@@ -165,11 +164,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0, top: 8.0),
           child: CircleAvatar(
-            backgroundColor: theme.colorScheme.onBackground.withOpacity(0.1),
+            backgroundColor: theme.colorScheme.onSurface.withOpacity(0.1),
             child: IconButton(
               icon: Icon(
-                Icons.arrow_downward_rounded, 
-                color: theme.colorScheme.onBackground.withOpacity(0.8),
+                Icons.arrow_downward_rounded,
+                color: theme.colorScheme.onSurface.withOpacity(0.8),
               ),
               onPressed: () => Navigator.pop(context),
             ),
@@ -178,8 +177,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         actions: [
           IconButton(
             icon: Icon(
-              Icons.more_vert, 
-              color: theme.colorScheme.onBackground.withOpacity(0.8),
+              Icons.more_vert,
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
             ),
             onPressed: _showSongOptions,
           ),
@@ -193,8 +192,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             colors: [
               theme.colorScheme.primary.withOpacity(0.1),
               theme.colorScheme.secondary.withOpacity(0.05),
-              theme.colorScheme.background,
-              theme.colorScheme.background,
+              theme.colorScheme.surface,
+              theme.colorScheme.surface,
             ],
             stops: const [0.0, 0.3, 0.7, 1.0],
           ),
@@ -208,7 +207,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.onBackground.withOpacity(0.2),
+                    color: theme.colorScheme.onSurface.withOpacity(0.2),
                     blurRadius: 25,
                     spreadRadius: 2,
                     offset: const Offset(0, 10),
@@ -222,7 +221,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     animation: _animationController,
                     builder: (_, child) {
                       return Transform.rotate(
-                        angle: _animationController.value * 2 * 3.14159 * (musicProvider.isPlaying ? 1 : 0),
+                        angle: _animationController.value *
+                            2 *
+                            3.14159 *
+                            (musicProvider.isPlaying ? 1 : 0),
                         child: Container(
                           width: 280,
                           height: 280,
@@ -230,9 +232,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             shape: BoxShape.circle,
                             color: theme.colorScheme.surface.withOpacity(0.3),
                             border: Border.all(
-                              color: theme.colorScheme.onSurface.withOpacity(0.1), 
-                              width: 12
-                            ),
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.1),
+                                width: 12),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.3),
@@ -241,7 +243,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             ],
                             image: currentSong.albumArtUrl != null
                                 ? DecorationImage(
-                                    image: NetworkImage(currentSong.albumArtUrl!),
+                                    image:
+                                        NetworkImage(currentSong.albumArtUrl!),
                                     fit: BoxFit.cover,
                                   )
                                 : null,
@@ -258,7 +261,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             ),
             const Spacer(),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
               child: Column(
                 children: [
                   Text(
@@ -272,44 +276,45 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-
-Wrap(
-  alignment: WrapAlignment.center,
-  children: currentSong.artists.map((artist) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ArtistDetailScreen(
-              artistName: artist,
-              artistImageUrl: currentSong.albumArtUrl,
-            ),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: Text(
-          artist,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.secondary.withOpacity(0.9),
-            decoration: TextDecoration.underline,
-            decorationColor: theme.colorScheme.secondary.withOpacity(0.5),
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    );
-  }).toList()
-)
-
+                  Wrap(
+                      alignment: WrapAlignment.center,
+                      children: currentSong.artists.map((artist) {
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ArtistDetailScreen(
+                                  artistName: artist,
+                                  artistImageUrl: currentSong.albumArtUrl,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 4.0),
+                            child: Text(
+                              artist,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.secondary
+                                    .withOpacity(0.9),
+                                decoration: TextDecoration.underline,
+                                decorationColor: theme.colorScheme.secondary
+                                    .withOpacity(0.5),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        );
+                      }).toList())
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
               child: Column(
                 children: [
                   Slider(
@@ -335,7 +340,8 @@ Wrap(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _formatDuration(Duration(seconds: _currentSliderValue.toInt())),
+                          _formatDuration(
+                              Duration(seconds: _currentSliderValue.toInt())),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onPrimary.withOpacity(0.7),
                           ),
@@ -353,7 +359,8 @@ Wrap(
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -386,7 +393,9 @@ Wrap(
                     ),
                     child: IconButton(
                       icon: Icon(
-                        musicProvider.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        musicProvider.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                         color: theme.colorScheme.onSecondary,
                         size: 48,
                       ),
@@ -422,7 +431,8 @@ Wrap(
             ),
             const Spacer(),
             Padding(
-              padding: const EdgeInsets.only(bottom: 32.0, left: 32.0, right: 32.0),
+              padding:
+                  const EdgeInsets.only(bottom: 32.0, left: 32.0, right: 32.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

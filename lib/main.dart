@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'dart:io' show Platform, exit;
-import 'package:sqflite_common_ffi/sqflite_ffi.dart' as sqflite_ffi;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' as sqflite_ffi;
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/downloads_screen.dart';
@@ -18,33 +18,27 @@ import 'providers/theme_provider.dart';
 import 'providers/music_provider.dart' as music_provider;
 import 'services/youtube_service.dart';
 import 'utils/package_info_utils.dart';
+
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
-  // Initialize FFI for Linux
+  WidgetsFlutterBinding.ensureInitialized();
+
   if (Platform.isLinux) {
     sqflite_ffi.sqfliteFfiInit();
     sqflite_ffi.databaseFactory = sqflite_ffi.databaseFactoryFfi;
   }
 
-  WidgetsFlutterBinding.ensureInitialized();
   await PackageInfoUtils.init();
 
-  // Request storage permission (skipping on Linux)
   if (!Platform.isLinux) {
     await Permission.storage.request();
   }
 
-  final youTubeService = YouTubeService();
-  
-  runApp(MusicPlayerApp(
-    youTubeService: youTubeService,
-  ));
-
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
 
-    WindowOptions windowOptions = const WindowOptions(
+    const windowOptions = WindowOptions(
       size: Size(1280, 720),
       center: true,
       backgroundColor: Colors.transparent,
@@ -57,15 +51,16 @@ Future<void> main() async {
       await windowManager.focus();
     });
   }
+
+  final youTubeService = YouTubeService();
+
+  runApp(MusicPlayerApp(youTubeService: youTubeService));
 }
 
 class MusicPlayerApp extends StatelessWidget {
   final YouTubeService youTubeService;
 
-  const MusicPlayerApp({
-    super.key, 
-    required this.youTubeService,
-  });
+  const MusicPlayerApp({super.key, required this.youTubeService});
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +168,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         title: Text(_getTitle()),
         centerTitle: true,
         actions: [
-          if (_selectedIndex == 0) // Sadece Home ekranında göster
+          if (_selectedIndex == 0)
             IconButton(
               icon: const Icon(Icons.search),
               onPressed: () {
@@ -231,7 +226,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
               height: 70,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.2),
@@ -270,8 +265,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                         Text(
                           currentSong?.artist ?? 'Select a song to play',
                           style: TextStyle(
-                            color:
-                                Theme.of(context).textTheme.bodySmall?.color,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                             fontSize: 14,
                           ),
                           maxLines: 1,

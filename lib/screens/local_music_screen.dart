@@ -1,10 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path/path.dart' as path;
-import 'package:permission_handler/permission_handler.dart';
 import '../providers/music_provider.dart' as music_provider;
-import '../models/song.dart';
 
 class LocalMusicScreen extends StatelessWidget {
   const LocalMusicScreen({super.key});
@@ -26,7 +22,9 @@ class LocalMusicScreen extends StatelessWidget {
       body: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProvider, _) {
           // Load music when the screen is first built
-          if (musicProvider.songs.isEmpty && !musicProvider.isLoading && musicProvider.error == null) {
+          if (musicProvider.songs.isEmpty &&
+              !musicProvider.isLoading &&
+              musicProvider.error == null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               musicProvider.loadLocalMusic();
             });
@@ -51,7 +49,8 @@ class LocalMusicScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const Icon(Icons.error_outline,
+                        size: 64, color: Colors.red),
                     const SizedBox(height: 24),
                     Text(
                       musicProvider.error!,
@@ -93,8 +92,8 @@ class LocalMusicScreen extends StatelessWidget {
                       'Make sure you have music files in your device storage and tap the refresh button to scan again.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).hintColor,
-                      ),
+                            color: Theme.of(context).hintColor,
+                          ),
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(

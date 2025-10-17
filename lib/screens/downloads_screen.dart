@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart';
 import '../services/youtube_service.dart';
+import '../services/youtube/youtube_download_service.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
@@ -13,272 +14,194 @@ class DownloadsScreen extends StatefulWidget {
 }
 
 class _DownloadsScreenState extends State<DownloadsScreen> {
-  late YouTubeService _youTubeService;
-  final Map<String, double> _downloadProgress = {};
-  
+  late YoutubeDownloadService _downloadService;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _youTubeService = Provider.of<YouTubeService>(context, listen: false);
+    _downloadService =
+        Provider.of<YoutubeDownloadService>(context, listen: false);
   }
 
   @override
   void initState() {
     super.initState();
-    _youTubeService = Provider.of<YouTubeService>(context, listen: false);
-    _youTubeService.addListener(_onDownloadsChanged);
+    _downloadService.addListener(_onDownloadsChanged);
   }
 
   @override
   void dispose() {
-    _youTubeService.removeListener(_onDownloadsChanged);
+    _downloadService.removeListener(_onDownloadsChanged);
     super.dispose();
   }
 
   void _onDownloadsChanged() {
     if (mounted) {
-      setState(() {}); // Trigger a rebuild when downloads change
+      setState(() {});
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Downloads'),
-      ),
-      body: _buildDownloadsList(),
-    );
-  }
-
-  Widget _buildDownloadsList() {
-    return Consumer2<YouTubeService, music_provider.MusicProvider>(
-      builder: (context, youTubeService, musicProvider, _) {
-        final activeDownloads = youTubeService.activeDownloads;
-        final downloadedSongs = musicProvider.youtubeSongs;
-        
-        if (activeDownloads.isEmpty && downloadedSongs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    return Consumer2<YoutubeDownloadService, music_provider.MusicProvider>(
+      builder: (context, downloadService, musicProvider, _) {
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Downloads'),
+              bottom: const TabBar(
+                tabs: [
+                  Tab(icon: Icon(Icons.downloading), text: 'Downloading'),
+                  Tab(icon: Icon(Icons.music_note), text: 'Downloads'),
+                ],
+              ),
+            ),
+            body: TabBarView(
               children: [
-                Icon(
-                  Icons.music_off,
-                  size: 64,
-                  color: Theme.of(context).disabledColor,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No downloads yet',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Download songs from the search tab',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                _buildDownloadingTab(downloadService),
+                _buildDownloadsList(musicProvider, downloadService),
               ],
             ),
-          );
-        }
-
-        return ListView(
-          children: [
-            if (activeDownloads.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Downloading...', 
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-              ...activeDownloads.map((download) => _buildDownloadItem(download)).toList(),
-              const Divider(),
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Downloaded', 
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-            ],
-            ...downloadedSongs.map((song) => _buildSongItem(song)).toList(),
-          ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildDownloadingTab() {
-    return Consumer<YouTubeService>(
-      builder: (context, youTubeService, _) {
-        final activeDownloads = youTubeService.activeDownloads;
-        
-        if (activeDownloads.isEmpty) {
-          return const Center(
-            child: Text('No active downloads'),
-          );
-        }
+  Widget _buildDownloadsList(music_provider.MusicProvider musicProvider,
+      YoutubeDownloadService downloadService) {
+    final activeDownloads = downloadService.activeDownloads;
+    final downloadedSongs =
+        musicProvider.songs.where((s) => s.isDownloaded).toList();
 
-        return ListView.builder(
-          itemCount: activeDownloads.length,
-          itemBuilder: (context, index) {
-            final download = activeDownloads[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: ListTile(
-                leading: const Icon(Icons.downloading, size: 32),
-                title: Text(
-                  download.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: download.cancelRequested
-                    ? const Padding(
-                        padding: EdgeInsets.only(right: 12.0),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.cancel, color: Colors.red),
-                        onPressed: () async {
-                          final youTubeService = Provider.of<YouTubeService>(
-                            context,
-                            listen: false,
-                          );
-                          await youTubeService.cancelDownload(download.videoId);
-                        },
-                        tooltip: 'Cancel download',
-                      ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: download.progress,
-                      minHeight: 4,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        download.cancelRequested 
-                            ? Colors.orange 
-                            : Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${(download.progress * 100).toStringAsFixed(1)}%',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        if (download.cancelRequested)
-                          Text(
-                            'Canceling...',
-                            style: TextStyle(
-                              color: Colors.orange,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (download.error != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        download.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildDownloadItem(dynamic download) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        leading: const Icon(Icons.downloading, size: 32),
-        title: Text(
-          download.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: download.cancelRequested
-            ? const Padding(
-                padding: EdgeInsets.only(right: 12.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                  ),
-                ),
-              )
-            : IconButton(
-                icon: const Icon(Icons.cancel, color: Colors.red),
-                onPressed: () => _youTubeService.cancelDownload(download.videoId),
-                tooltip: 'Cancel download',
-              ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    if (activeDownloads.isEmpty && downloadedSongs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Icon(
+              Icons.music_off,
+              size: 64,
+              color: Theme.of(context).disabledColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No downloads yet',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
+            Text(
+              'Download songs from the search tab',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      children: [
+        if (activeDownloads.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Downloading...',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          ...activeDownloads.map((download) => _buildDownloadItem(download)),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Downloaded',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+        ],
+        ...downloadedSongs.map((song) => _buildSongItem(song)),
+      ],
+    );
+  }
+
+  Widget _buildDownloadingTab(YoutubeDownloadService downloadService) {
+    final activeDownloads = downloadService.activeDownloads;
+    if (activeDownloads.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.download_done, size: 48, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('No active downloads'),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: activeDownloads.length,
+      itemBuilder: (context, index) {
+        final download = activeDownloads[index];
+        return _buildDownloadItem(download);
+      },
+    );
+  }
+
+  Widget _buildDownloadItem(YTDownloadProgress download) {
+    final isDownloading = download.isDownloading;
+    final hasError = download.error != null;
+
+    return ListTile(
+      leading: const Icon(Icons.download_rounded),
+      title: Text(download.title),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isDownloading && !hasError)
             LinearProgressIndicator(
               value: download.progress,
               minHeight: 4,
               backgroundColor: Colors.grey[300],
               valueColor: AlwaysStoppedAnimation<Color>(
-                download.cancelRequested 
-                    ? Colors.orange 
+                download.cancelRequested
+                    ? Colors.orange
                     : Theme.of(context).primaryColor,
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${(download.progress * 100).toStringAsFixed(1)}%',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (download.cancelRequested)
-                  Text(
-                    'Canceling...',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              ],
-            ),
-            if (download.error != null) ...[
-              const SizedBox(height: 4),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                download.error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 12,
-                ),
+                '${(download.progress * 100).toStringAsFixed(1)}%',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (download.cancelRequested)
+                const Text(
+                  'Canceling...',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
             ],
+          ),
+          if (download.error != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              download.error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+              ),
+            ),
           ],
-        ),
+        ],
       ),
+      trailing: !download.isDownloading && download.error == null
+          ? const Icon(Icons.check_circle, color: Colors.green)
+          : download.cancelRequested
+              ? const Icon(Icons.cancel, color: Colors.orange)
+              : null,
     );
   }
 
@@ -325,7 +248,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: Text(song.formattedDuration),
+        trailing: Text(_formatDuration(song.duration)),
         onTap: () {
           final musicProvider = Provider.of<music_provider.MusicProvider>(
             context,
@@ -337,46 +260,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     );
   }
 
-  String _formatDuration(Duration duration) {
+  String _formatDuration(int durationMs) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
-  }
+    final duration = Duration(milliseconds: durationMs);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
 
-  // Call this method when starting a download
-  void addDownload(String videoId, String title) {
-    if (!_downloadProgress.containsKey(videoId)) {
-      setState(() {
-        _downloadProgress[videoId] = 0.0;
-      });
-
-      _youTubeService.downloadAudio(
-        videoId,
-        context: context,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() {
-              _downloadProgress[videoId] = progress;
-            });
-          }
-        },
-      ).then((_) {
-        if (mounted) {
-          setState(() {
-            _downloadProgress.remove(videoId);
-          });
-        }
-      }).catchError((error) {
-        if (mounted) {
-          setState(() {
-            _downloadProgress.remove(videoId);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Download failed: $error')),
-          );
-        }
-      });
+    if (hours > 0) {
+      return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 }

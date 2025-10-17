@@ -9,10 +9,10 @@ class Song {
   final List<String> tags;
   final int? trackNumber; // Track number in album
   final DateTime dateAdded; // When the song was added to the library
-  
+
   // For backward compatibility
   String get artist => artists.isNotEmpty ? artists.first : 'Unknown Artist';
-  
+
   String get formattedDuration {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final duration = this.duration ~/ 1000; // Convert to seconds
@@ -20,12 +20,13 @@ class Song {
     final seconds = duration % 60;
     return '$minutes:${twoDigits(seconds)}';
   }
-  
+
   Duration get durationObject => Duration(milliseconds: duration);
   final bool isFavorite;
   final bool isDownloaded;
-  
-  bool hasTag(String tag) => tags.any((t) => t.toLowerCase() == tag.toLowerCase());
+
+  bool hasTag(String tag) =>
+      tags.any((t) => t.toLowerCase() == tag.toLowerCase());
 
   Song({
     required this.id,
@@ -79,7 +80,7 @@ class Song {
     return Song(
       id: json['id'] as String,
       title: json['title'] as String,
-      artists: json['artists'] is List 
+      artists: json['artists'] is List
           ? List<String>.from(json['artists'])
           : [json['artist'] as String? ?? 'Unknown Artist'],
       album: json['album'] as String?,
@@ -90,8 +91,8 @@ class Song {
       isDownloaded: json['isDownloaded'] as bool? ?? false,
       tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
       trackNumber: json['trackNumber'] as int?,
-      dateAdded: json['dateAdded'] != null 
-          ? DateTime.parse(json['dateAdded'] as String) 
+      dateAdded: json['dateAdded'] != null
+          ? DateTime.parse(json['dateAdded'] as String)
           : null,
     );
   }

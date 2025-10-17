@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/main.dart';
@@ -63,7 +62,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         listen: false,
       );
       await musicProvider.loadLocalMusic(forceRescan: true);
-      
+
       // Tarama bittiğinde, bir daha ilk açılış ekranını gösterme
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_first_launch', false);
@@ -131,7 +130,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   // İlk açılış işaretini kaydet
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool('is_first_launch', false);
-                  
+
                   if (mounted) {
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(

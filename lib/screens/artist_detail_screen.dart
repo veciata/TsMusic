@@ -5,22 +5,24 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
 import '../services/youtube_service.dart';
 import '../models/song.dart';
+import '../models/youtube_audio.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
   String? artistImageUrl;
 
   ArtistDetailScreen({
-    Key? key,
+    super.key,
     required this.artistName,
     this.artistImageUrl,
-  }) : super(key: key);
+  });
 
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
 }
 
-class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTickerProviderStateMixin {
+class _ArtistDetailScreenState extends State<ArtistDetailScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final YouTubeService _youTubeService = YouTubeService();
   List<Song> _youtubeSongs = [];
@@ -39,7 +41,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.8) {
       _loadMoreYouTubeSongs();
     }
   }
@@ -76,16 +79,20 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     try {
       final results = await _youTubeService.searchAudio(widget.artistName);
       setState(() {
-        _youtubeSongs = results.map((audio) => Song(
-          id: 'youtube_${audio.id}',
-          title: audio.title,
-          artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
-          album: 'YouTube',
-          albumArtUrl: audio.thumbnailUrl,
-          url: audio.audioUrl ?? '',
-          duration: audio.duration?.inMilliseconds ?? 0,
-          tags: ['youtube'],
-        )).toList();
+        _youtubeSongs = results
+            .map((audio) => Song(
+                  id: 'youtube_${audio.id}',
+                  title: audio.title,
+                  artists: audio.artists.isNotEmpty
+                      ? audio.artists
+                      : ['Unknown Artist'],
+                  album: 'YouTube',
+                  albumArtUrl: audio.thumbnailUrl,
+                  url: audio.audioUrl ?? '',
+                  duration: audio.duration?.inMilliseconds ?? 0,
+                  tags: ['youtube'],
+                ))
+            .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -105,16 +112,20 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     try {
       final results = await _youTubeService.searchAudio(widget.artistName);
       setState(() {
-        _youtubeSongs.addAll(results.map((audio) => Song(
-          id: 'youtube_${audio.id}',
-          title: audio.title,
-          artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
-          album: 'YouTube',
-          albumArtUrl: audio.thumbnailUrl,
-          url: audio.audioUrl ?? '',
-          duration: audio.duration?.inMilliseconds ?? 0,
-          tags: ['youtube'],
-        )).toList());
+        _youtubeSongs.addAll(results
+            .map((audio) => Song(
+                  id: 'youtube_${audio.id}',
+                  title: audio.title,
+                  artists: audio.artists.isNotEmpty
+                      ? audio.artists
+                      : ['Unknown Artist'],
+                  album: 'YouTube',
+                  albumArtUrl: audio.thumbnailUrl,
+                  url: audio.audioUrl ?? '',
+                  duration: audio.duration?.inMilliseconds ?? 0,
+                  tags: ['youtube'],
+                ))
+            .toList());
         _isLoading = false;
         _hasMore = results.isNotEmpty;
       });
@@ -163,15 +174,22 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 2))],
+                    shadows: [
+                      Shadow(
+                          color: Colors.black54,
+                          blurRadius: 10,
+                          offset: Offset(0, 2))
+                    ],
                   ),
                 ),
                 background: artistImageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: artistImageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: Colors.grey[800]),
-                        errorWidget: (context, url, error) => _buildPlaceholderImage(),
+                        placeholder: (context, url) =>
+                            Container(color: Colors.grey[800]),
+                        errorWidget: (context, url, error) =>
+                            _buildPlaceholderImage(),
                       )
                     : _buildPlaceholderImage(),
               ),
@@ -201,20 +219,20 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     try {
       // Convert to lowercase and remove any query parameters or fragments
       String normalized = path.split('?')[0].split('#')[0].toLowerCase().trim();
-      
+
       // Handle different path formats that point to the same location
       const String emulatedPrefix = '/storage/emulated/0/';
       const String sdcardPrefix = '/sdcard/';
-      
+
       // Convert /storage/emulated/0/ to /sdcard/ for consistency
       if (normalized.startsWith(emulatedPrefix)) {
         normalized = '/sdcard/${normalized.substring(emulatedPrefix.length)}';
       }
-      
+
       // Remove any redundant path segments
       final uri = Uri.file(normalized);
       final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      
+
       // Rebuild path with normalized segments
       return '/${segments.join('/')}';
     } catch (e) {
@@ -225,20 +243,23 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     }
   }
 
-  Widget _buildLocalSongsTab(List<Song> songs, music_provider.MusicProvider musicProvider) {
-    if (songs.isEmpty) return const Center(child: Text('No local songs found for this artist'));
+  Widget _buildLocalSongsTab(
+      List<Song> songs, music_provider.MusicProvider musicProvider) {
+    if (songs.isEmpty) {
+      return const Center(child: Text('No local songs found for this artist'));
+    }
 
     // Use a map to ensure unique songs by their normalized path
     final Map<String, Song> uniqueSongs = {};
     final Set<String> seenPaths = {};
-    
+
     for (final song in songs) {
       try {
         if (song.url.isEmpty) continue;
-        
+
         final normalizedPath = _normalizePath(song.url);
         if (normalizedPath.isEmpty) continue;
-        
+
         if (!seenPaths.contains(normalizedPath)) {
           seenPaths.add(normalizedPath);
           uniqueSongs[song.id] = song;
@@ -249,9 +270,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         }
       }
     }
-    
+
     final uniqueSongsList = uniqueSongs.values.toList();
-    
+
     if (uniqueSongsList.isEmpty) {
       return const Center(child: Text('No valid songs found for this artist'));
     }
@@ -272,13 +293,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const Icon(Icons.music_note, size: 50),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.music_note, size: 50),
                   ),
                 )
               : const Icon(Icons.music_note, size: 50),
           title: Text(
             song.title,
-            style: TextStyle(fontWeight: isCurrentSong ? FontWeight.bold : FontWeight.normal),
+            style: TextStyle(
+                fontWeight:
+                    isCurrentSong ? FontWeight.bold : FontWeight.normal),
           ),
           subtitle: Text(song.album ?? 'Unknown Album'),
           trailing: Text(song.formattedDuration),
@@ -289,8 +313,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   }
 
   Widget _buildYouTubeTab() {
-    if (_isLoading && _youtubeSongs.isEmpty) return const Center(child: CircularProgressIndicator());
-    if (_youtubeSongs.isEmpty) return const Center(child: Text('No YouTube songs found for this artist'));
+    if (_isLoading && _youtubeSongs.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_youtubeSongs.isEmpty) {
+      return const Center(
+          child: Text('No YouTube songs found for this artist'));
+    }
 
     return ListView.builder(
       controller: _scrollController,
@@ -308,7 +337,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const Icon(Icons.music_video, size: 50),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.music_video, size: 50),
                   ),
                 )
               : const Icon(Icons.music_video, size: 50),
@@ -323,7 +353,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
             },
           ),
           onTap: () {
-            final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+            final musicProvider = Provider.of<music_provider.MusicProvider>(
+                context,
+                listen: false);
             musicProvider.playSong(song);
           },
         );

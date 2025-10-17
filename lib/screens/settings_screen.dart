@@ -220,7 +220,7 @@ class SettingsScreen extends StatelessWidget {
                   showAboutDialog(
                     context: context,
                     applicationName: 'TS Music',
-                    applicationVersion: '${PackageInfoUtils.version}',
+                    applicationVersion: PackageInfoUtils.version,
                     applicationIcon: const Icon(Icons.music_note, size: 50),
                     children: const [
                       Text('A beautiful music player app'),

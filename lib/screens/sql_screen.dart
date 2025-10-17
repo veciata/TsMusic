@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
@@ -38,11 +37,15 @@ class _SqlScreenState extends State<SqlScreen> {
     }
 
     // Fetch some domain data
-    final songs = await db.query(DatabaseHelper.tableSongs, orderBy: 'id DESC', limit: 100);
-    final artists = await db.query(DatabaseHelper.tableArtists, orderBy: 'id DESC', limit: 100);
-    final genres = await db.query(DatabaseHelper.tableGenres, orderBy: 'id DESC', limit: 100);
-    final playlists = await db.query(DatabaseHelper.tablePlaylists, orderBy: 'id');
-    
+    final songs = await db.query(DatabaseHelper.tableSongs,
+        orderBy: 'id DESC', limit: 100);
+    final artists = await db.query(DatabaseHelper.tableArtists,
+        orderBy: 'id DESC', limit: 100);
+    final genres = await db.query(DatabaseHelper.tableGenres,
+        orderBy: 'id DESC', limit: 100);
+    final playlists =
+        await db.query(DatabaseHelper.tablePlaylists, orderBy: 'id');
+
     // Fetch songs for each playlist
     final playlistSongs = <int, List<Map<String, Object?>>>{};
     for (final playlist in playlists) {
@@ -87,7 +90,8 @@ class _SqlScreenState extends State<SqlScreen> {
                 await DatabaseHelper().syncMusicLibrary(mp);
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Synced music library to database')),
+                  const SnackBar(
+                      content: Text('Synced music library to database')),
                 );
                 setState(() {
                   _overviewFuture = _loadOverview();
@@ -164,10 +168,12 @@ class _SqlScreenState extends State<SqlScreen> {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _TablesTab(tableNames: data.tableNames, counts: data.counts),
+                      _TablesTab(
+                          tableNames: data.tableNames, counts: data.counts),
                       _SimpleListTab(
                         titleKey: 'title',
-                        subtitleBuilder: (m) => 'id: ${m['id']}  •  duration: ${m['duration']}',
+                        subtitleBuilder: (m) =>
+                            'id: ${m['id']}  •  duration: ${m['duration']}',
                         rows: data.songs,
                       ),
                       _SimpleListTab(
@@ -202,11 +208,11 @@ class _SqlScreenState extends State<SqlScreen> {
         final playlistId = playlist['id'] as int;
         final songs = data.playlistSongs[playlistId] ?? [];
         final isNowPlaying = playlistId == DatabaseHelper.nowPlayingPlaylistId;
-        
+
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
           child: ExpansionTile(
-            leading: isNowPlaying 
+            leading: isNowPlaying
                 ? const Icon(Icons.play_arrow, color: Colors.green)
                 : const Icon(Icons.playlist_play),
             title: Text(
@@ -220,7 +226,8 @@ class _SqlScreenState extends State<SqlScreen> {
             children: [
               if (playlist['description'] != null)
                 Padding(
-                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
+                  padding: const EdgeInsets.only(
+                      left: 16.0, right: 16.0, bottom: 8.0),
                   child: Text(playlist['description'].toString()),
                 ),
               if (songs.isEmpty)
@@ -238,9 +245,11 @@ class _SqlScreenState extends State<SqlScreen> {
                     return ListTile(
                       leading: Text('${songIndex + 1}.'),
                       title: Text(song['title']?.toString() ?? 'Unknown Title'),
-                      subtitle: Text(song['artists']?.toString() ?? 'Unknown Artist'),
+                      subtitle:
+                          Text(song['artists']?.toString() ?? 'Unknown Artist'),
                       trailing: Text(
-                        _formatDuration(Duration(milliseconds: (song['duration'] as int?) ?? 0)),
+                        _formatDuration(Duration(
+                            milliseconds: (song['duration'] as int?) ?? 0)),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     );
@@ -258,7 +267,7 @@ class _SqlScreenState extends State<SqlScreen> {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
     } else {
@@ -270,12 +279,13 @@ class _SqlScreenState extends State<SqlScreen> {
     return ListView(
       padding: const EdgeInsets.all(8.0),
       children: [
-        const Text('Tables', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Text('Tables',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 8),
         ...data.tableNames.map((name) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Text('• $name (${data.counts[name] ?? 0} records)'),
-        )).toList(),
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Text('• $name (${data.counts[name] ?? 0} records)'),
+            )),
       ],
     );
   }
@@ -298,7 +308,8 @@ class _TablesTab extends StatelessWidget {
           title: Text(name),
           trailing: CircleAvatar(
             radius: 14,
-            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            backgroundColor:
+                Theme.of(context).colorScheme.primary.withOpacity(0.1),
             child: Text(
               '$count',
               style: TextStyle(

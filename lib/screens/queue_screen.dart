@@ -25,7 +25,8 @@ class QueueScreen extends StatelessWidget {
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Clear Queue?'),
-                          content: const Text('This will remove all songs from the queue.'),
+                          content: const Text(
+                              'This will remove all songs from the queue.'),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context, false),
@@ -54,7 +55,7 @@ class QueueScreen extends StatelessWidget {
       body: Consumer<MusicProvider>(
         builder: (context, musicProvider, _) {
           final List<Song> queue = musicProvider.queue;
-          final int? currentIndex = musicProvider.currentIndex;
+          final int currentIndex = musicProvider.currentIndex ?? 0;
 
           if (queue.isEmpty) {
             return const Center(child: Text('Queue is empty'));
@@ -97,7 +98,8 @@ class QueueScreen extends StatelessWidget {
                   leading: CircleAvatar(
                     backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                     child: isCurrent
-                        ? Icon(Icons.equalizer, color: theme.colorScheme.primary)
+                        ? Icon(Icons.equalizer,
+                            color: theme.colorScheme.primary)
                         : const Icon(Icons.music_note),
                   ),
                   title: Text(
