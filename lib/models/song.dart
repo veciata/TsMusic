@@ -12,6 +12,9 @@ class Song {
 
   // For backward compatibility
   String get artist => artists.isNotEmpty ? artists.first : 'Unknown Artist';
+  String get artworkPath => albumArtUrl ?? '';
+  bool get isLocalFile => url.startsWith('/');
+  String get filePath => url;
 
   String get formattedDuration {
     String twoDigits(int n) => n.toString().padLeft(2, '0');

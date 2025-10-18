@@ -9,7 +9,8 @@ class SongRepository {
 
   Future<List<Song>> getSongs() async {
     try {
-      final dbSongs = await _databaseHelper.getSongs();
+      final dbSongsData = await _databaseHelper.getSongs();
+      final dbSongs = dbSongsData.map((data) => Song.fromJson(data)).toList();
       if (dbSongs.isNotEmpty) {
         await _cacheSongs(dbSongs);
         return dbSongs;
@@ -35,7 +36,7 @@ class SongRepository {
 
   Future<void> saveSongs(List<Song> songs) async {
     try {
-      await _databaseHelper.insertSongsBulk(songs);
+      await _databaseHelper.insertSongsBulk(songs.map((s) => s.toMap()).toList());
       await _cacheSongs(songs);
     } catch (e) {
       print('Error saving songs: $e');
@@ -45,8 +46,9 @@ class SongRepository {
 
   Future<void> updateSong(Song song) async {
     try {
-      await _databaseHelper.updateSong(song);
-      final songs = await _databaseHelper.getSongs();
+      await _databaseHelper.updateSong(int.parse(song.id), song.toMap());
+      final songsData = await _databaseHelper.getSongs();
+      final songs = songsData.map((data) => Song.fromJson(data)).toList();
       await _cacheSongs(songs);
     } catch (e) {
       print('Error updating song: $e');
@@ -56,8 +58,9 @@ class SongRepository {
 
   Future<void> deleteSong(String songId) async {
     try {
-      await _databaseHelper.deleteSong(songId);
-      final songs = await _databaseHelper.getSongs();
+      await _databaseHelper.deleteSong(int.parse(songId));
+      final songsData = await _databaseHelper.getSongs();
+      final songs = songsData.map((data) => Song.fromJson(data)).toList();
       await _cacheSongs(songs);
     } catch (e) {
       print('Error deleting song: $e');

@@ -20,15 +20,21 @@ export 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 /// Main YouTube service that provides access to all YouTube related functionality.
 class YouTubeService extends ChangeNotifier {
+  final YoutubeExplode _yt;
   final YoutubeSearchService _searchService;
   final YoutubeDownloadService _downloadService;
   final yt_player.YoutubePlayerService _playerService;
   final ValueNotifier<bool> isLoading = ValueNotifier(false);
 
   YouTubeService()
-      : _searchService = YoutubeSearchService(),
+      : _yt = YoutubeExplode(),
+        _searchService = YoutubeSearchService(),
         _downloadService = YoutubeDownloadService(),
         _playerService = yt_player.YoutubePlayerService() {
+    // Initialize services with the shared YoutubeExplode instance
+    _searchService.setYoutubeExplode(_yt);
+    _downloadService.setYoutubeExplode(_yt);
+    
     // Forward notifications from child services
     _searchService.addListener(notifyListeners);
     _downloadService.addListener(notifyListeners);
@@ -41,7 +47,7 @@ class YouTubeService extends ChangeNotifier {
   bool get isPlaying => _playerService.isPlaying;
   Duration get position => _playerService.position;
   Duration get duration => _playerService.duration;
-  List<YTDownloadProgress> get activeDownloads =>
+  List<DownloadProgress> get activeDownloads =>
       _downloadService.activeDownloads;
 
   // Search methods
@@ -90,7 +96,7 @@ class YouTubeService extends ChangeNotifier {
   // Download methods
   Future<void> downloadAudio(YouTubeAudio audio, BuildContext context) async {
     await _downloadService.downloadAudio(
-      videoId: audio.id,
+      audio.id,
       context: context,
       onProgress: (progress) {
         // Update progress
@@ -111,18 +117,24 @@ class YouTubeService extends ChangeNotifier {
 
   // Cleanup
   @override
-  Future<void> dispose() async {
-    _searchService.removeListener(notifyListeners);
-    _downloadService.removeListener(notifyListeners);
-    _playerService.removeListener(notifyListeners);
+  void dispose() {
+    try {
+      // Remove listeners first
+      _searchService.removeListener(notifyListeners);
+      _downloadService.removeListener(notifyListeners);
+      _playerService.removeListener(notifyListeners);
 
-    // Dispose all services
-    (_searchService as ChangeNotifier).dispose();
-
-    (_downloadService as ChangeNotifier).dispose();
-
-    (_playerService as ChangeNotifier).dispose();
-
-    super.dispose();
+      // Close the YouTube client
+      _yt.close();
+      
+      // Dispose all services
+      _searchService.dispose();
+      _downloadService.dispose();
+      _playerService.dispose();
+    } catch (e) {
+      debugPrint('Error disposing YouTubeService: $e');
+    } finally {
+      super.dispose();
+    }
   }
 }

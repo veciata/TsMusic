@@ -36,6 +36,16 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    
+    applicationVariants.all {
+        val variant = this
+        variant.outputs
+            .filterIsInstance<com.android.build.gradle.internal.api.BaseVariantOutputImpl>()
+            .forEach { output ->
+                val outputFileName = "tsmusic.apk"
+                output.outputFileName = outputFileName
+            }
+    }
 }
 
 flutter {

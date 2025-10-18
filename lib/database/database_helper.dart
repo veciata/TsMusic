@@ -7,6 +7,7 @@ import 'package:tsmusic/providers/music_provider.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
+  static DatabaseHelper get instance => _instance;
   static Database? _database;
   final Map<String, Song> _songsMap = {};
   final List<Song> _localSongs = [];
@@ -129,7 +130,7 @@ class DatabaseHelper {
   }
 
   // Increment this version when making schema changes
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3;
 
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), 'music_player.db');
@@ -201,6 +202,15 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
     }
+
+    if (oldVersion < 3) {
+      // Version 3: Add missing columns to songs table
+      await db.execute('ALTER TABLE $tableSongs ADD COLUMN album TEXT');
+      await db.execute('ALTER TABLE $tableSongs ADD COLUMN album_art_url TEXT');
+      await db.execute('ALTER TABLE $tableSongs ADD COLUMN is_favorite INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE $tableSongs ADD COLUMN is_downloaded INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE $tableSongs ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -268,8 +278,13 @@ class DatabaseHelper {
         title TEXT NOT NULL,
         file_path TEXT NOT NULL UNIQUE,
         duration INTEGER,
+        album TEXT,
+        album_art_url TEXT,
+        is_favorite INTEGER DEFAULT 0,
+        is_downloaded INTEGER DEFAULT 0,
         track_number INTEGER,
-        $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     ''');
 
@@ -1099,6 +1114,38 @@ class DatabaseHelper {
     });
 
     return count;
+  }
+
+  Future<void> insertSongsBulk(List<Map<String, dynamic>> songs) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final song in songs) {
+        await txn.insert(
+          tableSongs,
+          song,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  Future<void> updateSong(int songId, Map<String, dynamic> updates) async {
+    final db = await database;
+    await db.update(
+      tableSongs,
+      updates,
+      where: 'id = ?',
+      whereArgs: [songId],
+    );
+  }
+
+  Future<void> deleteSong(int songId) async {
+    final db = await database;
+    await db.delete(
+      tableSongs,
+      where: 'id = ?',
+      whereArgs: [songId],
+    );
   }
 
   Future<void> close() async {

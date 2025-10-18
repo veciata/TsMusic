@@ -17,6 +17,13 @@ import '../services/audio_notification_service.dart';
 import '../services/metadata_enrichment_service.dart';
 import '../database/database_helper.dart';
 
+enum PlayerMode {
+  single,
+  playOne,
+  playAll,
+  shuffle,
+}
+
 extension StringExtension on String {
   String trimAll() => trim().replaceAll(RegExp(r'\s+'), ' ');
 }
@@ -209,6 +216,7 @@ class MusicProvider extends ChangeNotifier {
   final int _enrichedCount = 0;
   bool _shuffleEnabled = false;
   LoopMode _loopMode = LoopMode.off;
+  PlayerMode _playerMode = PlayerMode.playAll;
 
   List<Song> get songs => _displayedSongs;
   List<Song> get filteredSongs => _filteredSongs;
@@ -216,9 +224,16 @@ class MusicProvider extends ChangeNotifier {
   int get enrichedCount => _enrichedCount;
   bool get shuffleEnabled => _shuffleEnabled;
   LoopMode get loopMode => _loopMode;
+  PlayerMode get playerMode => _playerMode;
+  bool get isShuffling => _shuffleEnabled;
+  bool get isPlaying => _audioPlayer.playing;
+  Stream<ProcessingState> get playbackStateStream => _audioPlayer.processingStateStream;
+  Stream<Duration?> get durationStream => _audioPlayer.durationStream;
+  Stream<PlayerMode> get playerModeStream => Stream.value(_playerMode);
+  bool get hasPrevious => _currentIndex > 0;
+  bool get hasNext => _currentIndex < _playlist.length - 1;
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
   Stream<bool> get playingStream => _audioPlayer.playingStream;
-  bool get isPlaying => _audioPlayer.playing;
   Duration get position => _audioPlayer.position;
   Duration get duration => _audioPlayer.duration ?? Duration.zero;
   Song? get currentSong => _playlist.isNotEmpty &&
@@ -406,6 +421,38 @@ class MusicProvider extends ChangeNotifier {
     _shuffleEnabled = !_shuffleEnabled;
     _audioPlayer.setShuffleModeEnabled(_shuffleEnabled);
     notifyListeners();
+  }
+
+  void toggleShuffleMode() => toggleShuffle();
+
+  void setPlayMode(PlayerMode mode) {
+    _playerMode = mode;
+    // Implement logic based on mode
+    switch (mode) {
+      case PlayerMode.single:
+        _audioPlayer.setLoopMode(LoopMode.off);
+        _shuffleEnabled = false;
+        break;
+      case PlayerMode.playOne:
+        _audioPlayer.setLoopMode(LoopMode.one);
+        _shuffleEnabled = false;
+        break;
+      case PlayerMode.playAll:
+        _audioPlayer.setLoopMode(LoopMode.all);
+        _shuffleEnabled = false;
+        break;
+      case PlayerMode.shuffle:
+        _audioPlayer.setLoopMode(LoopMode.all);
+        _shuffleEnabled = true;
+        _audioPlayer.setShuffleModeEnabled(true);
+        break;
+    }
+    notifyListeners();
+  }
+
+  Future<List<Song>> searchSongs(String query) async {
+    final results = await _databaseHelper.searchSongs(query);
+    return results.map((data) => Song.fromJson(data)).toList();
   }
 
   void cycleRepeatMode() {

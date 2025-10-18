@@ -7,7 +7,7 @@ import '../../models/youtube_audio.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' show Video;
 
 class YoutubeSearchService extends ChangeNotifier {
-  final YoutubeExplode _yt = YoutubeExplode();
+  late YoutubeExplode _yt;
   final Map<String, List<Video>> _searchPages = {};
   bool _isSearching = false;
   String? _currentQuery;
@@ -105,13 +105,13 @@ class YoutubeSearchService extends ChangeNotifier {
     }
   }
 
+  void setYoutubeExplode(YoutubeExplode yt) {
+    _yt = yt;
+  }
+
   @override
   void dispose() {
-    try {
-      _yt.close();
-    } catch (e) {
-      debugPrint('Error disposing YoutubeSearchService: $e');
-    }
+    // Don't close _yt here as it's managed by YouTubeService
     super.dispose();
   }
 

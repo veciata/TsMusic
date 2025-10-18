@@ -1,308 +1,445 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/providers/music_provider.dart';
 import 'package:provider/provider.dart';
-import '../../models/song.dart';
-import '../../providers/music_provider.dart' as music_provider;
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:sqflite/sqflite.dart';
 
-class YTDownloadProgress {
+class DownloadProgress {
   final String videoId;
-  String title;
+  final String title;
   double progress;
   bool isDownloading;
   String? error;
-  StreamSubscription? subscription;
   bool cancelRequested;
-  String? filePath;
+  StreamSubscription<List<int>>? subscription;
+  final Completer<void>? completer;
 
-  YTDownloadProgress({
+  DownloadProgress({
     required this.videoId,
     required this.title,
     this.progress = 0.0,
     this.isDownloading = true,
     this.error,
-    this.subscription,
     this.cancelRequested = false,
-    this.filePath,
+    this.subscription,
+    this.completer,
   });
-
-  Map<String, dynamic> toJson() => {
-        'videoId': videoId,
-        'title': title,
-        'progress': progress,
-        'isDownloading': isDownloading,
-        'error': error,
-        'cancelRequested': cancelRequested,
-        'filePath': filePath,
-      };
 }
 
 class YoutubeDownloadService with ChangeNotifier {
-  final YoutubeExplode _yt = YoutubeExplode();
-  final Map<String, YTDownloadProgress> _activeDownloads = {};
-  final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
+  late YoutubeExplode _yt;
+  final http.Client _httpClient = http.Client();
+  final Map<String, DownloadProgress> _activeDownloads = {};
 
-  List<YTDownloadProgress> get activeDownloads =>
-      _activeDownloads.values.toList();
-  bool get hasActiveDownloads => _activeDownloads.isNotEmpty;
-
-  bool isDownloading(String videoId) => _activeDownloads.containsKey(videoId);
-
-  YTDownloadProgress? getDownload(String videoId) => _activeDownloads[videoId];
-
-  Future<String?> downloadAudio({
-    required String videoId,
-    required BuildContext context,
-    required void Function(double progress) onProgress,
-  }) async {
-    if (_activeDownloads.containsKey(videoId)) {
-      debugPrint('Download already in progress for video: $videoId');
-      return _activeDownloads[videoId]?.filePath;
-    }
-
-    final progress = YTDownloadProgress(
-      videoId: videoId,
-      title: 'Downloading...',
-      progress: 0.0,
-      isDownloading: true,
-    );
-
-    _activeDownloads[videoId] = progress;
-    notifyListeners();
-
-    try {
-      isLoading.value = true;
-
-      // Check storage permission
-      if (!await _checkStoragePermission()) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Storage permission required')),
-          );
-        }
-        _removeDownload(videoId, error: 'Storage permission denied');
-        return null;
-      }
-
-      // Get video info
-      final video = await _yt.videos.get(videoId);
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      final audioStreamInfo = manifest.audioOnly.withHighestBitrate();
-
-      // Update progress with video title
-      progress.title = _sanitizeFileName(video.title);
-      notifyListeners();
-
-      try {
-        // Get download directory
-        final directory = await _getDownloadDirectory();
-        final fileName = '${_sanitizeFileName(video.title)}.m4a';
-        final file = File('${directory.path}/$fileName');
-
-        // Create directory if it doesn't exist
-        if (!await directory.exists()) {
-          await directory.create(recursive: true);
-        }
-
-        // Download the audio
-        final videoStream = _yt.videos.streamsClient.get(audioStreamInfo);
-        final fileStream = file.openWrite();
-
-        final contentLength = audioStreamInfo.size.totalBytes;
-        int receivedLength = 0;
-
-        await for (final data in videoStream) {
-          if (progress.cancelRequested) {
-            await fileStream.close();
-            await file.delete();
-            _removeDownload(videoId);
-            return null;
-          }
-
-          fileStream.add(data);
-          receivedLength += data.length;
-
-          // Update progress
-          final progressValue =
-              contentLength > 0 ? receivedLength / contentLength : 0.0;
-          progress.progress = progressValue;
-          onProgress(progressValue);
-          notifyListeners();
-        }
-
-        await fileStream.close();
-        progress.filePath = file.path;
-        progress.isDownloading = false;
-
-        // Add to music library
-        if (context.mounted) {
-          await _addToMusicLibrary(context, video, file.path);
-        }
-
-        _removeDownload(videoId);
-        return file.path;
-      } catch (e) {
-        _removeDownload(videoId, error: e.toString());
-        rethrow;
-      }
-    } catch (e) {
-      debugPrint('Error downloading audio: $e');
-      _removeDownload(videoId, error: e.toString());
-      rethrow;
-    } finally {
-      isLoading.value = false;
-    }
+  void setYoutubeExplode(YoutubeExplode yt) {
+    _yt = yt;
   }
 
-  Future<void> _addToMusicLibrary(
-    BuildContext context,
-    Video video,
-    String filePath,
-  ) async {
-    try {
-      final musicProvider =
-          Provider.of<music_provider.MusicProvider>(context, listen: false);
+  List<DownloadProgress> get activeDownloads => _activeDownloads.values.toList();
 
-      // Check if song already exists
-      final existingSong = musicProvider.songs.firstWhere(
-        (s) => s.id == video.id.value,
-        orElse: () => Song(
-          id: '',
-          title: '',
-          artists: [],
-          url: '',
-          duration: 0,
-        ),
-      );
+  void _notifyProgressUpdate() {
+    notifyListeners();
+  }
 
-      if (existingSong.id.isEmpty) {
-        final song = Song(
-          id: video.id.value,
-          title: video.title,
-          artists: [video.author],
-          album: 'YouTube',
-          url: filePath,
-          duration: video.duration?.inMilliseconds ?? 0,
-          isDownloaded: true,
-          albumArtUrl: video.thumbnails.highResUrl,
-        );
+  void _addActiveDownload(String videoId, String title) {
+    _activeDownloads[videoId] = DownloadProgress(
+      videoId: videoId,
+      title: title,
+      progress: 0.0,
+      isDownloading: true,
+      completer: Completer<void>(),
+    );
+    _notifyProgressUpdate();
+  }
 
-        await musicProvider.addSong(song);
-      } else {
-        // Update existing song
-        await musicProvider.updateSong(existingSong.copyWith(
-          url: filePath,
-          isDownloaded: true,
-        ));
-      }
-    } catch (e) {
-      debugPrint('Error adding/updating song in library: $e');
-      rethrow;
+  void _updateDownloadProgress(String videoId, double progress) {
+    if (_activeDownloads.containsKey(videoId)) {
+      _activeDownloads[videoId]!.progress = progress;
+      _activeDownloads[videoId]!.isDownloading = progress < 1.0;
+      _notifyProgressUpdate();
     }
   }
 
   void _removeDownload(String videoId, {String? error}) {
-    final progress = _activeDownloads[videoId];
-    if (progress != null) {
+    if (_activeDownloads.containsKey(videoId)) {
+      final download = _activeDownloads[videoId]!;
       if (error != null) {
-        progress.error = error;
-        progress.isDownloading = false;
-        // Keep the download in the list for a while to show the error
-        Future.delayed(const Duration(seconds: 5), () {
-          _activeDownloads.remove(videoId);
-          notifyListeners();
-        });
+        download.error = error;
+        download.isDownloading = false;
+        if (error == 'Canceled by user') {
+          download.completer?.complete();
+        } else {
+          download.completer?.completeError(error);
+        }
       } else {
-        _activeDownloads.remove(videoId);
+        download.completer?.complete();
       }
-      notifyListeners();
+      try {
+        download.subscription?.cancel();
+      } catch (_) {}
+      _activeDownloads.remove(videoId);
+      _notifyProgressUpdate();
     }
   }
 
-  Future<void> cancelDownload(String videoId) async {
-    final progress = _activeDownloads[videoId];
-    if (progress != null) {
-      progress.cancelRequested = true;
-      await progress.subscription?.cancel();
+  Future<bool> cancelDownload(String videoId) async {
+    final d = _activeDownloads[videoId];
+    if (d == null) return false;
+    d.cancelRequested = true;
+    d.isDownloading = false;
+    _notifyProgressUpdate();
+    try {
+      await d.subscription?.cancel();
+    } catch (_) {}
+    return true;
+  }
 
-      // Delete the partially downloaded file if it exists
-      if (progress.filePath != null) {
-        try {
-          final file = File(progress.filePath!);
-          if (await file.exists()) {
-            await file.delete();
+  Future<String?> downloadAudio(
+    String videoId, {
+    void Function(double)? onProgress,
+    required BuildContext context,
+  }) async {
+    if (!await _checkStoragePermission()) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Storage permission required')),
+        );
+      }
+      return null;
+    }
+
+    try {
+      final video = await _yt.videos.get(videoId);
+      final safeTitle =
+          '${video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.opus';
+
+      _addActiveDownload(videoId, video.title);
+      if (onProgress != null) onProgress(0.0);
+      _updateDownloadProgress(videoId, 0.0);
+
+      // Get the appropriate directory for storing music
+      Directory musicDir;
+      if (kIsWeb) return null;
+      
+      try {
+        if (Platform.isAndroid) {
+          // Try external storage first (requires MANAGE_EXTERNAL_STORAGE permission)
+          try {
+            musicDir = Directory('/storage/emulated/0/Music/tsmusic');
+            if (!await musicDir.exists()) {
+              await musicDir.create(recursive: true);
+            }
+            // Verify we can write to the directory
+            final testFile = File('${musicDir.path}/.test');
+            await testFile.writeAsString('test');
+            await testFile.delete();
+          } catch (e) {
+            print('Could not use external storage, falling back to app directory: $e');
+            // Fall back to app's documents directory
+            final appDocDir = await getApplicationDocumentsDirectory();
+            musicDir = Directory('${appDocDir.path}/tsmusic');
+            if (!await musicDir.exists()) {
+              await musicDir.create(recursive: true);
+            }
           }
-        } catch (e) {
-          debugPrint('Error deleting partial download: $e');
+        } else if (Platform.isIOS) {
+          // On iOS, use the documents directory
+          final appDocDir = await getApplicationDocumentsDirectory();
+          musicDir = Directory('${appDocDir.path}/tsmusic');
+          if (!await musicDir.exists()) {
+            await musicDir.create(recursive: true);
+          }
+        } else {
+          // For other platforms
+          final appDocDir = await getApplicationDocumentsDirectory();
+          musicDir = Directory('${appDocDir.path}/tsmusic');
+          if (!await musicDir.exists()) {
+            await musicDir.create(recursive: true);
+          }
         }
+      } catch (e) {
+        print('Error setting up download directory: $e');
+        _removeDownload(videoId, error: 'Failed to set up download directory');
+        return null;
       }
 
-      _removeDownload(videoId, error: 'Download cancelled');
+      final file = File('${musicDir.path}/$safeTitle');
+      if (await file.exists()) {
+        await _addDownloadedSongToLibrary(
+          videoId: videoId,
+          filePath: file.path,
+          context: context,
+        );
+        _updateDownloadProgress(videoId, 1.0);
+        _removeDownload(videoId);
+        return file.path;
+      }
+
+      // Get audio stream URL
+      String? audioUrl;
+      try {
+        audioUrl = await _getAudioStream(videoId);
+        if (audioUrl == null) {
+          throw Exception('No audio stream available');
+        }
+      } catch (e) {
+        print('Error getting audio stream: $e');
+        _updateDownloadProgress(videoId, 0.0);
+        _removeDownload(videoId, error: 'Failed to get audio stream: ${e.toString()}');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: Failed to get audio stream')),
+          );
+        }
+        return null;
+      }
+
+      final request = http.Request('GET', Uri.parse(audioUrl));
+      final response = await _httpClient.send(request);
+      if (response.statusCode != 200) {
+        _updateDownloadProgress(videoId, 0.0);
+        _removeDownload(videoId,
+            error: 'Download failed with status ${response.statusCode}');
+        return null;
+      }
+
+      final contentLength = response.contentLength ?? 0;
+      int receivedLength = 0;
+      final bytes = <int>[];
+      final done = Completer<void>();
+
+      final sub = response.stream.listen((chunk) {
+        if (_activeDownloads[videoId]?.cancelRequested == true) return;
+        bytes.addAll(chunk);
+        receivedLength += chunk.length;
+        if (contentLength > 0) {
+          final progress = receivedLength / contentLength;
+          _updateDownloadProgress(videoId, progress);
+          onProgress?.call(progress);
+        }
+      }, onError: (e) {
+        if (!done.isCompleted) done.completeError(e);
+      }, onDone: () {
+        if (!done.isCompleted) done.complete();
+      }, cancelOnError: true);
+
+      _activeDownloads[videoId]?.subscription = sub;
+
+      try {
+        await done.future;
+      } catch (e) {
+        if (_activeDownloads[videoId]?.cancelRequested == true) {
+          _removeDownload(videoId, error: 'Canceled by user');
+          return null;
+        }
+        rethrow;
+      } finally {
+        try {
+          await sub.cancel();
+        } catch (_) {}
+      }
+
+      if (_activeDownloads[videoId]?.cancelRequested == true) return null;
+
+      await file.writeAsBytes(bytes);
+
+      if (_activeDownloads[videoId]?.cancelRequested == true) return null;
+      await _addDownloadedSongToLibrary(
+        videoId: videoId,
+        filePath: file.path,
+        context: context,
+      );
+      _updateDownloadProgress(videoId, 1.0);
+      _removeDownload(videoId);
+      return file.path;
+    } catch (e) {
+      _removeDownload(videoId, error: 'Download failed: $e');
+      return null;
     }
   }
 
   Future<bool> _checkStoragePermission() async {
-    if (Platform.isAndroid) {
-      var status = await Permission.storage.status;
-      if (!status.isGranted) {
-        status = await Permission.storage.request();
-      }
-      return status.isGranted;
-    } else if (Platform.isIOS) {
-      // On iOS, we don't need storage permission for app's documents directory
-      return true;
-    }
-    // For other platforms (web, desktop, etc.)
-    return true;
+    if (!Platform.isAndroid) return true;
+    
+    // Request storage permissions
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.storage,
+      Permission.manageExternalStorage,
+      if (await Permission.audio.request().isGranted) Permission.audio,
+    ].request();
+    
+    // Check if we have the necessary permissions
+    bool hasStoragePermission = statuses[Permission.storage]?.isGranted ?? false;
+    bool hasManageExternal = statuses[Permission.manageExternalStorage]?.isGranted ?? false;
+    
+    // For Android 10 and below, storage permission is enough
+    if (hasStoragePermission) return true;
+    
+    // For Android 11+, we need manage external storage
+    if (hasManageExternal) return true;
+    
+    // If we get here, permissions were denied
+    return false;
   }
 
-  Future<Directory> _getDownloadDirectory() async {
-    if (Platform.isAndroid) {
-      // For Android, use the music directory
-      final directory = Directory('/storage/emulated/0/Music/TSMusic');
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-      return directory;
-    } else if (Platform.isIOS) {
-      // For iOS, use the documents directory
-      return await getApplicationDocumentsDirectory();
-    } else {
-      // For other platforms (web, desktop, etc.)
-      return Directory.current;
+  
+Future<String?> _getAudioStream(String videoId) async {
+  try {
+    print('Fetching manifest for video: $videoId');
+    final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+    final audioStreams = manifest.audioOnly;
+
+    if (audioStreams.isNotEmpty) {
+      final bestAudio = audioStreams.withHighestBitrate();
+      print('Selected audio stream: ${bestAudio.bitrate}');
+      return bestAudio.url.toString();
     }
+
+    print('No audio-only streams found, trying muxed fallback...');
+    final muxed = manifest.muxed;
+    if (muxed.isNotEmpty) {
+      final fallback = muxed.withHighestBitrate();
+      print('Using muxed fallback stream: ${fallback.bitrate}');
+      return fallback.url.toString();
+    }
+
+    print('No audio or muxed streams available for $videoId');
+    return null;
+  } on YoutubeExplodeException catch (e) {
+    print('YoutubeExplode error: $e');
+    await Future.delayed(const Duration(seconds: 1));
+    try {
+      print('Retrying manifest fetch for $videoId...');
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      final audioStreams = manifest.audioOnly;
+      if (audioStreams.isNotEmpty) {
+        final bestAudio = audioStreams.withHighestBitrate();
+        return bestAudio.url.toString();
+      }
+    } catch (err) {
+      print('Retry failed: $err');
+    }
+    return null;
+  } catch (e, s) {
+    print('Unexpected error fetching audio stream for $videoId: $e');
+    print(s);
+    return null;
+  }
+}
+
+
+  Future<void> _addDownloadedSongToLibrary({
+    required String videoId,
+    required String filePath,
+    required BuildContext context,
+  }) async {
+    try {
+      final video = await _yt.videos.get(videoId);
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      await db.transaction((txn) async {
+        final existingSongs = await txn.query(
+          DatabaseHelper.tableSongs,
+          where: 'file_path = ?',
+          whereArgs: [filePath],
+        );
+
+        if (existingSongs.isNotEmpty) return;
+
+        final songMap = {
+          'title': video.title,
+          'file_path': filePath,
+          'duration': video.duration?.inMilliseconds ?? 0,
+          'is_downloaded': 1,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+
+        final songId = await txn.insert(
+          DatabaseHelper.tableSongs,
+          songMap,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        final artistId =
+            await _getOrCreateArtist(txn, video.author.isNotEmpty ? video.author : 'Unknown Artist');
+
+        await txn.insert(
+          DatabaseHelper.tableSongArtist,
+          {
+            'song_id': songId,
+            'artist_id': artistId,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+
+        await txn.insert(
+          DatabaseHelper.tableSongGenre,
+          {
+            'song_id': songId,
+            'genre_id': await _getOrCreateGenre(txn, 'tsmusic'),
+            'created_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      });
+
+      if (context.mounted) {
+        final musicProvider = Provider.of<MusicProvider>(context, listen: false);
+        await musicProvider.loadLocalMusic();
+      }
+    } catch (_) {}
   }
 
-  String _sanitizeFileName(String name) {
-    // Remove invalid characters and limit length
-    var sanitized = name
-        .replaceAll(RegExp(r'[\\/*?:"<>|]'), '_')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+  Future<int> _getOrCreateArtist(DatabaseExecutor db, String name) async {
+    final result = await db.query(
+      DatabaseHelper.tableArtists,
+      where: '${DatabaseHelper.columnName} = ?',
+      whereArgs: [name],
+    );
 
-    // Limit length to 100 characters to avoid filesystem issues
-    if (sanitized.length > 100) {
-      sanitized = '${sanitized.substring(0, 97)}...';
-    }
+    if (result.isNotEmpty) return result.first[DatabaseHelper.columnId] as int;
 
-    return sanitized;
+    return await db.insert(
+      DatabaseHelper.tableArtists,
+      {
+        DatabaseHelper.columnName: name,
+        DatabaseHelper.columnCreatedAt: DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  Future<int> _getOrCreateGenre(DatabaseExecutor db, String name) async {
+    final result = await db.query(
+      DatabaseHelper.tableGenres,
+      where: '${DatabaseHelper.columnName} = ?',
+      whereArgs: [name],
+    );
+
+    if (result.isNotEmpty) return result.first[DatabaseHelper.columnId] as int;
+
+    return await db.insert(
+      DatabaseHelper.tableGenres,
+      {
+        DatabaseHelper.columnName: name,
+        DatabaseHelper.columnCreatedAt: DateTime.now().toIso8601String(),
+      },
+    );
   }
 
   @override
   void dispose() {
-    // Close resources
-    _yt.close();
-
-    // Cancel all active downloads
     for (final download in _activeDownloads.values) {
-      download.subscription?.cancel();
+      download.completer?.completeError('Service disposed');
     }
-
     _activeDownloads.clear();
     super.dispose();
   }

@@ -72,8 +72,8 @@ class MusicPlayerApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
-          final lightTheme = themeProvider.getLightTheme();
-          final darkTheme = themeProvider.getDarkTheme();
+          final lightTheme = themeProvider.lightTheme;
+          final darkTheme = themeProvider.darkTheme;
           final isDark = themeProvider.isDarkMode;
           final baseTextTheme =
               isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
@@ -218,7 +218,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const NowPlayingScreen()),
+                      builder: (context) => NowPlayingScreen()),
                 );
               }
             },

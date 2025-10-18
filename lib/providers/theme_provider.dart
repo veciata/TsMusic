@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/scheduler.dart';
 
 enum PlayerStyle {
   classic,
@@ -9,23 +10,22 @@ enum PlayerStyle {
 }
 
 class ThemeProvider with ChangeNotifier {
-  static const String _themeModeKey = 'theme_mode';
-  static const String _primaryColorKey = 'primary_color';
-  static const String _playerStyleKey = 'player_style';
+  static const _themeModeKey = 'theme_mode';
+  static const _primaryColorKey = 'primary_color';
+  static const _playerStyleKey = 'player_style';
 
   ThemeMode _themeMode = ThemeMode.system;
   bool _isDarkMode = false;
-  Color _primaryColor = const Color(0xFF1DB954); // Default Spotify green
+  Color _primaryColor = const Color(0xFF1DB954);
   PlayerStyle _playerStyle = PlayerStyle.modern;
 
-  // Get theme colors
   final List<Color> availableColors = const [
-    Color(0xFF1DB954), // Spotify Green
-    Color(0xFF1E88E5), // Blue
-    Color(0xFF9C27B0), // Purple
-    Color(0xFFE91E63), // Pink
-    Color(0xFFFF5722), // Deep Orange
-    Color(0xFF009688), // Teal
+    Color(0xFF1DB954),
+    Color(0xFF1E88E5),
+    Color(0xFF9C27B0),
+    Color(0xFFE91E63),
+    Color(0xFFFF5722),
+    Color(0xFF009688),
   ];
 
   ThemeMode get themeMode => _themeMode;
@@ -33,7 +33,6 @@ class ThemeProvider with ChangeNotifier {
   Color get primaryColor => _primaryColor;
   PlayerStyle get playerStyle => _playerStyle;
 
-  // Player style names for UI
   String getPlayerStyleName(PlayerStyle style) {
     switch (style) {
       case PlayerStyle.classic:
@@ -47,100 +46,77 @@ class ThemeProvider with ChangeNotifier {
     }
   }
 
-  // Initialize theme from shared preferences
   Future<void> loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    final themeIndex = prefs.getInt(_themeModeKey) ?? 0;
-    final colorValue = prefs.getInt(_primaryColorKey) ?? 0xFF1DB954;
-    final styleIndex =
-        prefs.getInt(_playerStyleKey) ?? PlayerStyle.modern.index;
-
-    _themeMode = ThemeMode.values[themeIndex];
-    _primaryColor = Color(colorValue);
-    _playerStyle = PlayerStyle.values[styleIndex];
+    _themeMode = ThemeMode.values[prefs.getInt(_themeModeKey) ?? 0];
+    _primaryColor = Color(prefs.getInt(_primaryColorKey) ?? 0xFF1DB954);
+    _playerStyle =
+        PlayerStyle.values[prefs.getInt(_playerStyleKey) ?? PlayerStyle.modern.index];
     _updateDarkMode();
     notifyListeners();
   }
 
   void _updateDarkMode() {
-    _isDarkMode = _themeMode == ThemeMode.dark ||
-        (_themeMode == ThemeMode.system &&
-            WidgetsBinding.instance.window.platformBrightness ==
-                Brightness.dark);
+    if (_themeMode == ThemeMode.system) {
+      _isDarkMode = SchedulerBinding.instance.window.platformBrightness == Brightness.dark;
+    } else {
+      _isDarkMode = _themeMode == ThemeMode.dark;
+    }
+  }
+
+  Future<void> _saveInt(String key, int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(key, value);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     _updateDarkMode();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_themeModeKey, mode.index);
-
+    await _saveInt(_themeModeKey, mode.index);
     notifyListeners();
+  }
+
+  Future<void> toggleTheme() async {
+    await setThemeMode(_themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
   }
 
   Future<void> setPrimaryColor(Color color) async {
     _primaryColor = color;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_primaryColorKey, color.value);
-
+    await _saveInt(_primaryColorKey, color.value);
     notifyListeners();
   }
 
   Future<void> setPlayerStyle(PlayerStyle style) async {
     _playerStyle = style;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_playerStyleKey, style.index);
-
+    await _saveInt(_playerStyleKey, style.index);
     notifyListeners();
   }
 
-  Future<void> toggleTheme() async {
-    await setThemeMode(
-      _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
-    );
-  }
-
-  // Get the current theme data
-  ThemeData getLightTheme() {
-    final baseTheme = ThemeData.light();
-    return baseTheme.copyWith(
+  ThemeData get lightTheme {
+    final base = ThemeData.light();
+    return base.copyWith(
       colorScheme: ColorScheme.light(
         primary: _primaryColor,
         secondary: _primaryColor.withOpacity(0.8),
-        brightness: Brightness.light,
       ),
-      brightness: Brightness.light,
       primaryColor: _primaryColor,
       scaffoldBackgroundColor: Colors.grey[50],
       cardColor: Colors.white,
       dividerColor: Colors.grey[300],
-      // Ensure text themes are properly inherited
-      textTheme: baseTheme.textTheme,
-      primaryTextTheme: baseTheme.primaryTextTheme,
-      iconTheme: baseTheme.iconTheme,
     );
   }
 
-  ThemeData getDarkTheme() {
-    final baseTheme = ThemeData.dark();
-    return baseTheme.copyWith(
+  ThemeData get darkTheme {
+    final base = ThemeData.dark();
+    return base.copyWith(
       colorScheme: ColorScheme.dark(
         primary: _primaryColor,
         secondary: _primaryColor.withOpacity(0.8),
-        brightness: Brightness.dark,
       ),
-      brightness: Brightness.dark,
       primaryColor: _primaryColor,
       scaffoldBackgroundColor: Colors.grey[900],
       cardColor: Colors.grey[850],
       dividerColor: Colors.grey[700],
-      // Ensure text themes are properly inherited
-      textTheme: baseTheme.textTheme,
-      primaryTextTheme: baseTheme.primaryTextTheme,
-      iconTheme: baseTheme.iconTheme,
     );
   }
 }

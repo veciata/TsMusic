@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:path/path.dart' as path;
@@ -137,10 +138,8 @@ class StorageScanner {
         id: filePath, // Use file path as ID for local files
         title: title,
         artists: ['Unknown Artist'],
-        url: 'file://$filePath',
-        source: 'local',
+        url: filePath,
         duration: 0, // Will be updated later
-        fileSize: stat.size,
         isFavorite: false,
         isDownloaded: true,
         tags: [],

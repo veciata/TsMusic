@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart';
 import '../services/youtube_service.dart';
-import '../services/youtube/youtube_download_service.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
@@ -14,24 +13,28 @@ class DownloadsScreen extends StatefulWidget {
 }
 
 class _DownloadsScreenState extends State<DownloadsScreen> {
-  late YoutubeDownloadService _downloadService;
+  YouTubeService? _youTubeService;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _downloadService =
-        Provider.of<YoutubeDownloadService>(context, listen: false);
+    final newService = Provider.of<YouTubeService>(context, listen: false);
+    if (_youTubeService != newService) {
+      _youTubeService?.removeListener(_onDownloadsChanged);
+      _youTubeService = newService;
+      _youTubeService?.addListener(_onDownloadsChanged);
+    }
   }
 
   @override
   void initState() {
     super.initState();
-    _downloadService.addListener(_onDownloadsChanged);
+    _youTubeService?.addListener(_onDownloadsChanged);
   }
 
   @override
   void dispose() {
-    _downloadService.removeListener(_onDownloadsChanged);
+    _youTubeService?.removeListener(_onDownloadsChanged);
     super.dispose();
   }
 
@@ -43,8 +46,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<YoutubeDownloadService, music_provider.MusicProvider>(
-      builder: (context, downloadService, musicProvider, _) {
+    if (_youTubeService == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    return Consumer2<YouTubeService, music_provider.MusicProvider>(
+      builder: (context, youTubeService, musicProvider, _) {
         return DefaultTabController(
           length: 2,
           child: Scaffold(
@@ -59,8 +66,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ),
             body: TabBarView(
               children: [
-                _buildDownloadingTab(downloadService),
-                _buildDownloadsList(musicProvider, downloadService),
+                _buildDownloadingTab(youTubeService),
+                _buildDownloadsList(musicProvider, youTubeService),
               ],
             ),
           ),
@@ -70,8 +77,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Widget _buildDownloadsList(music_provider.MusicProvider musicProvider,
-      YoutubeDownloadService downloadService) {
-    final activeDownloads = downloadService.activeDownloads;
+      YouTubeService youTubeService) {
+    final activeDownloads = youTubeService.activeDownloads;
     final downloadedSongs =
         musicProvider.songs.where((s) => s.isDownloaded).toList();
 
@@ -121,9 +128,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     );
   }
 
-  Widget _buildDownloadingTab(YoutubeDownloadService downloadService) {
-    final activeDownloads = downloadService.activeDownloads;
-    if (activeDownloads.isEmpty) {
+  Widget _buildDownloadingTab(YouTubeService youTubeService) {
+    final activeDownloads = youTubeService.activeDownloads;
+    
+    Widget buildEmptyState() {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -136,16 +144,23 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
     }
 
+    if (activeDownloads.isEmpty) {
+      return buildEmptyState();
+    }
+
     return ListView.builder(
+      key: const PageStorageKey('downloading_list'),
       itemCount: activeDownloads.length,
       itemBuilder: (context, index) {
+        if (index >= activeDownloads.length) return const SizedBox.shrink();
         final download = activeDownloads[index];
+        if (download == null) return const SizedBox.shrink();
         return _buildDownloadItem(download);
       },
     );
   }
 
-  Widget _buildDownloadItem(YTDownloadProgress download) {
+  Widget _buildDownloadItem(dynamic download) {
     final isDownloading = download.isDownloading;
     final hasError = download.error != null;
 

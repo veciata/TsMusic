@@ -115,10 +115,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
-    final downloadService =
-        Provider.of<YoutubeDownloadService>(context, listen: false);
-    final isDownloading =
-        downloadService.activeDownloads.any((d) => d.videoId == audio.id);
+    final youTubeService = Provider.of<YouTubeService>(context, listen: false);
+    final isDownloading = youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
 
     if (isDownloading && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,15 +126,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
-      await downloadService.downloadAudio(
-        videoId: audio.id,
-        context: context,
-        onProgress: (progress) {
-          // Update UI with download progress if needed
-          debugPrint(
-              'Download progress: ${(progress * 100).toStringAsFixed(1)}%');
-        },
-      );
+      await youTubeService.downloadAudio(audio, context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Download completed')),
