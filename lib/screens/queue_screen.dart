@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/new_music_provider.dart';
+import '../providers/music_provider.dart';
 import '../models/song.dart';
 
 class QueueScreen extends StatelessWidget {
@@ -14,7 +14,7 @@ class QueueScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Now Playing Queue'),
         actions: [
-          Consumer<NewMusicProvider>(
+          Consumer<MusicProvider>(
             builder: (context, musicProvider, _) => IconButton(
               tooltip: 'Clear queue',
               icon: const Icon(Icons.delete_sweep_rounded),
@@ -51,7 +51,7 @@ class QueueScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Consumer<NewMusicProvider>(
+      body: Consumer<MusicProvider>(
         builder: (context, musicProvider, _) {
           final List<Song> queue = musicProvider.queue;
           final int? currentIndex = musicProvider.currentIndex;
@@ -112,7 +112,7 @@ class QueueScreen extends StatelessWidget {
                         : null,
                   ),
                   subtitle: Text(
-                    song.artist,
+                    song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

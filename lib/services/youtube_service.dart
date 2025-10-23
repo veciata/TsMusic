@@ -7,7 +7,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:tsmusic/providers/new_music_provider.dart';
+import '../providers/music_provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -709,7 +709,7 @@ class YouTubeService with ChangeNotifier {
 
       // Notify the music provider to refresh its data
       if (context.mounted) {
-        final musicProvider = Provider.of<NewMusicProvider>(context, listen: false);
+        final musicProvider = Provider.of<MusicProvider>(context, listen: false);
         await musicProvider.loadLocalMusic();
       }
     } catch (e) {

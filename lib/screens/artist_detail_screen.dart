@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 import '../services/youtube_service.dart';
 import '../models/song.dart';
 
@@ -137,7 +137,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
     final localSongs = musicProvider.getSongsByArtist(widget.artistName);
 
     String? artistImageUrl = widget.artistImageUrl;
@@ -225,7 +225,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     }
   }
 
-  Widget _buildLocalSongsTab(List<Song> songs, music_provider.NewMusicProvider musicProvider) {
+  Widget _buildLocalSongsTab(List<Song> songs, music_provider.MusicProvider musicProvider) {
     if (songs.isEmpty) return const Center(child: Text('No local songs found for this artist'));
 
     // Use a map to ensure unique songs by their normalized path
@@ -323,7 +323,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
             },
           ),
           onTap: () {
-            final musicProvider = Provider.of<music_provider.NewMusicProvider>(context, listen: false);
+            final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
             musicProvider.playSong(song);
           },
         );

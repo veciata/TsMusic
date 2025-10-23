@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/main.dart';
-import 'package:tsmusic/providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/utils/permission_helper.dart';
 
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({super.key});
+  final VoidCallback? onComplete;
+
+  const WelcomeScreen({super.key, this.onComplete});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -29,13 +30,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final isFirstLaunch = prefs.getBool('is_first_launch') ?? true;
 
     if (!isFirstLaunch) {
-      // Uygulama daha önce açıldıysa doğrudan ana ekrana yönlendir
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const MainNavigationScreen(),
-          ),
-        );
+      // Uygulama daha önce açıldıysa callback'i çağır
+      if (mounted && widget.onComplete != null) {
+        widget.onComplete!();
       }
       return;
     }
@@ -58,7 +55,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> _startMusicScan() async {
     try {
-      final musicProvider = Provider.of<music_provider.NewMusicProvider>(
+      final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
         listen: false,
       );
@@ -81,7 +78,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
 
     return Scaffold(
       body: Center(
@@ -131,13 +128,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   // İlk açılış işaretini kaydet
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool('is_first_launch', false);
-                  
-                  if (mounted) {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => const MainNavigationScreen(),
-                      ),
-                    );
+
+                  if (mounted && widget.onComplete != null) {
+                    widget.onComplete!();
                   }
                 },
                 style: ElevatedButton.styleFrom(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 import '../screens/now_playing_screen.dart';
 import '../screens/queue_screen.dart';
 
@@ -9,7 +9,7 @@ class NowPlayingBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<music_provider.NewMusicProvider>(
+    return Consumer<music_provider.MusicProvider>(
       builder: (context, musicProvider, _) {
         final currentSong = musicProvider.currentSong;
         if (currentSong == null) {
@@ -103,7 +103,7 @@ class NowPlayingBottomSheet extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            currentSong.artist,
+                            currentSong.artists.isNotEmpty ? currentSong.artists.join(' & ') : 'Unknown Artist',
                             style: TextStyle(
                               fontSize: 14,
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),

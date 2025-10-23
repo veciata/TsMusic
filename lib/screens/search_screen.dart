@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart' as model;
 import '../services/youtube_service.dart';
 import '../main.dart';
@@ -217,7 +217,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 
-  Widget _buildSearchResults(List<model.Song> localSongs, music_provider.NewMusicProvider provider, 
+  Widget _buildSearchResults(List<model.Song> localSongs, music_provider.MusicProvider provider,
       model.Song? currentSong, bool isPlaying) {
     if (_searchController.text.isEmpty) {
       return const Center(
@@ -228,7 +228,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final query = _searchController.text.toLowerCase();
     final filteredLocalSongs = localSongs.where((song) {
       return song.title.toLowerCase().contains(query) ||
-          song.artist.toLowerCase().contains(query) ||
+          song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
           (song.album?.toLowerCase().contains(query) ?? false);
     }).toList();
 
@@ -257,7 +257,7 @@ class _SearchScreenState extends State<SearchScreen> {
             return ListTile(
               leading: const Icon(Icons.music_note),
               title: Text(song.title),
-              subtitle: Text(song.artist),
+              subtitle: Text(song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist'),
               trailing: IconButton(
                 icon: Icon(isCurrent && isSongPlaying ? Icons.pause : Icons.play_arrow),
                 onPressed: () {
@@ -326,7 +326,7 @@ class _SearchScreenState extends State<SearchScreen> {
         .where((d) => d.videoId == audio.id)
         .firstOrNull;
 
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context, listen: false);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
     final isDownloaded = musicProvider.songs
         .any((s) => s.id == audio.id && s.isDownloaded);
 
@@ -413,7 +413,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.NewMusicProvider>(context);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
     final currentSong = musicProvider.currentSong;
     final isPlaying = musicProvider.isPlaying;
     final localSongs = musicProvider.songs;
@@ -484,7 +484,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             maxLines: 1,
                           ),
                           Text(
-                            currentSong.artist,
+                            currentSong.artists.isNotEmpty ? currentSong.artists.join(' & ') : 'Unknown Artist',
                             style: Theme.of(context).textTheme.bodySmall,
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,

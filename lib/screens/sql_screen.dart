@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:provider/provider.dart';
-import 'package:tsmusic/providers/new_music_provider.dart' as music_provider;
+import '../providers/music_provider.dart' as music_provider;
 
 class SqlScreen extends StatefulWidget {
   const SqlScreen({super.key});
@@ -21,51 +21,75 @@ class _SqlScreenState extends State<SqlScreen> {
   }
 
   Future<_DbOverview> _loadOverview() async {
-    final db = await DatabaseHelper().database;
+    try {
+      final db = await DatabaseHelper().database;
 
-    // Fetch tables from sqlite_master
-    final tables = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-    );
+      // Fetch tables from sqlite_master
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      );
 
-    // Build counts per table
-    final Map<String, int> counts = {};
-    for (final row in tables) {
-      final name = row['name'] as String;
-      final cntRes = await db.rawQuery('SELECT COUNT(*) as c FROM $name');
-      final c = (cntRes.first['c'] as int?) ?? 0;
-      counts[name] = c;
+      // Build counts per table
+      final Map<String, int> counts = {};
+      for (final row in tables) {
+        final name = row['name'] as String;
+        try {
+          final cntRes = await db.rawQuery('SELECT COUNT(*) as c FROM $name');
+          final c = (cntRes.first['c'] as int?) ?? 0;
+          counts[name] = c;
+        } catch (e) {
+          debugPrint('Error counting records in table $name: $e');
+          counts[name] = 0;
+        }
+      }
+
+      // Fetch some domain data
+      final songs = await db.query(DatabaseHelper.tableSongs, orderBy: 'id DESC', limit: 100);
+      final artists = await db.query(DatabaseHelper.tableArtists, orderBy: 'id DESC', limit: 100);
+      final genres = await db.query(DatabaseHelper.tableGenres, orderBy: 'id DESC', limit: 100);
+      final playlists = await db.query(DatabaseHelper.tablePlaylists, orderBy: 'id');
+
+      // Fetch songs for each playlist
+      final playlistSongs = <int, List<Map<String, Object?>>>{};
+      for (final playlist in playlists) {
+        final playlistId = playlist['id'] as int;
+        try {
+          final songs = await db.rawQuery('''
+            SELECT s.*, ps.position
+            FROM ${DatabaseHelper.tableSongs} s
+            JOIN ${DatabaseHelper.tablePlaylistSongs} ps ON s.id = ps.song_id
+            WHERE ps.playlist_id = ?
+            ORDER BY ps.position
+          ''', [playlistId]);
+          playlistSongs[playlistId] = songs;
+        } catch (e) {
+          debugPrint('Error fetching songs for playlist $playlistId: $e');
+          playlistSongs[playlistId] = [];
+        }
+      }
+
+      return _DbOverview(
+        tableNames: tables.map((e) => e['name'] as String).toList(),
+        counts: counts,
+        songs: songs,
+        artists: artists,
+        genres: genres,
+        playlists: playlists,
+        playlistSongs: playlistSongs,
+      );
+    } catch (e) {
+      debugPrint('Error loading database overview: $e');
+      // Return empty overview on error
+      return _DbOverview(
+        tableNames: [],
+        counts: {},
+        songs: [],
+        artists: [],
+        genres: [],
+        playlists: [],
+        playlistSongs: {},
+      );
     }
-
-    // Fetch some domain data
-    final songs = await db.query(DatabaseHelper.tableSongs, orderBy: 'id DESC', limit: 100);
-    final artists = await db.query(DatabaseHelper.tableArtists, orderBy: 'id DESC', limit: 100);
-    final genres = await db.query(DatabaseHelper.tableGenres, orderBy: 'id DESC', limit: 100);
-    final playlists = await db.query(DatabaseHelper.tablePlaylists, orderBy: 'id');
-    
-    // Fetch songs for each playlist
-    final playlistSongs = <int, List<Map<String, Object?>>>{};
-    for (final playlist in playlists) {
-      final playlistId = playlist['id'] as int;
-      final songs = await db.rawQuery('''
-        SELECT s.*, ps.position 
-        FROM ${DatabaseHelper.tableSongs} s
-        JOIN ${DatabaseHelper.tablePlaylistSongs} ps ON s.id = ps.song_id
-        WHERE ps.playlist_id = ?
-        ORDER BY ps.position
-      ''', [playlistId]);
-      playlistSongs[playlistId] = songs;
-    }
-
-    return _DbOverview(
-      tableNames: tables.map((e) => e['name'] as String).toList(),
-      counts: counts,
-      songs: songs,
-      artists: artists,
-      genres: genres,
-      playlists: playlists,
-      playlistSongs: playlistSongs,
-    );
   }
 
   @override
@@ -74,32 +98,6 @@ class _SqlScreenState extends State<SqlScreen> {
       appBar: AppBar(
         title: const Text('SQL Explorer'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sync from Library',
-            onPressed: () async {
-              try {
-                final mp = context.read<music_provider.NewMusicProvider>();
-                // Ensure songs are loaded
-                if (mp.songs.isEmpty) {
-                  await mp.loadSongsFromStorage();
-                }
-                await DatabaseHelper().syncMusicLibrary(mp);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Synced music library to database')),
-                );
-                setState(() {
-                  _overviewFuture = _loadOverview();
-                });
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Sync failed: $e')),
-                );
-              }
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -128,7 +126,7 @@ class _SqlScreenState extends State<SqlScreen> {
           final data = snapshot.data!;
           final allEmpty = data.counts.values.every((c) => c == 0);
           return DefaultTabController(
-            length: 5,
+            length: 6,
             child: Column(
               children: [
                 if (allEmpty)
@@ -140,7 +138,7 @@ class _SqlScreenState extends State<SqlScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Database is empty. Tap the Sync button (↻) to import songs from your library.',
+                            'Database is empty. Music files will be automatically added when you play songs.',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),

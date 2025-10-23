@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io' show Platform, exit;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
@@ -14,7 +15,7 @@ import 'screens/now_playing_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/search_screen.dart';
 import 'providers/theme_provider.dart';
-import 'providers/new_music_provider.dart' as music_provider;
+import 'providers/music_provider.dart' as music_provider;
 import 'services/youtube_service.dart';
 import 'utils/package_info_utils.dart';
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
@@ -47,21 +48,63 @@ Future<void> main() async {
   }
 }
 
-class MusicPlayerApp extends StatelessWidget {
+class MusicPlayerApp extends StatefulWidget {
   final YouTubeService youTubeService;
 
   const MusicPlayerApp({
-    super.key, 
+    super.key,
     required this.youTubeService,
   });
 
   @override
+  State<MusicPlayerApp> createState() => _MusicPlayerAppState();
+}
+
+class _MusicPlayerAppState extends State<MusicPlayerApp> {
+  bool _showWelcome = true;
+  bool _welcomeChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initWelcomeStatus();
+  }
+
+  Future<void> _initWelcomeStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool('tsmusic_welcome_done') ?? false;
+    if (!mounted) return;
+    setState(() {
+      _showWelcome = !done;
+      _welcomeChecked = true;
+    });
+  }
+
+  void _onWelcomeComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tsmusic_welcome_done', true);
+    setState(() {
+      _showWelcome = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_welcomeChecked) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
-        ChangeNotifierProvider(create: (_) => music_provider.NewMusicProvider()),
-        ChangeNotifierProvider(create: (_) => youTubeService),
+        ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
+        ChangeNotifierProvider(create: (_) => widget.youTubeService),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -78,7 +121,9 @@ class MusicPlayerApp extends StatelessWidget {
             theme: lightTheme.copyWith(textTheme: textTheme),
             darkTheme: darkTheme.copyWith(textTheme: textTheme),
             themeMode: themeProvider.themeMode,
-            home: const WelcomeScreen(),
+            home: _showWelcome
+                ? WelcomeScreen(onComplete: _onWelcomeComplete)
+                : const MainNavigationScreen(),
           );
         },
       ),
@@ -110,11 +155,31 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
     _requestNotificationPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final musicProv =
-          Provider.of<music_provider.NewMusicProvider>(context, listen: false);
-      if (musicProv.songs.isEmpty) {
-        musicProv.loadSongsFromStorage();
-      }
+          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      // Load from database first, then scan for new music in background
+      _initializeMusic(musicProv);
     });
+  }
+
+  Future<void> _initializeMusic(music_provider.MusicProvider musicProv) async {
+    try {
+      // First load from database
+      await musicProv.loadFromDatabaseOnly();
+
+      // If no music found, trigger a scan
+      if (musicProv.songs.isEmpty) {
+        debugPrint('No music in database, scanning for music...');
+        await musicProv.scanForNewMusic();
+      }
+    } catch (e) {
+      debugPrint('Error initializing music: $e');
+      // Try scanning anyway
+      try {
+        await musicProv.scanForNewMusic();
+      } catch (scanError) {
+        debugPrint('Error during music scan: $scanError');
+      }
+    }
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -202,7 +267,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
         ],
       ),
-      bottomSheet: Consumer<music_provider.NewMusicProvider>(
+      bottomSheet: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProv, _) {
           final currentSong = musicProv.currentSong;
           return GestureDetector(
@@ -256,7 +321,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          currentSong?.artist ?? 'Select a song to play',
+                          currentSong?.artists.isNotEmpty == true ? currentSong!.artists.join(' & ') : 'Select a song to play',
                           style: TextStyle(
                             color:
                                 Theme.of(context).textTheme.bodySmall?.color,
