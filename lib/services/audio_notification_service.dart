@@ -31,14 +31,10 @@ class AudioPlayerTask extends BaseAudioHandler {
   }
 
   @override
-  Future<void> skipToNext() async {
-    // Implement skip to next logic
-  }
+  Future<void> skipToNext() => _player.seekToNext();
 
   @override
-  Future<void> skipToPrevious() async {
-    // Implement skip to previous logic
-  }
+  Future<void> skipToPrevious() => _player.seekToPrevious();
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);

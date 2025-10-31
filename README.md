@@ -1,65 +1,113 @@
+# TS Music
 
----
+A modern, cross-platform music player with local library support and YouTube integration, built with Flutter.
 
-# TS Music – App Plan
+[![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev/)
+[![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-## Overview
-TS Music is a modern audio player that combines local library playback with YouTube sourcing and rich metadata enrichment. It is designed to work across mobile and desktop platforms with a clean, Material 3-inspired UI.
+## Features
 
-## Core Features (MVP)
-- Local music library scan and playback
-- Mini player with quick controls; full Now Playing screen
-- Now Playing Queue (view, reorder, remove, jump-to)
+- Local music library scanning and playback
+- Background audio playback with system controls
+- YouTube music streaming and import
 - Favorites management
-- Background playback with system notifications
-- YouTube import/stream support (via `YouTubeService`)
-- Basic search, sorting, and metadata display
+- Queue management with drag-to-reorder
+- Search and filter your music library
+- Material 3 design with dynamic theming
+- Responsive layout for mobile and desktop
+- Internationalization support
 
-## Architecture
-- UI Screens: `lib/screens/`
-  - `home_screen.dart` – library and discovery
-  - `now_playing_screen.dart` – full-screen player
-  - `queue_screen.dart` – Now Playing queue management
-  - `downloads_screen.dart`, `settings_screen.dart`, `sql_screen.dart`
-- Widgets: `lib/widgets/`
-  - `now_playing_bottom_sheet.dart` – mini player sheet
-- State: `lib/providers/new_music_provider.dart` (Provider + ChangeNotifier)
-- Services: `lib/services/`
-  - `youtube_service.dart` – YouTube integration
-  - `audio_notification_service.dart` – background controls/notifications
-  - `metadata_enrichment_service.dart` – enrich unknown artists/genres
-- Data: `lib/database/` – `database_helper.dart` for persistence
-- Models: `lib/models/song.dart`
+## Getting Started
 
-## State Management
-`NewMusicProvider` controls playback and library state. Key APIs used by the UI:
-- Playback: `play()`, `pause()`, `togglePlayPause()`, `seek()`, `previous()`, `next()`
-- Current: `currentSong`, `currentIndex`, `isPlaying`, `position`, `duration`
-- Queue: `queue`, `playAt(index)`, `removeFromQueue(index)`, `moveInQueue(oldIndex, newIndex)`
-- Library: `songs`, `loadSongsFromStorage()`, `sortSongs()`, `filterSongs()`
-- Favorites: `isFavorite(id)`, `toggleFavorite(id)`
+### Prerequisites
 
-## Queue Interactions
-- Reorder songs by dragging the handle.
-- Swipe left/right to remove a song.
-- Tap an item to play it immediately.
+- Flutter SDK (latest stable version)
+- Dart SDK (latest stable version)
+- Android Studio / Xcode (for mobile development)
+- VS Code or Android Studio (recommended IDEs)
 
-## Permissions
-- Storage access (Android) to scan local files
-- Notifications (Android/iOS) for audio controls
+### Installation
 
-## Build & Run
-1. Flutter: 3.x+
-2. Run `flutter pub get`
-3. Start app: `flutter run`
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/tsmusic.git
+   cd tsmusic
+   ```
 
-## Roadmap (Next Steps)
-- Playlists (user-defined) separate from queue
-- Shuffle/Repeat modes and UI indicators
-- Enhanced search and filtering
-- Artwork caching and improved error handling for images
-- Queue persistence across sessions
-- Download management and offline YouTube handling
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Run the app**
+   ```bash
+   flutter run
+   ```
+
+## Project Structure
+
+```
+lib/
+├── core/
+│   ├── constants/      # App constants, enums, and configurations
+│   ├── services/       # Business logic and API services
+│   ├── theme/          # App theming and styling
+│   └── utils/          # Helper functions and extensions
+├── models/             # Data models and DTOs
+├── providers/          # State management
+├── screens/            # App screens/pages
+│   ├── home/           # Home screen components
+│   ├── settings/       # Settings screen components
+│   └── ...
+├── widgets/            # Reusable UI components
+├── routes/             # Navigation routes
+└── localization/       # Internationalization files
+```
+
+## Tech Stack
+
+- **Framework**: Flutter
+- **Language**: Dart
+- **State Management**: Provider
+- **Audio Playback**: just_audio
+- **Database**: sqflite
+- **Networking**: http
+- **YouTube Integration**: youtube_explode_dart
+- **UI**: Material 3, FlexColorScheme
+
+## Code Style
+
+This project follows the [Effective Dart](https://dart.dev/guides/language/effective-dart) style guide. Please ensure your code adheres to these guidelines before submitting pull requests.
+
+Key points:
+- Use `camelCase` for variables and functions
+- Use `PascalCase` for class names
+- Use `UPPER_CASE` for constants
+- Use `_private` for private members
+- Always include documentation for public APIs
+- Keep methods short and focused on a single responsibility
+
+## Contributing
+
+Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) before submitting pull requests.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Flutter](https://flutter.dev/) team for the amazing framework
+- [just_audio](https://pub.dev/packages/just_audio) for audio playback
+- [youtube_explode_dart](https://pub.dev/packages/youtube_explode_dart) for YouTube integration
+- All contributors who have helped improve this project
 
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,

@@ -15,10 +15,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:tsmusic/database/database_helper.dart';
 
-// YouTube API anahtarı (güvenlik için daha sonra saklanmalıdır)
-const String _youtubeApiKey = 'YOUR_YOUTUBE_API_KEY';
-
-// Audio quality enum
 enum AudioQuality {
   high,
   medium,
@@ -208,85 +204,65 @@ class YouTubeService with ChangeNotifier {
     }
   }
   
-  // Try different methods to get the audio stream
+  // Get audio stream using YouTube Explode
   Future<String?> _getAudioStream(String videoId) async {
-    // Try YouTube Explode first (most reliable method)
     try {
       final url = await _getExplodeAudioStream(videoId);
       if (url != null) return url;
     } catch (e) {
-      debugPrint('YouTube Explode method failed: $e');
+      debugPrint('Failed to get audio stream: $e');
     }
-    
-    // Fallback to direct method
-    try {
-      final url = await _getDirectAudioStream(videoId);
-      if (url != null) return url;
-    } catch (e) {
-      debugPrint('Direct method failed: $e');
-    }
-    
-    // As a last resort, try using yt-dlp/yt-dlp-ffmpeg
-    try {
-      final url = await _getYtDlpStream(videoId);
-      if (url != null) return url;
-    } catch (e) {
-      debugPrint('yt-dlp method failed: $e');
-    }
-    
     return null;
   }
   
-  // Get audio stream using yt-dlp
-  Future<String?> _getYtDlpStream(String videoId) async {
+  
+  // Download audio using YouTube Explode
+  Future<File?> downloadWithExplode(String videoId, String title, {void Function(double)? onProgress}) async {
     try {
-      final result = await Process.run('yt-dlp', [
-        '--format', 'bestaudio/best',
-        '--get-url',
-        'https://www.youtube.com/watch?v=$videoId'
-      ]);
+      // Get the video manifest
+      final video = await _yt.videos.get(videoId);
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
       
-      if (result.exitCode == 0) {
-        final url = result.stdout.toString().trim();
-        if (url.isNotEmpty) {
-          debugPrint('Got audio URL from yt-dlp: $url');
-          return url;
-        }
-      } else {
-        debugPrint('yt-dlp error: ${result.stderr}');
+      // Get the best audio stream
+      final audioStream = manifest.audioOnly.withHighestBitrate();
+      
+      // Get the app's documents directory for saving the file
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final musicDir = Directory('${appDocDir.path}/music');
+      if (!await musicDir.exists()) {
+        await musicDir.create(recursive: true);
       }
-    } catch (e) {
-      debugPrint('Error in yt-dlp: $e');
-    }
-    return null;
-  }
-  
-  // Get audio stream using direct method
-  Future<String?> _getDirectAudioStream(String videoId) async {
-    try {
-      final response = await http.post(
-        Uri.https('www.youtube.com', '/youtubei/v1/player', {'key': _youtubeApiKey}),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: '{"videoId":"$videoId","context":{"client":{"clientName":"ANDROID","clientVersion":"17.10.35","androidSdkVersion":30}}}',
-      );
       
-      if (response.statusCode == 200) {
-        // Parse the response to get the streaming URL
-        // This is a simplified example - you'll need to parse the actual response
-        final regex = RegExp(r'"url"\s*:\s*"(https?://[^"]+mime=audio[^"]+)"');
-        final match = regex.firstMatch(response.body);
-        if (match != null) {
-          return match.group(1)?.replaceAll('\\u0026', '&');
+      // Create a safe filename
+      final safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final filePath = '${musicDir.path}/$safeTitle.${audioStream.container.name}';
+      final file = File(filePath);
+      
+      // Download the audio
+      final fileStream = file.openWrite();
+      final stream = _yt.videos.streamsClient.get(audioStream);
+      
+      // Track download progress
+      var received = 0;
+      final total = audioStream.size.totalBytes;
+      
+      await for (final data in stream) {
+        fileStream.add(data);
+        received += data.length;
+        if (onProgress != null && total != null) {
+          onProgress(received / total);
         }
       }
+      
+      await fileStream.close();
+      return file;
+      
     } catch (e) {
-      debugPrint('Error in direct audio stream: $e');
+      debugPrint('Error downloading with YouTube Explode: $e');
+      return null;
     }
-    return null;
   }
-  
+
   // Get audio stream using YouTube Explode with retry logic
   Future<String?> _getExplodeAudioStream(String videoId, {int retryCount = 2}) async {
     for (int attempt = 1; attempt <= retryCount; attempt++) {
