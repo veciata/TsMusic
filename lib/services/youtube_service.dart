@@ -6,14 +6,24 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:provider/provider.dart';
-import '../providers/music_provider.dart';
-import 'package:tsmusic/models/song.dart';
+
+
+
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:path/path.dart' as path;
+import 'package:tsmusic/core/exceptions/storage_permission_exception.dart';
 import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/models/song.dart' as ts;
+
+class DownloadResult {
+  final String filePath;
+  final ts.Song song;
+
+  DownloadResult({required this.filePath, required this.song});
+}
 
 enum AudioQuality {
   high,
@@ -87,15 +97,13 @@ class DownloadProgress {
 }
 
 class YouTubeService with ChangeNotifier {
-  static final YoutubeExplode _yt = YoutubeExplode();
-  static final http.Client _httpClient = http.Client();
-  static bool _isDisposed = false;
-  static final YouTubeService _instance = YouTubeService._internal();
+  final YoutubeExplode _yt;
+  final http.Client _httpClient;
+  final AudioPlayer _audioPlayer;
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
   final Map<String, DownloadProgress> _activeDownloads = {};
   YouTubeAudio? _currentAudio;
-  bool _isPlaying = false;
+
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
   
@@ -111,29 +119,20 @@ class YouTubeService with ChangeNotifier {
   YouTubeAudio? get currentAudio => _currentAudio;
   bool get isPlaying => _audioPlayer.playing;
 
-  // Factory constructor
-  factory YouTubeService() {
-    if (_isDisposed) {
-      throw StateError('YouTubeService was disposed and cannot be used again');
-    }
-    return _instance;
-  }
-
-  // Private constructor
-  YouTubeService._internal() {
-    _isDisposed = false;
+  // Public constructor
+  YouTubeService({YoutubeExplode? yt, http.Client? httpClient, AudioPlayer? audioPlayer})
+      : _yt = yt ?? YoutubeExplode(),
+        _httpClient = httpClient ?? http.Client(),
+        _audioPlayer = audioPlayer ?? AudioPlayer() {
     _init();
   }
 
   void _init() {
     // Initialize audio player
     _audioPlayer.playbackEventStream.listen((event) {
-      _isPlaying = _audioPlayer.playing;
+
       notifyListeners();
-    }, onError: (e) {
-      debugPrint('Audio player error: $e');
-      _isPlaying = false;
-      notifyListeners();
+
     });
   }
 
@@ -175,8 +174,8 @@ class YouTubeService with ChangeNotifier {
         await _audioPlayer.load();
         
         // Start playing
-        await _audioPlayer.play();
-        _isPlaying = true;
+        _audioPlayer.play();
+
         
         debugPrint('Audio playback started successfully');
       } catch (e) {
@@ -209,10 +208,11 @@ class YouTubeService with ChangeNotifier {
     try {
       final url = await _getExplodeAudioStream(videoId);
       if (url != null) return url;
+      return null;
     } catch (e) {
       debugPrint('Failed to get audio stream: $e');
+      rethrow;
     }
-    return null;
   }
   
   
@@ -220,7 +220,6 @@ class YouTubeService with ChangeNotifier {
   Future<File?> downloadWithExplode(String videoId, String title, {void Function(double)? onProgress}) async {
     try {
       // Get the video manifest
-      final video = await _yt.videos.get(videoId);
       final manifest = await _yt.videos.streamsClient.getManifest(videoId);
       
       // Get the best audio stream
@@ -249,7 +248,7 @@ class YouTubeService with ChangeNotifier {
       await for (final data in stream) {
         fileStream.add(data);
         received += data.length;
-        if (onProgress != null && total != null) {
+        if (onProgress != null && total > 0) {
           onProgress(received / total);
         }
       }
@@ -259,19 +258,20 @@ class YouTubeService with ChangeNotifier {
       
     } catch (e) {
       debugPrint('Error downloading with YouTube Explode: $e');
-      return null;
+      rethrow;
     }
   }
 
   // Get audio stream using YouTube Explode with retry logic
   Future<String?> _getExplodeAudioStream(String videoId, {int retryCount = 2}) async {
+    debugPrint('_getExplodeAudioStream: Attempting to get audio stream for video $videoId');
     for (int attempt = 1; attempt <= retryCount; attempt++) {
       try {
-        debugPrint('Attempt $attempt to get stream for video $videoId');
+        debugPrint('_getExplodeAudioStream: Attempt $attempt to get stream for video $videoId');
         final manifest = await _yt.videos.streamsClient.getManifest(videoId);
         
         // Try different audio qualities
-        for (final quality in _audioQualityPreference) {
+        for (final _ in _audioQualityPreference) {
           try {
             // Filter streams by codec and sort by bitrate (highest first)
             final streams = manifest.audio
@@ -281,11 +281,11 @@ class YouTubeService with ChangeNotifier {
                 
             if (streams.isNotEmpty) {
               final stream = streams.first;
-              debugPrint('Found audio stream: ${stream.url} (${stream.bitrate} bps)');
+              debugPrint('_getExplodeAudioStream: Found audio stream: ${stream.url} (${stream.bitrate} bps)');
               return stream.url.toString();
             }
           } catch (e) {
-            debugPrint('Error processing stream quality: $e');
+            debugPrint('_getExplodeAudioStream: Error processing stream quality: $e');
             continue;
           }
         }
@@ -293,11 +293,11 @@ class YouTubeService with ChangeNotifier {
         // If no preferred quality found, try any audio stream
         final anyAudio = manifest.audio.firstOrNull;
         if (anyAudio != null) {
-          debugPrint('Falling back to any available audio stream: ${anyAudio.url}');
+          debugPrint('_getExplodeAudioStream: Falling back to any available audio stream: ${anyAudio.url}');
           return anyAudio.url.toString();
         }
       } catch (e) {
-        debugPrint('Error in YouTube Explode audio stream (attempt $attempt): $e');
+        debugPrint('_getExplodeAudioStream: Error in YouTube Explode audio stream (attempt $attempt): $e');
         if (attempt == retryCount) {
           rethrow;
         }
@@ -305,13 +305,13 @@ class YouTubeService with ChangeNotifier {
         await Future.delayed(Duration(seconds: attempt * 2));
       }
     }
+    debugPrint('_getExplodeAudioStream: No audio stream found for video $videoId after $retryCount attempts.');
     return null;
   }
   
   // Pause audio
   Future<void> pause() async {
     await _audioPlayer.pause();
-    _isPlaying = false;
     notifyListeners();
   }
   
@@ -319,7 +319,6 @@ class YouTubeService with ChangeNotifier {
   Future<void> stop() async {
     await _audioPlayer.stop();
     _currentAudio = null;
-    _isPlaying = false;
     notifyListeners();
   }
   
@@ -347,37 +346,40 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  void _removeDownload(String videoId, {String? error}) {
+  void _completeDownload(String videoId) {
+    debugPrint('_completeDownload: Completing download for videoId: $videoId');
     if (_activeDownloads.containsKey(videoId)) {
       final download = _activeDownloads[videoId]!;
-      if (error != null) {
-        download.error = error;
-        download.isDownloading = false;
-        if (error == 'Canceled by user') {
-          download.completer?.complete();
-        } else {
-          download.completer?.completeError(error);
-        }
-      } else {
-        download.completer?.complete();
+      if (!download.completer!.isCompleted) {
+        download.completer!.complete();
       }
-      try {
-        download.subscription?.cancel();
-      } catch (_) {}
       _activeDownloads.remove(videoId);
       _notifyProgressUpdate();
+      debugPrint('_completeDownload: Download for videoId: $videoId completed and removed from active list.');
     }
   }
 
   Future<bool> cancelDownload(String videoId) async {
     final d = _activeDownloads[videoId];
     if (d == null) return false;
+
     d.cancelRequested = true;
     d.isDownloading = false;
+
+    // Immediately remove from the list to update UI
+    _activeDownloads.remove(videoId);
     _notifyProgressUpdate();
-    try {
-      await d.subscription?.cancel();
-    } catch (_) {}
+
+    // Background cancellation
+    Future.microtask(() async {
+      try {
+        await d.subscription?.cancel();
+        debugPrint('cancelDownload: Subscription cancelled for $videoId');
+      } catch (e) {
+        debugPrint('Error during background subscription cancellation: $e');
+      }
+    });
+
     return true;
   }
 
@@ -389,7 +391,7 @@ class YouTubeService with ChangeNotifier {
       return videos.map((video) => YouTubeAudio.fromVideo(video)).toList();
     } catch (e) {
       debugPrint('Error searching YouTube: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -404,75 +406,25 @@ class YouTubeService with ChangeNotifier {
       return videos.map((video) => YouTubeAudio.fromVideo(video)).toList();
     } catch (e) {
       debugPrint('Error loading next page for "$query": $e');
-      return [];
+      rethrow;
     }
   }
 
-  Future<String?> _getBestAudioStreamUrl(String videoId) async {
-    try {
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      
-      // Try to get audio-only streams first
-      final audioStreams = manifest.audio;
-      if (audioStreams.isNotEmpty) {
-        return audioStreams.withHighestBitrate().url.toString();
-      }
-      
-      // If no audio-only streams, try muxed streams
-      final muxedStreams = manifest.muxed;
-      if (muxedStreams.isNotEmpty) {
-        // Sort by quality and get the best one
-        final sortedStreams = muxedStreams.toList()
-          ..sort((a, b) => (b.bitrate.bitsPerSecond).compareTo(a.bitrate.bitsPerSecond));
-        return sortedStreams.first.url.toString();
-      }
-      
-      return null;
-    } catch (e) {
-      debugPrint('Error getting audio stream URL: $e');
-      return null;
-    }
-  }
+
+
 
   Future<String?> getAudioStreamUrl(String videoId) async {
     try {
-      // First try to get the manifest
-      try {
-        final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-        final audioStreams = manifest.audioOnly;
-        if (audioStreams.isNotEmpty) {
-          final audioStream = audioStreams.withHighestBitrate();
-          return audioStream.url.toString();
-        }
-      } catch (e) {
-        debugPrint('Error getting stream manifest: $e');
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      final streams = manifest.audioOnly;
+      if (streams.isNotEmpty) {
+        return streams.withHighestBitrate().url.toString();
       }
-
-      // If manifest fails, try to get the video details and use the muxed streams
-      try {
-        final video = await _yt.videos.get(videoId);
-        final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-        final streams = manifest.muxed;
-        if (streams.isNotEmpty) {
-          // Try to find a medium quality stream first
-          var stream = streams.firstWhere(
-            (s) => s.videoQuality.name.contains('medium'),
-            orElse: () => streams.first,
-          );
-          return stream.url.toString();
-        }
-      } catch (e) {
-        debugPrint('Error getting muxed streams: $e');
+      // Fallback for streams that are not audio-only
+      final muxedStreams = manifest.muxed;
+      if (muxedStreams.isNotEmpty) {
+        return muxedStreams.withHighestBitrate().url.toString();
       }
-
-      // If all else fails, try to get the video URL directly
-      try {
-        final video = await _yt.videos.get(videoId);
-        return 'https://www.youtube.com/watch?v=$videoId';
-      } catch (e) {
-        debugPrint('Error getting video URL: $e');
-      }
-
       return null;
     } catch (e) {
       debugPrint('Error getting audio stream URL: $e');
@@ -480,257 +432,181 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  Future<String?> downloadAudio(
-    String videoId, {
+  Future<DownloadResult?> downloadAudio({
+    required String videoId,
     void Function(double)? onProgress,
-    required BuildContext context,
   }) async {
-    if (!await _checkStoragePermission()) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Storage permission required')),
-        );
-      }
-      return null;
-    }
-
+    debugPrint('downloadAudio: Starting download for videoId: $videoId');
+    File? tempFile;
     try {
       final video = await _yt.videos.get(videoId);
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      final streamInfo = manifest.muxed.withHighestBitrate();
+      final container = streamInfo.container.name;
+
       final safeTitle =
-          '${video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.opus';
+          '${video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.$container';
       _addActiveDownload(videoId, video.title);
-      if (onProgress != null) onProgress(0.0);
+      onProgress?.call(0.0);
       _updateDownloadProgress(videoId, 0.0);
+      debugPrint('downloadAudio: Video title: ${video.title}, safeTitle: $safeTitle');
 
-      Directory? musicDir;
-      if (kIsWeb) return null;
-      else if (Platform.isAndroid || Platform.isIOS) {
-        try {
-          musicDir = Directory('/storage/emulated/0/Music/tsmusic');
-          if (!await musicDir.exists()) await musicDir.create(recursive: true);
-        } catch (e) {
-          final appDocDir = await getApplicationDocumentsDirectory();
-          musicDir = Directory('${appDocDir.path}/tsmusic');
-          if (!await musicDir.exists()) await musicDir.create(recursive: true);
-        }
-      } else {
-        final appDocDir = await getApplicationDocumentsDirectory();
-        musicDir = Directory('${appDocDir.path}/tsmusic');
-        if (!await musicDir.exists()) await musicDir.create(recursive: true);
-      }
+      final musicDir = await _getMusicDirectory();
+      final finalFile = File(path.join(musicDir.path, safeTitle));
+      debugPrint('downloadAudio: Music directory: ${musicDir.path}, finalFile path: ${finalFile.path}');
+      
+      tempFile = File('${finalFile.path}.tmp');
+      debugPrint('downloadAudio: Temporary file path: ${tempFile.path}');
 
-      final file = File('${musicDir!.path}/$safeTitle');
-      if (await file.exists()) {
-        await _addDownloadedSongToLibrary(
-          videoId: videoId,
-          filePath: file.path,
-          context: context,
-        );
+      if (await finalFile.exists()) {
+        debugPrint('downloadAudio: File already exists: ${finalFile.path}');
         _updateDownloadProgress(videoId, 1.0);
-        _removeDownload(videoId);
-        return file.path;
+        _completeDownload(videoId);
+        final song = await _addDownloadedSongToLibrary(
+          videoId: videoId,
+          filePath: finalFile.path,
+        );
+        debugPrint('downloadAudio: Existing file added to library.');
+        return DownloadResult(filePath: finalFile.path, song: song);
       }
 
-      final audioUrl = await getAudioStreamUrl(videoId);
-      if (audioUrl == null) {
-        _updateDownloadProgress(videoId, 0.0);
-        _removeDownload(videoId, error: 'Failed to get audio stream');
-        return null;
-      }
+      final streamUrl = streamInfo.url.toString();
+      debugPrint('downloadAudio: Got stream URL: $streamUrl');
 
-      final request = http.Request('GET', Uri.parse(audioUrl));
+      final request = http.Request('GET', Uri.parse(streamUrl));
+      request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
       final response = await _httpClient.send(request);
+
       if (response.statusCode != 200) {
-        _updateDownloadProgress(videoId, 0.0);
-        _removeDownload(videoId, error: 'Download failed with status ${response.statusCode}');
-        return null;
+        throw Exception('Download failed with status ${response.statusCode}');
       }
 
-      final contentLength = response.contentLength ?? 0;
-      int receivedLength = 0;
-      final bytes = <int>[];
-      final done = Completer<void>();
+      final contentLength = response.contentLength ?? streamInfo.size.totalBytes;
+      debugPrint('downloadAudio: Content length: $contentLength bytes');
+      var receivedBytes = 0;
+      final fileStream = tempFile.openWrite();
+      final completer = Completer<void>();
 
-      final sub = response.stream.listen((chunk) {
-        if (_activeDownloads[videoId]?.cancelRequested == true) return;
-        bytes.addAll(chunk);
-        receivedLength += chunk.length;
-        if (contentLength > 0) {
-          final progress = receivedLength / contentLength;
-          _updateDownloadProgress(videoId, progress);
-          onProgress?.call(progress);
-        }
-      }, onError: (e) {
-        if (!done.isCompleted) done.completeError(e);
-      }, onDone: () {
-        if (!done.isCompleted) done.complete();
-      }, cancelOnError: true);
+      final sub = response.stream.listen(
+        (chunk) {
+          if (_activeDownloads[videoId]?.cancelRequested == true) {
+            debugPrint('downloadAudio: Cancellation requested for $videoId');
+            if (!completer.isCompleted) {
+              completer.completeError(Exception('Canceled by user'));
+            }
+            return;
+          }
+          fileStream.add(chunk);
+          receivedBytes += chunk.length;
+          if (contentLength > 0) {
+            final progress = receivedBytes / contentLength;
+            _updateDownloadProgress(videoId, progress);
+            onProgress?.call(progress);
+            debugPrint('downloadAudio: VideoId: $videoId, Received: $receivedBytes, Total: $contentLength, Progress: ${progress.toStringAsFixed(2)}');
+          }
+        },
+        onError: (e) {
+          debugPrint('downloadAudio: Stream error for $videoId: $e');
+          if (!completer.isCompleted) completer.completeError(e);
+        },
+        onDone: () {
+          debugPrint('downloadAudio: Stream done for $videoId');
+          if (!completer.isCompleted) completer.complete();
+        },
+        cancelOnError: true,
+      );
 
       _activeDownloads[videoId]?.subscription = sub;
 
-      try {
-        await done.future;
-      } catch (e) {
-        if (_activeDownloads[videoId]?.cancelRequested == true) {
-          _removeDownload(videoId, error: 'Canceled by user');
-          return null;
-        }
-        rethrow;
-      } finally {
-        try {
-          await sub.cancel();
-        } catch (_) {}
+      await completer.future;
+      await fileStream.flush();
+      await fileStream.close();
+      
+      if (_activeDownloads[videoId]?.cancelRequested == true) {
+        debugPrint('downloadAudio: Download cancelled before rename for $videoId');
+        return null;
       }
 
-      if (_activeDownloads[videoId]?.cancelRequested == true) return null;
+      await tempFile.rename(finalFile.path);
+      tempFile = null;
+      debugPrint('downloadAudio: Renamed temp file to final file: ${finalFile.path}');
 
-      await file.writeAsBytes(bytes);
-      await _addDownloadedSongToLibrary(
+      final song = await _addDownloadedSongToLibrary(
         videoId: videoId,
-        filePath: file.path,
-        context: context,
+        filePath: finalFile.path,
       );
       _updateDownloadProgress(videoId, 1.0);
-      _removeDownload(videoId);
-      return file.path;
+      _completeDownload(videoId);
+      debugPrint('downloadAudio: Download completed and added to library for $videoId');
+      return DownloadResult(filePath: finalFile.path, song: song);
+
     } catch (e) {
-      _removeDownload(videoId, error: 'Download failed: $e');
-      return null;
+      final download = _activeDownloads[videoId];
+      if (download != null) {
+        download.isDownloading = false;
+        if (download.cancelRequested) {
+          download.error = 'Canceled';
+          debugPrint('downloadAudio: Download $videoId cancelled by user.');
+        } else {
+          download.error = 'Download failed';
+          debugPrint('downloadAudio: Download $videoId failed with error: $e');
+        }
+        _notifyProgressUpdate();
+      }
+    } finally {
+      if (tempFile != null && await tempFile.exists()) {
+        try {
+          await tempFile.delete();
+          debugPrint('downloadAudio: Deleted temporary file: ${tempFile.path}');
+        } catch (e) {
+          debugPrint('downloadAudio: Failed to delete temporary download file: $e');
+        }
+      }
+      debugPrint('downloadAudio: Exiting download for videoId: $videoId');
     }
+    return null;
   }
 
-  Future<bool> _checkStoragePermission() async {
-    if (!Platform.isAndroid) return true;
-    if (await Permission.manageExternalStorage.isGranted) return true;
-    var status = await Permission.storage.request();
-    if (!status.isGranted) {
-      status = await Permission.manageExternalStorage.request();
+  Future<Directory> _getMusicDirectory() async {
+    Directory appDocDir;
+    if (kIsWeb) {
+      throw UnsupportedError('Downloads are not supported on Web.');
     }
-    return status.isGranted;
+    
+    appDocDir = await getApplicationDocumentsDirectory();
+    
+    final musicDir = Directory(path.join(appDocDir.path, 'tsmusic_downloads'));
+    if (!await musicDir.exists()) {
+      await musicDir.create(recursive: true);
+    }
+    return musicDir;
   }
 
-  /// Creates a unique numeric ID for YouTube songs
-  /// Uses the video ID and file path to generate a consistent hash
-  int _createYouTubeSongId(String videoId, String filePath) {
-    // Combine video ID and file path for uniqueness
-    final uniqueString = '${videoId}_$filePath';
-    // Generate a positive integer hash
-    return uniqueString.hashCode & 0x7FFFFFFF; // Ensure positive integer
-  }
 
-  Future<void> _addDownloadedSongToLibrary({
+
+  Future<ts.Song> _addDownloadedSongToLibrary({
     required String videoId,
     required String filePath,
-    required BuildContext context,
   }) async {
     try {
       final video = await _yt.videos.get(videoId);
       final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-      
-      await db.transaction((txn) async {
-        // First, check if song already exists by file path
-        final existingSongs = await txn.query(
-          DatabaseHelper.tableSongs,
-          where: 'file_path = ?',
-          whereArgs: [filePath],
-        );
 
-        if (existingSongs.isNotEmpty) {
-          // Song already exists, no need to add it again
-          return;
-        }
-        
-        // Create song without specifying ID to let the database auto-generate it
-        final songMap = {
-          'title': video.title,
-          'file_path': filePath,
-          'duration': video.duration?.inMilliseconds ?? 0,
-          'is_downloaded': 1,
-          'created_at': DateTime.now().toIso8601String(),
-        };
-
-        // Insert song and get the auto-generated ID
-        final songId = await txn.insert(
-          DatabaseHelper.tableSongs,
-          songMap,
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-
-        // Get or create artist
-        final artistId = await _getOrCreateArtist(txn, video.author.isNotEmpty ? video.author : 'Unknown Artist');
-        
-        // Link song to artist
-        await txn.insert(
-          DatabaseHelper.tableSongArtist,
-          {
-            'song_id': songId,
-            'artist_id': artistId,
-            'created_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
-
-        // Add tags
-        await txn.insert(
-          DatabaseHelper.tableSongGenre,
-          {
-            'song_id': songId,
-            'genre_id': await _getOrCreateGenre(txn, 'tsmusic'),
-            'created_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
-      });
-
-      // Notify the music provider to refresh its data
-      if (context.mounted) {
-        final musicProvider = Provider.of<MusicProvider>(context, listen: false);
-        await musicProvider.loadLocalMusic();
-      }
+      return await dbHelper.addSongFromYouTube(
+        filePath: filePath,
+        title: video.title,
+        author: video.author,
+        duration: video.duration?.inMilliseconds ?? 0,
+      );
     } catch (e) {
       debugPrint('Error adding downloaded song to library: $e');
       rethrow;
     }
   }
 
-  Future<int> _getOrCreateArtist(DatabaseExecutor db, String name) async {
-    final result = await db.query(
-      DatabaseHelper.tableArtists,
-      where: '${DatabaseHelper.columnName} = ?',
-      whereArgs: [name],
-    );
-    
-    if (result.isNotEmpty) return result.first[DatabaseHelper.columnId] as int;
-    
-    // Insert new artist and return the ID
-    return await db.insert(
-      DatabaseHelper.tableArtists,
-      {
-        DatabaseHelper.columnName: name,
-        DatabaseHelper.columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-    );
-  }
 
-  Future<int> _getOrCreateGenre(DatabaseExecutor db, String name) async {
-    final result = await db.query(
-      DatabaseHelper.tableGenres,
-      where: '${DatabaseHelper.columnName} = ?',
-      whereArgs: [name],
-    );
-    
-    if (result.isNotEmpty) return result.first[DatabaseHelper.columnId] as int;
-    
-    // Insert new genre and return the ID
-    return await db.insert(
-      DatabaseHelper.tableGenres,
-      {
-        DatabaseHelper.columnName: name,
-        DatabaseHelper.columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-    );
-  }
+
+
 
   @override
   void dispose() {
@@ -739,6 +615,7 @@ class YouTubeService with ChangeNotifier {
     }
     _activeDownloads.clear();
     _audioPlayer.dispose();
+    _httpClient.close(); // Close the http client
     isLoading.dispose();
     super.dispose();
   }

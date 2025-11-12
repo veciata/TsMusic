@@ -1,19 +1,17 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite/sqlite_api.dart';
+
 import 'package:path/path.dart';
 import 'package:tsmusic/models/song.dart';
-import 'package:tsmusic/providers/music_provider.dart';
+
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
   final Map<String, Song> _songsMap = {};
   final List<Song> _localSongs = [];
-  final List<Song> _scannedSongs = [];
   final List<Song> _displayedSongs = [];
-  bool _isScanning = false;
 
   // Table names
   static const String tableArtists = 'artists';
@@ -77,7 +75,7 @@ class DatabaseHelper {
       tableSongs,
       orderBy: 'date_added DESC',
     );
-    return List.generate(maps.length, (i) => Song.fromJson(Map<String, dynamic>.from(maps[i])));
+    return List.generate(maps.length, (i) => Song.fromJson(maps[i]),);
   }
 
   // Check if database is empty
@@ -136,19 +134,19 @@ class DatabaseHelper {
     // Check if database exists and get its version
     final dbExists = await databaseExists(path);
     if (dbExists) {
-      print('Database exists at $path');
+      debugPrint('Database exists at $path');
       // Get the current database version
       final db = await openDatabase(path);
       try {
         final version = await db.getVersion();
-        print('Current database version: $version');
+        debugPrint('Current database version: $version');
       } catch (e) {
-        print('Error getting database version: $e');
+        debugPrint('Error getting database version: $e');
       } finally {
         await db.close();
       }
     } else {
-      print('Creating new database at $path');
+      debugPrint('Creating new database at $path');
     }
     
     return await openDatabase(
@@ -160,12 +158,12 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    print('Upgrading database from version $oldVersion to $newVersion');
+    debugPrint('Upgrading database from version $oldVersion to $newVersion');
     
     if (oldVersion < 2) {
       // Version 2: Add playlists and playlist_songs tables
       await db.execute('''
-        CREATE TABLE $tablePlaylists (
+        CREATE TABLE IF NOT EXISTS $tablePlaylists (
           $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
           description TEXT,
@@ -175,7 +173,7 @@ class DatabaseHelper {
       ''');
 
       await db.execute('''
-        CREATE TABLE $tablePlaylistSongs (
+        CREATE TABLE IF NOT EXISTS $tablePlaylistSongs (
           playlist_id INTEGER NOT NULL,
           song_id INTEGER NOT NULL,
           position INTEGER NOT NULL,
@@ -202,10 +200,10 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    print('Creating database tables with version: $version');
+    debugPrint('Creating database tables with version: $version');
     // Create artists table
     await db.execute('''
-      CREATE TABLE $tableArtists (
+      CREATE TABLE IF NOT EXISTS $tableArtists (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
         $columnName TEXT NOT NULL UNIQUE,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -214,7 +212,7 @@ class DatabaseHelper {
     
     // Create playlists table
     await db.execute('''
-      CREATE TABLE $tablePlaylists (
+      CREATE TABLE IF NOT EXISTS $tablePlaylists (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
         description TEXT,
@@ -238,7 +236,7 @@ class DatabaseHelper {
 
     // Create genres table
     await db.execute('''
-      CREATE TABLE $tableGenres (
+      CREATE TABLE IF NOT EXISTS $tableGenres (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
         $columnName TEXT NOT NULL UNIQUE,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -247,7 +245,7 @@ class DatabaseHelper {
 
     // Create albums table
     await db.execute('''
-      CREATE TABLE $tableAlbums (
+      CREATE TABLE IF NOT EXISTS $tableAlbums (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         artist_id INTEGER NOT NULL,
@@ -260,7 +258,7 @@ class DatabaseHelper {
 
     // Create songs table
     await db.execute('''
-      CREATE TABLE $tableSongs (
+      CREATE TABLE IF NOT EXISTS $tableSongs (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         file_path TEXT NOT NULL UNIQUE,
@@ -272,7 +270,7 @@ class DatabaseHelper {
 
     // Create artist_genre junction table (many-to-many)
     await db.execute('''
-      CREATE TABLE $tableArtistGenre (
+      CREATE TABLE IF NOT EXISTS $tableArtistGenre (
         artist_id INTEGER NOT NULL,
         genre_id INTEGER NOT NULL,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -284,7 +282,7 @@ class DatabaseHelper {
 
     // Create song_artist junction table (many-to-many)
     await db.execute('''
-      CREATE TABLE $tableSongArtist (
+      CREATE TABLE IF NOT EXISTS $tableSongArtist (
         song_id INTEGER NOT NULL,
         artist_id INTEGER NOT NULL,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -296,7 +294,7 @@ class DatabaseHelper {
 
       // Create song_genre junction table (many-to-many)
     await db.execute('''
-      CREATE TABLE $tableSongGenre (
+      CREATE TABLE IF NOT EXISTS $tableSongGenre (
         song_id INTEGER NOT NULL,
         genre_id INTEGER NOT NULL,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -308,31 +306,7 @@ class DatabaseHelper {
     
     // Create playlist_songs junction table
     await db.execute('''
-      CREATE TABLE $tablePlaylistSongs (
-        playlist_id INTEGER NOT NULL,
-        song_id INTEGER NOT NULL,
-        position INTEGER NOT NULL,
-        $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (playlist_id, song_id),
-        FOREIGN KEY (playlist_id) REFERENCES $tablePlaylists($columnId) ON DELETE CASCADE,
-        FOREIGN KEY (song_id) REFERENCES $tableSongs($columnId) ON DELETE CASCADE
-      )
-    ''');
-
-    // Create playlists table
-    await db.execute('''
-      CREATE TABLE $tablePlaylists (
-        $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        description TEXT,
-        cover_art_url TEXT,
-        $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    // Create playlist_songs junction table (many-to-many with position)
-    await db.execute('''
-      CREATE TABLE $tablePlaylistSongs (
+      CREATE TABLE IF NOT EXISTS $tablePlaylistSongs (
         playlist_id INTEGER NOT NULL,
         song_id INTEGER NOT NULL,
         position INTEGER NOT NULL,
@@ -391,7 +365,7 @@ class DatabaseHelper {
     final existingId = await findSongIdByPath(song['file_path']);
     if (existingId != -1) {
       if (kDebugMode) {
-        print('Song already exists (ID: $existingId): ${song['file_path']}');
+        debugPrint('Song already exists (ID: $existingId): ${song['file_path']}');
       }
       return -1; // Indicate that no new row was inserted
     }
@@ -420,7 +394,6 @@ class DatabaseHelper {
   // Returns songs with a primary artist (first linked artist) to simplify UI
   Future<List<Map<String, dynamic>>> getSongsWithArtist() async {
     final db = await database;
-    // Join songs with first artist relation (min artist_id per song_id)
     return await db.rawQuery('''
       SELECT s.$columnId as song_id,
              s.title as title,
@@ -558,7 +531,7 @@ class DatabaseHelper {
         tableSongs,
         columns: [columnId],
         where: 'file_path = ?',
-        whereArgs: [filePath],
+        whereArgs: [filePath,],
         limit: 1,
       );
       if (rows.isEmpty) return; // song not found in DB
@@ -648,22 +621,7 @@ class DatabaseHelper {
     );
   }
   
-  /// Helper method to process a single song-artist relationship
-  Future<void> _processSongArtist(Transaction txn, int songId, String artistName) async {
-    if (artistName.trim().isEmpty) return;
-    
-    final artistId = await _getOrCreateArtist(txn, artistName);
-    
-    await txn.insert(
-      tableSongArtist,
-      {
-        'song_id': songId,
-        'artist_id': artistId,
-        'created_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
-  }
+
   
   /// Gets an existing genre ID or creates a new one if it doesn't exist
   Future<int> _getOrCreateGenre(Transaction txn, String genreName) async {
@@ -924,7 +882,7 @@ class DatabaseHelper {
     if (newPositions.isEmpty) return 0;
     
     final db = await database;
-    int count = 0;
+    int count = 0; // Initialize count
     
     await db.transaction((txn) async {
       for (final entry in newPositions.entries) {
@@ -947,5 +905,83 @@ class DatabaseHelper {
   Future<void> close() async {
     final db = await database;
     await db.close();
+  }
+
+  Future<Song> addSongFromYouTube({
+    required String filePath,
+    required String title,
+    required String author,
+    required int duration,
+  }) async {
+    final db = await database;
+    int? songId;
+
+    await db.transaction((txn) async {
+      // First, check if song already exists by file path
+      final existingSongs = await txn.query(
+        tableSongs,
+        where: 'file_path = ?',
+        whereArgs: [filePath],
+      );
+
+      if (existingSongs.isNotEmpty) {
+        songId = existingSongs.first['id'] as int;
+      } else {
+        final songMap = {
+          'title': title,
+          'file_path': filePath,
+          'duration': duration,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+
+        songId = await txn.insert(
+          tableSongs,
+          songMap,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        final artistId = await _getOrCreateArtist(txn, author.isNotEmpty ? author : 'Unknown Artist');
+        
+        await txn.insert(
+          tableSongArtist,
+          {'song_id': songId, 'artist_id': artistId,},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+
+        await txn.insert(
+          tableSongGenre,
+          {'song_id': songId, 'genre_id': await _getOrCreateGenre(txn, 'tsmusic'),},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    });
+
+    // Fetch the complete song details to return
+    final songData = await db.query(
+      tableSongs,
+      where: '$columnId = ?',
+      whereArgs: [songId],
+    );
+
+    if (songData.isEmpty) {
+      throw Exception('Failed to retrieve downloaded song from database.');
+    }
+
+    final artistsData = await getArtistsForSong(songId!);
+    final artists = artistsData.map((row) => row['name'] as String).toList();
+
+    final map = songData.first;
+    // The Song model expects a String ID, but the database provides an int.
+    // It also expects 'url' but the db has 'file_path'.
+    // We need to manually map the fields.
+    return Song(
+      id: map['id'] as int,
+      title: map['title'] as String,
+      url: map['file_path'] as String,
+      duration: map['duration'] as int,
+      artists: artists.isNotEmpty ? artists : [author],
+      isDownloaded: true, // It's a downloaded song
+      dateAdded: DateTime.parse(map['created_at'] as String),
+    );
   }
 }

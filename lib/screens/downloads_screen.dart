@@ -106,105 +106,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     );
   }
 
-  Widget _buildDownloadingTab() {
-    return Consumer<YouTubeService>(
-      builder: (context, youTubeService, _) {
-        final activeDownloads = youTubeService.activeDownloads;
-        
-        if (activeDownloads.isEmpty) {
-          return const Center(
-            child: Text('No active downloads'),
-          );
-        }
 
-        return ListView.builder(
-          itemCount: activeDownloads.length,
-          itemBuilder: (context, index) {
-            final download = activeDownloads[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: ListTile(
-                leading: const Icon(Icons.downloading, size: 32),
-                title: Text(
-                  download.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: download.cancelRequested
-                    ? const Padding(
-                        padding: EdgeInsets.only(right: 12.0),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.cancel, color: Colors.red),
-                        onPressed: () async {
-                          final youTubeService = Provider.of<YouTubeService>(
-                            context,
-                            listen: false,
-                          );
-                          await youTubeService.cancelDownload(download.videoId);
-                        },
-                        tooltip: 'Cancel download',
-                      ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: download.progress,
-                      minHeight: 4,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        download.cancelRequested 
-                            ? Colors.orange 
-                            : Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${(download.progress * 100).toStringAsFixed(1)}%',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        if (download.cancelRequested)
-                          Text(
-                            'Canceling...',
-                            style: TextStyle(
-                              color: Colors.orange,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (download.error != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        download.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
   Widget _buildDownloadItem(dynamic download) {
     return Card(
@@ -238,7 +140,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           children: [
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: download.progress,
+              value: download.progress > 0 ? download.progress : null,
               minHeight: 4,
               backgroundColor: Colors.grey[300],
               valueColor: AlwaysStoppedAnimation<Color>(
@@ -252,7 +154,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${(download.progress * 100).toStringAsFixed(1)}%',
+                  download.progress > 0 ? '${(download.progress * 100).toStringAsFixed(1)}%' : 'Downloading...',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 if (download.cancelRequested)
@@ -337,12 +239,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     );
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
-  }
+
 
   // Call this method when starting a download
   void addDownload(String videoId, String title) {
@@ -352,8 +249,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       });
 
       _youTubeService.downloadAudio(
-        videoId,
-        context: context,
+        videoId: videoId,
         onProgress: (progress) {
           if (mounted) {
             setState(() {
