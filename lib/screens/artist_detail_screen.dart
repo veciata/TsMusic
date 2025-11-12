@@ -8,13 +8,13 @@ import '../models/song.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
-  String? artistImageUrl;
+  final ValueNotifier<String?> artistImageUrlNotifier;
 
   ArtistDetailScreen({
     Key? key,
     required this.artistName,
-    this.artistImageUrl,
-  }) : super(key: key);
+    ValueNotifier<String?>? artistImageUrl,
+  }) : artistImageUrlNotifier = artistImageUrl ?? ValueNotifier<String?>(null), super(key: key);
 
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
@@ -45,10 +45,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   }
 
   Future<void> _fetchArtistImageIfNeeded() async {
-    if (widget.artistImageUrl != null) return;
+    if (widget.artistImageUrlNotifier.value != null) return;
     if (_artistImageCache.containsKey(widget.artistName)) {
       setState(() {
-        widget.artistImageUrl = _artistImageCache[widget.artistName];
+        widget.artistImageUrlNotifier.value = _artistImageCache[widget.artistName];
       });
       return;
     }
@@ -59,7 +59,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         if (song.thumbnailUrl != null && song.thumbnailUrl!.isNotEmpty) {
           _artistImageCache[widget.artistName] = song.thumbnailUrl!;
           setState(() {
-            widget.artistImageUrl = song.thumbnailUrl!;
+            widget.artistImageUrlNotifier.value = song.thumbnailUrl!;
           });
           break;
         }
@@ -77,7 +77,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
       final results = await _youTubeService.searchAudio(widget.artistName);
       setState(() {
         _youtubeSongs = results.map((audio) => Song(
-          id: 'youtube_${audio.id}',
+          id: audio.id.hashCode,
           title: audio.title,
           artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
           album: 'YouTube',
@@ -106,7 +106,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
       final results = await _youTubeService.searchAudio(widget.artistName);
       setState(() {
         _youtubeSongs.addAll(results.map((audio) => Song(
-          id: 'youtube_${audio.id}',
+          id: audio.id.hashCode,
           title: audio.title,
           artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
           album: 'YouTube',
@@ -140,16 +140,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     final musicProvider = Provider.of<music_provider.MusicProvider>(context);
     final localSongs = musicProvider.getSongsByArtist(widget.artistName);
 
-    String? artistImageUrl = widget.artistImageUrl;
-    if (artistImageUrl == null && localSongs.isNotEmpty) {
-      for (final song in localSongs) {
-        if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
-          artistImageUrl = song.albumArtUrl;
-          break;
-        }
-      }
-    }
-
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -157,23 +147,28 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
             SliverAppBar(
               expandedHeight: 200.0,
               pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  widget.artistName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 2))],
-                  ),
-                ),
-                background: artistImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: artistImageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: Colors.grey[800]),
-                        errorWidget: (context, url, error) => _buildPlaceholderImage(),
-                      )
-                    : _buildPlaceholderImage(),
+              flexibleSpace: ValueListenableBuilder<String?>(
+                valueListenable: widget.artistImageUrlNotifier,
+                builder: (context, artistImageUrl, child) {
+                  return FlexibleSpaceBar(
+                    title: Text(
+                      widget.artistName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 2))],
+                      ),
+                    ),
+                    background: artistImageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: artistImageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(color: Colors.grey[800]),
+                            errorWidget: (context, url, error) => _buildPlaceholderImage(),
+                          )
+                        : _buildPlaceholderImage(),
+                  );
+                },
               ),
               bottom: TabBar(
                 controller: _tabController,
@@ -204,7 +199,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
       
       // Handle different path formats that point to the same location
       const String emulatedPrefix = '/storage/emulated/0/';
-      const String sdcardPrefix = '/sdcard/';
       
       // Convert /storage/emulated/0/ to /sdcard/ for consistency
       if (normalized.startsWith(emulatedPrefix)) {
@@ -229,7 +223,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     if (songs.isEmpty) return const Center(child: Text('No local songs found for this artist'));
 
     // Use a map to ensure unique songs by their normalized path
-    final Map<String, Song> uniqueSongs = {};
+    final Map<int, Song> uniqueSongs = {};
     final Set<String> seenPaths = {};
     
     for (final song in songs) {
@@ -261,8 +255,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
       itemBuilder: (context, index) {
         final song = uniqueSongsList[index];
         final isCurrentSong = musicProvider.currentSong?.id == song.id;
-        final isPlaying = isCurrentSong && musicProvider.isPlaying;
-
         return ListTile(
           leading: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
               ? ClipRRect(

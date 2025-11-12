@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:io' show Platform, exit;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
@@ -16,8 +15,10 @@ import 'screens/welcome_screen.dart';
 import 'screens/search_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/music_provider.dart' as music_provider;
+import 'services/permission_service.dart';
 import 'services/youtube_service.dart';
 import 'utils/package_info_utils.dart';
+
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
@@ -25,9 +26,12 @@ Future<void> main() async {
   await PackageInfoUtils.init();
 
   final youTubeService = YouTubeService();
-  
+  final permissionService = PermissionService();
+  final hasPermission = await permissionService.hasStoragePermission();
+
   runApp(MusicPlayerApp(
     youTubeService: youTubeService,
+    hasPermission: hasPermission,
   ));
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -50,10 +54,12 @@ Future<void> main() async {
 
 class MusicPlayerApp extends StatefulWidget {
   final YouTubeService youTubeService;
+  final bool hasPermission;
 
   const MusicPlayerApp({
     super.key,
     required this.youTubeService,
+    required this.hasPermission,
   });
 
   @override
@@ -61,45 +67,22 @@ class MusicPlayerApp extends StatefulWidget {
 }
 
 class _MusicPlayerAppState extends State<MusicPlayerApp> {
-  bool _showWelcome = true;
-  bool _welcomeChecked = false;
+  late bool _hasPermission;
 
   @override
   void initState() {
     super.initState();
-    _initWelcomeStatus();
+    _hasPermission = widget.hasPermission;
   }
 
-  Future<void> _initWelcomeStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final done = prefs.getBool('tsmusic_welcome_done') ?? false;
-    if (!mounted) return;
+  void _onPermissionGranted() {
     setState(() {
-      _showWelcome = !done;
-      _welcomeChecked = true;
-    });
-  }
-
-  void _onWelcomeComplete() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('tsmusic_welcome_done', true);
-    setState(() {
-      _showWelcome = false;
+      _hasPermission = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_welcomeChecked) {
-      return const MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
-    }
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
@@ -121,9 +104,9 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
             theme: lightTheme.copyWith(textTheme: textTheme),
             darkTheme: darkTheme.copyWith(textTheme: textTheme),
             themeMode: themeProvider.themeMode,
-            home: _showWelcome
-                ? WelcomeScreen(onComplete: _onWelcomeComplete)
-                : const MainNavigationScreen(),
+            home: _hasPermission
+                ? const MainNavigationScreen()
+                : WelcomeScreen(onPermissionGranted: _onPermissionGranted),
           );
         },
       ),

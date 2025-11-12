@@ -1,5 +1,5 @@
 class Song {
-  final String id;
+  final int id;
   final String title;
   final List<String> artists;
   final String? album;
@@ -46,7 +46,7 @@ class Song {
         dateAdded = dateAdded ?? DateTime.now();
 
   Song copyWith({
-    String? id,
+    int? id,
     String? title,
     List<String>? artists,
     String? album,
@@ -76,8 +76,18 @@ class Song {
   }
 
   factory Song.fromJson(Map<String, dynamic> json) {
+    // Handle both int and String IDs for robustness
+    int songId;
+    if (json['id'] is String) {
+      songId = int.tryParse(json['id'] as String) ?? 0;
+    } else if (json['id'] is int) {
+      songId = json['id'] as int;
+    } else {
+      songId = 0; // Default or error case
+    }
+
     return Song(
-      id: json['id'] as String,
+      id: songId,
       title: json['title'] as String,
       artists: json['artists'] is List 
           ? List<String>.from(json['artists'])

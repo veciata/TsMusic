@@ -83,7 +83,7 @@ class AudioPlayerTask extends BaseAudioHandler {
     await _player.setAudioSource(audioSource);
     if (song != null) {
       mediaItem.add(MediaItem(
-        id: song.id,
+        id: song.id.toString(),
         title: song.title,
         artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
         artUri: song.albumArtUrl != null ? Uri.parse(song.albumArtUrl!) : null,

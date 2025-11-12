@@ -188,15 +188,15 @@ class NowPlayingBottomSheet extends StatelessWidget {
                     // Favorite
                     IconButton(
                       icon: Icon(
-                        musicProvider.isFavorite(currentSong.id) 
+                        musicProvider.isFavorite(currentSong.id.toString()) 
                             ? Icons.favorite 
                             : Icons.favorite_border,
-                        color: musicProvider.isFavorite(currentSong.id)
+                        color: musicProvider.isFavorite(currentSong.id.toString())
                             ? Colors.red
                             : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       ),
                       onPressed: () {
-                        musicProvider.toggleFavorite(currentSong.id);
+                        musicProvider.toggleFavorite(currentSong.id.toString());
                       },
                     ),
                     // Skip previous
@@ -252,12 +252,7 @@ class NowPlayingBottomSheet extends StatelessWidget {
     );
   }
 
-  static String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
-  }
+
 
   static void show(BuildContext context) {
     showModalBottomSheet(

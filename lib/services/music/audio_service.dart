@@ -37,8 +37,8 @@ class AudioService {
   }
 
   Future<void> setAudioSource(Song song) async {
-    if (song.isLocalFile) {
-      await _audioPlayer.setFilePath(song.filePath);
+    if (!song.url.startsWith('http')) {
+      await _audioPlayer.setFilePath(song.url);
     } else {
       await _audioPlayer.setUrl(song.url);
     }

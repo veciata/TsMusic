@@ -271,7 +271,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             MaterialPageRoute(
                               builder: (context) => ArtistDetailScreen(
                                 artistName: artist,
-                                artistImageUrl: currentSong.albumArtUrl,
+                                artistImageUrl: ValueNotifier<String?>(currentSong.albumArtUrl),
                               ),
                             ),
                           );

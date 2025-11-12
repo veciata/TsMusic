@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:tsmusic/database/database_helper.dart';
-import 'package:provider/provider.dart';
-import '../providers/music_provider.dart' as music_provider;
+
+
 
 class SqlScreen extends StatefulWidget {
   const SqlScreen({super.key});

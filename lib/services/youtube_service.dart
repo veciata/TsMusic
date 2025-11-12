@@ -6,13 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-
-
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-
 import 'package:path/path.dart' as path;
 import 'package:tsmusic/core/exceptions/storage_permission_exception.dart';
 import 'package:tsmusic/database/database_helper.dart';
@@ -21,7 +17,6 @@ import 'package:tsmusic/models/song.dart' as ts;
 class DownloadResult {
   final String filePath;
   final ts.Song song;
-
   DownloadResult({required this.filePath, required this.song});
 }
 

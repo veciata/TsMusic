@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
@@ -21,7 +21,7 @@ import '../database/database_helper.dart';
 class MusicProvider extends ChangeNotifier {
   // ===== CORE DEPENDENCIES =====
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final MetadataEnrichmentService _enrichment = MetadataEnrichmentService();
+
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   // ===== CONSTANTS =====
@@ -533,7 +533,24 @@ class MusicProvider extends ChangeNotifier {
       // First try database search for more accurate results
       final results = await _databaseHelper.searchSongs(query);
       if (results.isNotEmpty) {
-        _displayedSongs = results.map((e) => Song.fromJson(e)).toList();
+        final List<Song> searchedSongs = [];
+        for (final songData in results) {
+          final songId = songData['id'] as int;
+          final artistsData = await _databaseHelper.getArtistsForSong(songId);
+          final artists = artistsData.map((row) => row['name'] as String).toList();
+          
+          searchedSongs.add(Song(
+            id: songId,
+            title: songData['title'] as String,
+            url: songData['file_path'] as String,
+            duration: songData['duration'] as int,
+            artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
+            dateAdded: songData['created_at'] != null
+                ? DateTime.parse(songData['created_at'] as String)
+                : DateTime.now(),
+          ));
+        }
+        _displayedSongs = searchedSongs;
       } else {
         // Fallback to in-memory search if no results from database
         final lowerQuery = query.toLowerCase();
@@ -614,15 +631,11 @@ class MusicProvider extends ChangeNotifier {
               : <String>[];
 
           final song = Song(
-            id: songData['id'].toString(),
+            id: songData['id'] as int,
             title: songData['title'] as String? ?? 'Unknown Title',
             artists: artists,
-            album: songData['album'] as String? ?? 'Unknown Album',
-            albumArtUrl: songData['album_art_url'] as String?,
             url: songData['file_path'] as String,
             duration: songData['duration'] as int? ?? 0,
-            isFavorite: songData['is_favorite'] == 1,
-            isDownloaded: songData['is_downloaded'] == 1,
             tags: tags,
             trackNumber: songData['track_number'] as int?,
             dateAdded: songData['created_at'] != null
@@ -651,12 +664,26 @@ class MusicProvider extends ChangeNotifier {
   /// Load Now Playing playlist from database
   Future<void> _loadNowPlayingPlaylist() async {
     try {
-      final songs = await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
+      final songMaps = await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
       // Clear current playlist and add songs from database
       _playlist.clear();
       _songsMap.clear(); // Clear the map when reloading the playlist
-      for (final songData in songs) {
-        final song = Song.fromJson(Map<String, dynamic>.from(songData));
+      
+      for (final songData in songMaps) {
+        final songId = songData['id'] as int;
+        final artistsData = await _databaseHelper.getArtistsForSong(songId);
+        final artists = artistsData.map((row) => row['name'] as String).toList();
+
+        final song = Song(
+          id: songId,
+          title: songData['title'] as String,
+          url: songData['file_path'] as String,
+          duration: songData['duration'] as int,
+          artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
+          dateAdded: songData['created_at'] != null
+              ? DateTime.parse(songData['created_at'] as String)
+              : DateTime.now(),
+        );
         _addSongIfNotExists(song);
       }
       _displayedSongs = List.from(_playlist);
@@ -671,7 +698,7 @@ class MusicProvider extends ChangeNotifier {
   /// Update Now Playing playlist in database
   Future<void> _updateNowPlayingPlaylist() async {
     try {
-      final songIds = _playlist.map((song) => int.tryParse(song.id) ?? 0).where((id) => id > 0).toList();
+      final songIds = _playlist.map((song) => song.id).where((id) => id > 0).toList();
       await _databaseHelper.updateNowPlayingPlaylist(songIds);
     } catch (e) {
       if (kDebugMode) {
@@ -1440,7 +1467,7 @@ class MusicProvider extends ChangeNotifier {
                        file.path.toLowerCase().contains('tsmusic');
 
       final song = Song(
-        id: '${file.path}_${(await file.lastModified()).millisecondsSinceEpoch}',
+        id: file.path.hashCode,
         title: title.isNotEmpty ? title : path.basenameWithoutExtension(file.path),
         artists: artistsList,
         album: 'Unknown Album',

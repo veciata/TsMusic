@@ -5,7 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
 import '../models/song.dart' as model;
 import '../services/youtube_service.dart';
-import '../main.dart';
+
 import 'downloads_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -33,7 +33,7 @@ class _SearchScreenState extends State<SearchScreen> {
   late final YouTubeService _youTubeService;
   List<YouTubeAudio> _youtubeResults = [];
   bool _isSearchingYouTube = false;
-  final Map<String, bool> _loadingStates = {};
+
   bool _hasMoreYouTubeResults = true;
   Timer? _debounceTimer;
   String? _loadingYouTubeId;
@@ -49,10 +49,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchFocusNode.requestFocus();
   }
 
-  void _setupScrollController() {
-    _scrollController.addListener(_onScroll);
-    _searchScrollController.addListener(_onScroll);
-  }
+
 
   @override
   void dispose() {
@@ -99,21 +96,29 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
+    if (!mounted) return;
+    
     final isDownloading =
         _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
-    if (isDownloading && mounted) {
+    if (isDownloading) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Download already in progress')),
       );
+      _navigateToDownloads();
       return;
     }
 
     try {
-      await _youTubeService.downloadAudio(audio.id, context: context);
-      if (mounted) {
+      final result = await _youTubeService.downloadAudio(videoId: audio.id);
+      if (result != null && mounted) {
+        // Immediately add the song to the provider to update the UI
+        Provider.of<music_provider.MusicProvider>(context, listen: false)
+            .loadLocalMusic();
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download started: ${audio.title}')),
         );
+        _navigateToDownloads();
       }
     } catch (e) {
       if (mounted) {
@@ -207,15 +212,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
 
-    if (hours > 0) return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
-    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
-  }
 
   Widget _buildSearchResults(List<model.Song> localSongs, music_provider.MusicProvider provider,
       model.Song? currentSong, bool isPlaying) {
@@ -420,7 +417,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        if (currentSong != null && currentSong.id.startsWith('temp_')) {
+        if (currentSong != null && currentSong.url.startsWith('http')) {
           await musicProvider.stop();
         }
         return true;
@@ -453,7 +450,7 @@ class _SearchScreenState extends State<SearchScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              if (currentSong != null && currentSong.id.startsWith('temp_')) {
+              if (currentSong != null && currentSong.url.startsWith('http')) {
                 musicProvider.stop();
               }
               Navigator.of(context).pop();
@@ -465,7 +462,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: _buildSearchResults(localSongs, musicProvider, currentSong, isPlaying),
             ),
-            if (currentSong != null && currentSong.id.startsWith('temp_'))
+            if (currentSong != null && currentSong.url.startsWith('http'))
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(
@@ -513,9 +510,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             } else {
                               // Find the YouTubeAudio from search results
                               final youtubeAudio = _youtubeResults.firstWhere(
-                                (audio) => audio.id == currentSong.id.replaceFirst('temp_', ''),
+                              (audio) => audio.id.hashCode == currentSong.id,
                                 orElse: () => YouTubeAudio(
-                                  id: currentSong.id.replaceFirst('temp_', ''),
+                                  id: currentSong.id.toString(),
                                   title: currentSong.title,
                                   author: currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist',
                                   artists: currentSong.artists.isNotEmpty ? currentSong.artists : ['Unknown Artist'],

@@ -1,13 +1,13 @@
-import 'dart:async';
+
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-import 'package:tsmusic/providers/theme_provider.dart' as theme_provider;
+
 import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,8 +20,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _welcomeChecked = false;
-  String? _loadingError;
+
 
   @override
   void initState() {
@@ -32,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Song> _getSortedSongs(music_provider.MusicProvider provider) {
     try {
       // Use a case-insensitive map to track unique songs by their file path
-      final Map<String, Song> uniqueSongs = {};
+      final Map<int, Song> uniqueSongs = {};
       
       // Track seen file paths for duplicate detection
       final Set<String> seenPaths = {};
@@ -45,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
           
           // Handle different path formats that point to the same location
           const String emulatedPrefix = '/storage/emulated/0/';
-          const String sdcardPrefix = '/sdcard/';
           
           // Convert /storage/emulated/0/ to /sdcard/ for consistency
           if (path.startsWith(emulatedPrefix)) {
