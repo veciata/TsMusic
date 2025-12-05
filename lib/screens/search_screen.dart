@@ -109,11 +109,13 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
-      final result = await _youTubeService.downloadAudio(videoId: audio.id);
+      final result = await _youTubeService.downloadAudio(
+        videoId: audio.id,
+      );
       if (result != null && mounted) {
         // Immediately add the song to the provider to update the UI
-        Provider.of<music_provider.MusicProvider>(context, listen: false)
-            .loadLocalMusic();
+        await Provider.of<music_provider.MusicProvider>(context, listen: false)
+            .loadFromDatabaseOnly();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download started: ${audio.title}')),

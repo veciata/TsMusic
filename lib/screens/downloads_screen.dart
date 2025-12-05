@@ -257,8 +257,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             });
           }
         },
-      ).then((_) {
-        if (mounted) {
+      ).then((result) async {
+        if (result != null && mounted) {
+          await Provider.of<music_provider.MusicProvider>(context, listen: false)
+              .loadFromDatabaseOnly();
           setState(() {
             _downloadProgress.remove(videoId);
           });

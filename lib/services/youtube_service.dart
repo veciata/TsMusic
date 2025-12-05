@@ -5,12 +5,9 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb, ChangeNotifier
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path/path.dart' as path;
-import 'package:tsmusic/core/exceptions/storage_permission_exception.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/song.dart' as ts;
 
@@ -18,12 +15,6 @@ class DownloadResult {
   final String filePath;
   final ts.Song song;
   DownloadResult({required this.filePath, required this.song});
-}
-
-enum AudioQuality {
-  high,
-  medium,
-  low,
 }
 
 class YouTubeAudio {
@@ -101,13 +92,6 @@ class YouTubeService with ChangeNotifier {
 
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
-  
-  // Audio quality preferences
-  static const List<AudioQuality> _audioQualityPreference = [
-    AudioQuality.high,
-    AudioQuality.medium,
-    AudioQuality.low,
-  ];
 
   // Getters
   List<DownloadProgress> get activeDownloads => _activeDownloads.values.toList();
@@ -197,111 +181,31 @@ class YouTubeService with ChangeNotifier {
       isLoading.value = false;
     }
   }
-  
+
   // Get audio stream using YouTube Explode
   Future<String?> _getAudioStream(String videoId) async {
     try {
-      final url = await _getExplodeAudioStream(videoId);
-      if (url != null) return url;
-      return null;
+      StreamManifest manifest;
+      try {
+        manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      } catch (e) {
+        debugPrint('Failed to get manifest with default client: $e. Trying alternative clients.');
+        manifest = await _yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: [
+            YoutubeApiClient.android,
+            YoutubeApiClient.ios,
+          ],
+        );
+      }
+
+      final audioStream = manifest.audioOnly.withHighestBitrate() ??
+          manifest.muxed.withHighestBitrate();
+      return audioStream?.url.toString();
     } catch (e) {
       debugPrint('Failed to get audio stream: $e');
       rethrow;
     }
-  }
-  
-  
-  // Download audio using YouTube Explode
-  Future<File?> downloadWithExplode(String videoId, String title, {void Function(double)? onProgress}) async {
-    try {
-      // Get the video manifest
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      
-      // Get the best audio stream
-      final audioStream = manifest.audioOnly.withHighestBitrate();
-      
-      // Get the app's documents directory for saving the file
-      final appDocDir = await getApplicationDocumentsDirectory();
-      final musicDir = Directory('${appDocDir.path}/music');
-      if (!await musicDir.exists()) {
-        await musicDir.create(recursive: true);
-      }
-      
-      // Create a safe filename
-      final safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final filePath = '${musicDir.path}/$safeTitle.${audioStream.container.name}';
-      final file = File(filePath);
-      
-      // Download the audio
-      final fileStream = file.openWrite();
-      final stream = _yt.videos.streamsClient.get(audioStream);
-      
-      // Track download progress
-      var received = 0;
-      final total = audioStream.size.totalBytes;
-      
-      await for (final data in stream) {
-        fileStream.add(data);
-        received += data.length;
-        if (onProgress != null && total > 0) {
-          onProgress(received / total);
-        }
-      }
-      
-      await fileStream.close();
-      return file;
-      
-    } catch (e) {
-      debugPrint('Error downloading with YouTube Explode: $e');
-      rethrow;
-    }
-  }
-
-  // Get audio stream using YouTube Explode with retry logic
-  Future<String?> _getExplodeAudioStream(String videoId, {int retryCount = 2}) async {
-    debugPrint('_getExplodeAudioStream: Attempting to get audio stream for video $videoId');
-    for (int attempt = 1; attempt <= retryCount; attempt++) {
-      try {
-        debugPrint('_getExplodeAudioStream: Attempt $attempt to get stream for video $videoId');
-        final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-        
-        // Try different audio qualities
-        for (final _ in _audioQualityPreference) {
-          try {
-            // Filter streams by codec and sort by bitrate (highest first)
-            final streams = manifest.audio
-                .where((s) => s.audioCodec == 'mp4' || s.audioCodec == 'm4a' || s.audioCodec == 'webm')
-                .toList()
-                ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
-                
-            if (streams.isNotEmpty) {
-              final stream = streams.first;
-              debugPrint('_getExplodeAudioStream: Found audio stream: ${stream.url} (${stream.bitrate} bps)');
-              return stream.url.toString();
-            }
-          } catch (e) {
-            debugPrint('_getExplodeAudioStream: Error processing stream quality: $e');
-            continue;
-          }
-        }
-        
-        // If no preferred quality found, try any audio stream
-        final anyAudio = manifest.audio.firstOrNull;
-        if (anyAudio != null) {
-          debugPrint('_getExplodeAudioStream: Falling back to any available audio stream: ${anyAudio.url}');
-          return anyAudio.url.toString();
-        }
-      } catch (e) {
-        debugPrint('_getExplodeAudioStream: Error in YouTube Explode audio stream (attempt $attempt): $e');
-        if (attempt == retryCount) {
-          rethrow;
-        }
-        // Wait a bit before retrying
-        await Future.delayed(Duration(seconds: attempt * 2));
-      }
-    }
-    debugPrint('_getExplodeAudioStream: No audio stream found for video $videoId after $retryCount attempts.');
-    return null;
   }
   
   // Pause audio
@@ -431,73 +335,84 @@ class YouTubeService with ChangeNotifier {
     required String videoId,
     void Function(double)? onProgress,
   }) async {
-    debugPrint('downloadAudio: Starting download for videoId: $videoId');
-    File? tempFile;
-    try {
-      final video = await _yt.videos.get(videoId);
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      final streamInfo = manifest.muxed.withHighestBitrate();
-      final container = streamInfo.container.name;
+    if (_activeDownloads.containsKey(videoId)) {
+      debugPrint(
+        'downloadAudio: Download for videoId: $videoId is already in progress. Ignoring duplicate request.',
+      );
+      return null;
+    }
 
-      final safeTitle =
-          '${video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.$container';
-      _addActiveDownload(videoId, video.title);
-      onProgress?.call(0.0);
-      _updateDownloadProgress(videoId, 0.0);
-      debugPrint('downloadAudio: Video title: ${video.title}, safeTitle: $safeTitle');
+    final video = await _yt.videos.get(videoId);
+    _addActiveDownload(videoId, video.title);
+    debugPrint('downloadAudio: Starting download for videoId: $videoId');
+
+    try {
+      StreamManifest manifest;
+      try {
+        manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      } catch (e) {
+        debugPrint(
+          'Failed to get manifest with default client: $e. Trying alternative clients.',
+        );
+        manifest = await _yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: [
+            YoutubeApiClient.android,
+            YoutubeApiClient.ios,
+          ],
+        );
+      }
+
+      final streamInfo = manifest.audioOnly.withHighestBitrate();
+      if (streamInfo == null) {
+        throw Exception('No suitable audio stream found.');
+      }
 
       final musicDir = await _getMusicDirectory();
-      final finalFile = File(path.join(musicDir.path, safeTitle));
-      debugPrint('downloadAudio: Music directory: ${musicDir.path}, finalFile path: ${finalFile.path}');
-      
-      tempFile = File('${finalFile.path}.tmp');
-      debugPrint('downloadAudio: Temporary file path: ${tempFile.path}');
+      final safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final finalFile = File(
+        path.join(
+          musicDir.path,
+          '${safeTitle}_${streamInfo.bitrate.bitsPerSecond}.${streamInfo.container.name}',
+        ),
+      );
 
       if (await finalFile.exists()) {
-        debugPrint('downloadAudio: File already exists: ${finalFile.path}');
-        _updateDownloadProgress(videoId, 1.0);
+        debugPrint('downloadAudio: File already exists: ${finalFile.path}. Skipping.');
         _completeDownload(videoId);
-        final song = await _addDownloadedSongToLibrary(
-          videoId: videoId,
+        return DownloadResult(
           filePath: finalFile.path,
+          song: await _addDownloadedSongToLibrary(
+            videoId: videoId,
+            filePath: finalFile.path,
+            title: video.title,
+            author: video.author,
+            duration: video.duration?.inMilliseconds ?? 0,
+          ),
         );
-        debugPrint('downloadAudio: Existing file added to library.');
-        return DownloadResult(filePath: finalFile.path, song: song);
       }
 
-      final streamUrl = streamInfo.url.toString();
-      debugPrint('downloadAudio: Got stream URL: $streamUrl');
-
-      final request = http.Request('GET', Uri.parse(streamUrl));
-      request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
-      final response = await _httpClient.send(request);
-
-      if (response.statusCode != 200) {
-        throw Exception('Download failed with status ${response.statusCode}');
-      }
-
-      final contentLength = response.contentLength ?? streamInfo.size.totalBytes;
-      debugPrint('downloadAudio: Content length: $contentLength bytes');
+      final downloadProgress = _activeDownloads[videoId];
+      final stream = _yt.videos.streamsClient.get(streamInfo);
+      final contentLength = streamInfo.size.totalBytes;
       var receivedBytes = 0;
-      final fileStream = tempFile.openWrite();
+      final fileSink = finalFile.openWrite();
       final completer = Completer<void>();
 
-      final sub = response.stream.listen(
+      final sub = stream.listen(
         (chunk) {
-          if (_activeDownloads[videoId]?.cancelRequested == true) {
-            debugPrint('downloadAudio: Cancellation requested for $videoId');
+          if (downloadProgress?.cancelRequested == true) {
             if (!completer.isCompleted) {
               completer.completeError(Exception('Canceled by user'));
             }
             return;
           }
-          fileStream.add(chunk);
+          fileSink.add(chunk);
           receivedBytes += chunk.length;
           if (contentLength > 0) {
             final progress = receivedBytes / contentLength;
             _updateDownloadProgress(videoId, progress);
             onProgress?.call(progress);
-            debugPrint('downloadAudio: VideoId: $videoId, Received: $receivedBytes, Total: $contentLength, Progress: ${progress.toStringAsFixed(2)}');
           }
         },
         onError: (e) {
@@ -505,76 +420,79 @@ class YouTubeService with ChangeNotifier {
           if (!completer.isCompleted) completer.completeError(e);
         },
         onDone: () {
-          debugPrint('downloadAudio: Stream done for $videoId');
           if (!completer.isCompleted) completer.complete();
         },
         cancelOnError: true,
       );
 
-      _activeDownloads[videoId]?.subscription = sub;
-
-      await completer.future;
-      await fileStream.flush();
-      await fileStream.close();
-      
-      if (_activeDownloads[videoId]?.cancelRequested == true) {
-        debugPrint('downloadAudio: Download cancelled before rename for $videoId');
-        return null;
+      if (downloadProgress != null) {
+        downloadProgress.subscription = sub;
       }
 
-      await tempFile.rename(finalFile.path);
-      tempFile = null;
-      debugPrint('downloadAudio: Renamed temp file to final file: ${finalFile.path}');
+      await completer.future;
+      await fileSink.flush();
+      await fileSink.close();
+
+      if (downloadProgress?.cancelRequested == true) {
+        if (await finalFile.exists()) {
+          await finalFile.delete();
+        }
+        _completeDownload(videoId);
+        return null;
+      }
 
       final song = await _addDownloadedSongToLibrary(
         videoId: videoId,
         filePath: finalFile.path,
+        title: video.title,
+        author: video.author,
+        duration: video.duration?.inMilliseconds ?? 0,
       );
+
       _updateDownloadProgress(videoId, 1.0);
       _completeDownload(videoId);
-      debugPrint('downloadAudio: Download completed and added to library for $videoId');
-      return DownloadResult(filePath: finalFile.path, song: song);
 
+      return DownloadResult(filePath: finalFile.path, song: song);
     } catch (e) {
+      debugPrint('downloadAudio: Download $videoId failed with error: $e');
+      _completeDownload(videoId);
       final download = _activeDownloads[videoId];
       if (download != null) {
         download.isDownloading = false;
-        if (download.cancelRequested) {
-          download.error = 'Canceled';
-          debugPrint('downloadAudio: Download $videoId cancelled by user.');
-        } else {
-          download.error = 'Download failed';
-          debugPrint('downloadAudio: Download $videoId failed with error: $e');
-        }
+        download.error = download.cancelRequested ? 'Canceled' : 'Download failed';
         _notifyProgressUpdate();
       }
+      rethrow;
     } finally {
-      if (tempFile != null && await tempFile.exists()) {
-        try {
-          await tempFile.delete();
-          debugPrint('downloadAudio: Deleted temporary file: ${tempFile.path}');
-        } catch (e) {
-          debugPrint('downloadAudio: Failed to delete temporary download file: $e');
-        }
-      }
       debugPrint('downloadAudio: Exiting download for videoId: $videoId');
     }
-    return null;
   }
 
   Future<Directory> _getMusicDirectory() async {
-    Directory appDocDir;
     if (kIsWeb) {
       throw UnsupportedError('Downloads are not supported on Web.');
     }
-    
-    appDocDir = await getApplicationDocumentsDirectory();
-    
-    final musicDir = Directory(path.join(appDocDir.path, 'tsmusic_downloads'));
-    if (!await musicDir.exists()) {
-      await musicDir.create(recursive: true);
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      // Store downloads inside the app's documents directory so they remain sandboxed
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final musicDir = Directory(path.join(appDocDir.path, 'tsmusic'));
+      if (!await musicDir.exists()) {
+        await musicDir.create(recursive: true);
+      }
+      return musicDir;
+    } else {
+      // For desktop platforms, use the downloads directory
+      final downloadsDir = await getDownloadsDirectory();
+      if (downloadsDir == null) {
+        throw Exception('Could not get downloads directory.');
+      }
+      final musicDir = Directory(path.join(downloadsDir.path, 'tsmusic'));
+      if (!await musicDir.exists()) {
+        await musicDir.create(recursive: true);
+      }
+      return musicDir;
     }
-    return musicDir;
   }
 
 
@@ -582,16 +500,17 @@ class YouTubeService with ChangeNotifier {
   Future<ts.Song> _addDownloadedSongToLibrary({
     required String videoId,
     required String filePath,
+    required String title,
+    required String author,
+    required int duration,
   }) async {
     try {
-      final video = await _yt.videos.get(videoId);
       final dbHelper = DatabaseHelper();
-
       return await dbHelper.addSongFromYouTube(
         filePath: filePath,
-        title: video.title,
-        author: video.author,
-        duration: video.duration?.inMilliseconds ?? 0,
+        title: title,
+        author: author,
+        duration: duration,
       );
     } catch (e) {
       debugPrint('Error adding downloaded song to library: $e');

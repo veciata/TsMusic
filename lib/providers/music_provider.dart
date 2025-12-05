@@ -25,7 +25,7 @@ class MusicProvider extends ChangeNotifier {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   // ===== CONSTANTS =====
-  static const List<String> audioExtensions = ['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.opus', '.m4b', '.mp4'];
+  static const List<String> audioExtensions = ['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.opus', '.m4b'];
   static const String _songsKey = 'cached_songs';
   static const int nowPlayingPlaylistId = 1;
 
@@ -104,7 +104,7 @@ class MusicProvider extends ChangeNotifier {
 
   // ===== INITIALIZATION =====
   MusicProvider() {
-    _positionSubscription = _audioPlayer.positionStream.listen((_) => notifyListeners());
+
     AudioNotificationService.init(
       player: _audioPlayer,
       onCurrentSongChanged: (_) => notifyListeners(),
@@ -430,7 +430,7 @@ class MusicProvider extends ChangeNotifier {
       }
     }
     return null;
-  }
+    }
 
   List<Song> getSongsByArtist(String artistName) {
     return _playlist.where((song) => song.artists.any((artist) => artist == artistName)).toList();
@@ -1028,16 +1028,7 @@ class MusicProvider extends ChangeNotifier {
           externalDir.path,
           '${externalDir.path}/Music',
           '${externalDir.path}/Download',
-          '${externalDir.path}/media',
-          '${externalDir.path}/Documents',
-          '${externalDir.path}/Audio',
-          '${externalDir.path}/Sounds',
-          '${externalDir.path}/Ringtones',
-          '${externalDir.path}/Notifications',
-          '${externalDir.path}/Movies',
-          '${externalDir.path}/Videos',
-          '${externalDir.path}/Podcasts',
-          '${externalDir.path}/Audiobooks',
+          '${externalDir.path}/Music/tsmusic',
         ];
         musicDirectories.addAll(basePaths);
       }
@@ -1050,97 +1041,25 @@ class MusicProvider extends ChangeNotifier {
       // Primary storage
       '/storage/emulated/0/Music',
       '/storage/emulated/0/Download',
-      '/storage/emulated/0/Documents',
-      '/storage/emulated/0/Audio',
-      '/storage/emulated/0/Sounds',
-      '/storage/emulated/0/media',
-      '/storage/emulated/0/Ringtones',
-      '/storage/emulated/0/Notifications',
-      '/storage/emulated/0/Movies',
-      '/storage/emulated/0/Videos',
-      '/storage/emulated/0/Podcasts',
-      '/storage/emulated/0/Audiobooks',
-
-      // SD Card paths
       '/sdcard/Music',
       '/sdcard/Download',
-      '/sdcard/Documents',
-      '/sdcard/Audio',
-      '/sdcard/Sounds',
-      '/sdcard/media',
-      '/sdcard/Ringtones',
-      '/sdcard/Notifications',
-      '/sdcard/Movies',
-      '/sdcard/Videos',
-      '/sdcard/Podcasts',
-      '/sdcard/Audiobooks',
-
       // Alternative mount points
       '/mnt/sdcard/Music',
       '/mnt/sdcard/Download',
-      '/mnt/sdcard/Documents',
-      '/mnt/sdcard/Audio',
-      '/mnt/sdcard/Sounds',
-      '/mnt/sdcard/media',
 
       // System media paths
       '/data/media/0/Music',
       '/data/media/0/Download',
-      '/data/media/0/Documents',
-      '/data/media/0/Audio',
-      '/data/media/0/Sounds',
 
       // TSMusic specific
-      '/storage/emulated/0/TSMusic',
-      '/sdcard/TSMusic',
       '/data/data/com.veciata.tsmusic/files',
     ];
 
     musicDirectories.addAll(standardPaths);
 
-    // Add common music app directories
-    final appDirectories = [
-      // Google Music
-      '/storage/emulated/0/Android/data/com.google.android.music/files/music',
-
-      // Spotify
-      '/storage/emulated/0/Android/data/com.spotify.music/files',
-
-      // Apple Music
-      '/storage/emulated/0/Android/data/com.apple.android.music/files',
-
-      // Amazon Music
-      '/storage/emulated/0/Android/data/com.amazon.mp3/files',
-
-      // Pandora
-      '/storage/emulated/0/Android/data/com.pandora.android/files',
-
-      // SoundCloud
-      '/storage/emulated/0/Android/data/com.soundcloud.android/files',
-
-      // Deezer
-      '/storage/emulated/0/Android/data/deezer.android.app/files',
-
-      // Tidal
-      '/storage/emulated/0/Android/data/com.aspiro.tidal/files',
-
-      // YouTube Music
-      '/storage/emulated/0/Android/data/com.google.android.apps.youtube.music/files',
-
-      // Samsung Music
-      '/storage/emulated/0/Android/data/com.sec.android.app.music/files',
-
-      // Generic music apps
-      '/storage/emulated/0/Android/data/com.music/files',
-      '/storage/emulated/0/Android/data/com.player.music/files',
-    ];
-
-    musicDirectories.addAll(appDirectories);
-
     // Remove duplicates and filter out null/empty paths
     final uniquePaths = musicDirectories.where((path) => path.isNotEmpty).toList();
 
-    debugPrint('🎯 SCANNING ${uniquePaths.length} DIRECTORIES FOR MUSIC FILES');
     return uniquePaths;
   }
 

@@ -17,6 +17,7 @@ import 'providers/theme_provider.dart';
 import 'providers/music_provider.dart' as music_provider;
 import 'services/permission_service.dart';
 import 'services/youtube_service.dart';
+import 'package:tsmusic/providers/settings_provider.dart';
 import 'utils/package_info_utils.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
@@ -88,6 +89,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
         ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
         ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
         ChangeNotifierProvider(create: (_) => widget.youTubeService),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

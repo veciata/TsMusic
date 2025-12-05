@@ -17,18 +17,23 @@ class MusicScannerService {
     '.aac',
     '.flac',
     '.ogg',
-    '.opus',
   ];
 
   // Scan device for music files and update database
   Future<void> scanDeviceForMusic() async {
     try {
-      // Get external storage directory (where music is typically stored)
-      final directory = await getExternalStorageDirectory();
-      if (directory == null) return;
+      final Directory? primaryStorage = await getExternalStorageDirectory();
+      if (primaryStorage == null) return;
 
-      // Start scanning from the root of external storage
-      await _scanDirectory(directory);
+      final musicDir = Directory(path.join(primaryStorage.path, 'Music'));
+      final downloadsDir = Directory(path.join(primaryStorage.path, 'Download'));
+
+      if (await musicDir.exists()) {
+        await _scanDirectory(musicDir);
+      }
+      if (await downloadsDir.exists()) {
+        await _scanDirectory(downloadsDir);
+      }
     } catch (e) {
       print('Error scanning for music: $e');
     }
@@ -72,7 +77,7 @@ class MusicScannerService {
       final metadata = await _extractMetadata(file);
       
       // Insert into database
-      await _insertSongToDatabase(metadata);
+      await _insertSongToDatabase(file, metadata);
       
     } catch (e) {
       print('Error processing file ${file.path}: $e');
@@ -116,7 +121,7 @@ class MusicScannerService {
   }
 
   // Insert song and related data into database
-  Future<void> _insertSongToDatabase(Map<String, dynamic> songData) async {
+  Future<void> _insertSongToDatabase(File file, Map<String, dynamic> songData) async {
     final db = await _dbHelper.database;
     
     // Start a transaction
@@ -136,11 +141,10 @@ class MusicScannerService {
       );
       
       // Insert song
-      await txn.insert(
+      final songId = await txn.insert(
         DatabaseHelper.tableSongs,
         {
           'title': songData['title'],
-          'artist_id': artistId,
           'album_id': albumId,
           'genre_id': genreId,
           'file_path': songData['file_path'],
@@ -149,6 +153,23 @@ class MusicScannerService {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+
+      // Add artist to song
+      await txn.insert(
+        DatabaseHelper.tableSongArtist,
+        {'song_id': songId, 'artist_id': artistId},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+
+      // Add tag if in tsmusic folder
+      if (file.path.contains('/Music/tsmusic/')) {
+        final tagId = await _getOrCreateTag(txn, 'tsmusic');
+        await txn.insert(
+          DatabaseHelper.tableSongTags,
+          {'song_id': songId, 'tag_id': tagId},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
     });
   }
 
@@ -214,6 +235,25 @@ class MusicScannerService {
         'artist_id': artistId,
         if (year != null) 'year': year,
       },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  // Helper method to get or create a tag
+  Future<int> _getOrCreateTag(Transaction txn, String tagName) async {
+    final tags = await txn.query(
+      DatabaseHelper.tableTags,
+      where: 'name = ?',
+      whereArgs: [tagName],
+    );
+
+    if (tags.isNotEmpty) {
+      return tags.first['id'] as int;
+    }
+
+    return await txn.insert(
+      DatabaseHelper.tableTags,
+      {'name': tagName},
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }

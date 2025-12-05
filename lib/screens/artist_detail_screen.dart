@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
 import '../services/youtube_service.dart';
 import '../models/song.dart';
+import 'downloads_screen.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
@@ -22,16 +23,18 @@ class ArtistDetailScreen extends StatefulWidget {
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final YouTubeService _youTubeService = YouTubeService();
-  List<Song> _youtubeSongs = [];
+  late YouTubeService _youTubeService;
+  List<YouTubeAudio> _youtubeSongs = [];
   bool _isLoading = false;
   bool _hasMore = true;
   final ScrollController _scrollController = ScrollController();
   final Map<String, String> _artistImageCache = {};
+  String? _loadingYouTubeId;
 
   @override
   void initState() {
     super.initState();
+    _youTubeService = context.read<YouTubeService>();
     _tabController = TabController(length: 2, vsync: this);
     _loadYouTubeSongs();
     _scrollController.addListener(_onScroll);
@@ -76,23 +79,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     try {
       final results = await _youTubeService.searchAudio(widget.artistName);
       setState(() {
-        _youtubeSongs = results.map((audio) => Song(
-          id: audio.id.hashCode,
-          title: audio.title,
-          artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
-          album: 'YouTube',
-          albumArtUrl: audio.thumbnailUrl,
-          url: audio.audioUrl ?? '',
-          duration: audio.duration?.inMilliseconds ?? 0,
-          tags: ['youtube'],
-        )).toList();
+        _youtubeSongs = results;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading YouTube songs: $e')),
+          SnackBar(content: Text('Error loading online songs: $e')),
         );
       }
     }
@@ -103,18 +97,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
     setState(() => _isLoading = true);
     try {
-      final results = await _youTubeService.searchAudio(widget.artistName);
+      final results = await _youTubeService.searchAudioNextPage(widget.artistName);
       setState(() {
-        _youtubeSongs.addAll(results.map((audio) => Song(
-          id: audio.id.hashCode,
-          title: audio.title,
-          artists: audio.artists.isNotEmpty ? audio.artists : ['Unknown Artist'],
-          album: 'YouTube',
-          albumArtUrl: audio.thumbnailUrl,
-          url: audio.audioUrl ?? '',
-          duration: audio.duration?.inMilliseconds ?? 0,
-          tags: ['youtube'],
-        )).toList());
+        _youtubeSongs.addAll(results);
         _isLoading = false;
         _hasMore = results.isNotEmpty;
       });
@@ -126,6 +111,84 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         );
       }
     }
+  }
+
+  Future<void> _playAudio(YouTubeAudio audio) async {
+    if (!mounted) return;
+    
+    setState(() => _loadingYouTubeId = audio.id);
+    
+    try {
+      await _youTubeService.playAudio(audio);
+      
+      if (mounted) {
+        setState(() {
+          _loadingYouTubeId = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error playing audio: $e');
+      
+      if (mounted) {
+        setState(() => _loadingYouTubeId = null);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Audio could not be played'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => _playAudio(audio),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDownload(YouTubeAudio audio) async {
+    if (!mounted) return;
+    
+    final isDownloading =
+        _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
+    if (isDownloading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download already in progress')),
+      );
+      _navigateToDownloads();
+      return;
+    }
+
+    try {
+      final result = await _youTubeService.downloadAudio(
+        videoId: audio.id,
+      );
+      if (result != null && mounted) {
+        await Provider.of<music_provider.MusicProvider>(context, listen: false)
+            .loadFromDatabaseOnly();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download started: ${audio.title}')),
+        );
+        _navigateToDownloads();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    }
+  }
+
+  void _navigateToDownloads() {
+    if (!mounted) return;
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const DownloadsScreen(),
+      ),
+    );
   }
 
   @override
@@ -174,7 +237,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                 controller: _tabController,
                 tabs: const [
                   Tab(text: 'Local Songs'),
-                  Tab(text: 'YouTube'),
+                  Tab(text: 'Online'),
                 ],
               ),
             ),
@@ -191,25 +254,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     );
   }
 
-  // Helper function to normalize file paths for comparison
   String _normalizePath(String path) {
     try {
-      // Convert to lowercase and remove any query parameters or fragments
       String normalized = path.split('?')[0].split('#')[0].toLowerCase().trim();
-      
-      // Handle different path formats that point to the same location
       const String emulatedPrefix = '/storage/emulated/0/';
-      
-      // Convert /storage/emulated/0/ to /sdcard/ for consistency
       if (normalized.startsWith(emulatedPrefix)) {
         normalized = '/sdcard/${normalized.substring(emulatedPrefix.length)}';
       }
-      
-      // Remove any redundant path segments
       final uri = Uri.file(normalized);
       final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      
-      // Rebuild path with normalized segments
       return '/${segments.join('/')}';
     } catch (e) {
       if (kDebugMode) {
@@ -222,7 +275,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   Widget _buildLocalSongsTab(List<Song> songs, music_provider.MusicProvider musicProvider) {
     if (songs.isEmpty) return const Center(child: Text('No local songs found for this artist'));
 
-    // Use a map to ensure unique songs by their normalized path
     final Map<int, Song> uniqueSongs = {};
     final Set<String> seenPaths = {};
     
@@ -282,44 +334,106 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
   Widget _buildYouTubeTab() {
     if (_isLoading && _youtubeSongs.isEmpty) return const Center(child: CircularProgressIndicator());
-    if (_youtubeSongs.isEmpty) return const Center(child: Text('No YouTube songs found for this artist'));
+    if (_youtubeSongs.isEmpty) return const Center(child: Text('No online songs found for this artist'));
 
     return ListView.builder(
       controller: _scrollController,
       itemCount: _youtubeSongs.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _youtubeSongs.length) return _buildLoadingIndicator();
-        final song = _youtubeSongs[index];
-
-        return ListTile(
-          leading: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4.0),
-                  child: CachedNetworkImage(
-                    imageUrl: song.albumArtUrl!,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const Icon(Icons.music_video, size: 50),
-                  ),
-                )
-              : const Icon(Icons.music_video, size: 50),
-          title: Text(song.title),
-          subtitle: const Text('YouTube'),
-          trailing: IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Downloading ${song.title}')),
-              );
-            },
-          ),
-          onTap: () {
-            final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
-            musicProvider.playSong(song);
-          },
-        );
+        final audio = _youtubeSongs[index];
+        return _buildOnlineResultItem(audio);
       },
+    );
+  }
+
+  Widget _buildOnlineResultItem(YouTubeAudio audio) {
+    final youTubeService = Provider.of<YouTubeService>(context);
+    final isCurrent = youTubeService.currentAudio?.id == audio.id;
+    final isPlaying = youTubeService.isPlaying && isCurrent;
+    final isLoading = _loadingYouTubeId == audio.id;
+    
+    final downloadProgress = youTubeService.activeDownloads
+        .where((d) => d.videoId == audio.id)
+        .firstOrNull;
+
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final isDownloaded = musicProvider.songs
+        .any((s) => s.id == audio.id.hashCode && s.isDownloaded);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        leading: audio.thumbnailUrl?.isNotEmpty == true
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: CachedNetworkImage(
+                  imageUrl: audio.thumbnailUrl!,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(width: 60, height: 60, color: Colors.grey[300]),
+                  errorWidget: (context, url, error) =>
+                      Container(width: 60, height: 60, color: Colors.grey[300]),
+                ),
+              )
+            : Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[300],
+                child: const Icon(Icons.music_video),
+              ),
+        title: Text(
+          audio.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(audio.artists.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (isCurrent && isPlaying)
+              const LinearProgressIndicator(),
+            if (downloadProgress != null)
+              LinearProgressIndicator(value: downloadProgress.progress),
+            if (isDownloaded) const Text('Downloaded'),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              IconButton(
+                icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                onPressed: () => _playAudio(audio),
+              ),
+            IconButton(
+              icon: Icon(
+                isDownloaded
+                    ? Icons.check_circle
+                    : (downloadProgress != null ? Icons.downloading : Icons.download),
+              ),
+              onPressed: () async {
+                if (isDownloaded) {
+                  return;
+                }
+                if (downloadProgress != null) {
+                  _navigateToDownloads();
+                  return;
+                }
+                await _handleDownload(audio);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

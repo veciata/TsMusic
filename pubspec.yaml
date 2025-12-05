@@ -42,7 +42,7 @@ dependencies:
   rxdart: ^0.28.0
 
   # YouTube
-  youtube_explode_dart: ^3.0.3
+  youtube_explode_dart: ^3.0.5
   http: ^1.1.0
 
   # Desktop
@@ -51,6 +51,8 @@ dependencies:
   # UI components
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0

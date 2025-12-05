@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/settings_provider.dart'; // Import SettingsProvider
+import '../models/audio_format.dart'; // Import AudioFormat enum
 import '../utils/package_info_utils.dart';
 
 
@@ -108,10 +110,8 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
                 title: Text(
                   themeProvider.getPlayerStyleName(style),
                   style: TextStyle(
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
+                    fontWeight:                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected                        ? Theme.of(context).colorScheme.primary
                         : null,
                   ),
                 ),
@@ -144,12 +144,63 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   );
 }
 
+void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvider) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Select Audio Download Format'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: AudioFormat.values.map((format) {
+              final isSelected = format == settingsProvider.audioFormat;
+              return ListTile(
+                title: Text(
+                  settingsProvider.getAudioFormatName(format),
+                  style: TextStyle(
+                    fontWeight:                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                ),
+                leading: Radio<AudioFormat>(
+                  value: format,
+                  groupValue: settingsProvider.audioFormat,
+                  onChanged: (AudioFormat? newFormat) {
+                    if (newFormat != null) {
+                      settingsProvider.setAudioFormat(newFormat);
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+                onTap: () {
+                  settingsProvider.setAudioFormat(format);
+                  Navigator.of(context).pop();
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('CANCEL'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final settingsProvider = Provider.of<SettingsProvider>(context);
     final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
 
     return Scaffold(
@@ -207,6 +258,26 @@ if (kDebugMode) ...[
                     );
                   }).toList(),
                 ),
+              ),
+            ],
+          ),
+          // Downloads Section
+          SettingsSection(
+            title: 'Downloads',
+            icon: Icons.download,
+            children: [
+              ListTile(
+                title: const Text('Audio Download Format'),
+                leading: const Icon(Icons.audiotrack),
+                trailing: Text(
+                  settingsProvider.getAudioFormatName(settingsProvider.audioFormat),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                onTap: () {
+                  _showAudioFormatDialog(context, settingsProvider);
+                },
               ),
             ],
           ),
