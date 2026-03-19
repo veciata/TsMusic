@@ -65,9 +65,7 @@ class DatabaseHelper {
 
   DatabaseHelper._internal() {
     // Initialize the database when the singleton is created
-    _initDatabase().then((db) {
-      _verifyDatabaseSchema(db);
-    });
+    _initDatabase().then(_verifyDatabaseSchema);
   }
   
   factory DatabaseHelper() => _instance;

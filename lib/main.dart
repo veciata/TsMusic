@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:window_manager/window_manager.dart';
@@ -38,7 +37,7 @@ Future<void> main() async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
 
-    WindowOptions windowOptions = const WindowOptions(
+    final WindowOptions windowOptions = const WindowOptions(
       size: Size(1280, 720),
       center: true,
       backgroundColor: Colors.transparent,
@@ -83,8 +82,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
+  Widget build(BuildContext context) => MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
         ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
@@ -98,7 +96,14 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
           final isDark = themeProvider.isDarkMode;
           final baseTextTheme =
               isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
-          final textTheme = GoogleFonts.poppinsTextTheme(baseTextTheme);
+          final textTheme = baseTextTheme.copyWith(
+            headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          );
 
           return MaterialApp(
             title: 'TS Music',
@@ -113,7 +118,6 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
         },
       ),
     );
-  }
 }
 
 class MainNavigationScreen extends StatefulWidget {
@@ -217,7 +221,9 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SearchScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SearchScreen(),
+                  ),
                 );
               },
             ),
@@ -269,10 +275,10 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
               height: 70,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),
@@ -287,7 +293,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                       color: Theme.of(context)
                           .colorScheme
                           .primary
-                          .withOpacity(0.1),
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Icon(Icons.music_note, size: 30),
@@ -318,23 +324,29 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                       ],
                     ),
                   ),
-                  if (currentSong != null)
-                    IconButton(
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: IconButton(
                       icon: Icon(
                         musicProv.isPlaying ? Icons.pause : Icons.play_arrow,
-                        size: 32,
+                        size: 30,
                       ),
-                      onPressed: musicProv.togglePlayPause,
-                    )
-                  else
-                    IconButton(
-                      icon: const Icon(Icons.music_note, size: 32),
                       onPressed: () {
-                        if (musicProv.songs.isNotEmpty) {
-                          musicProv.playSong(musicProv.songs.first);
+                        if (musicProv.currentSong != null) {
+                          musicProv.togglePlayPause();
                         }
                       },
                     ),
+                  ),
                 ],
               ),
             ),

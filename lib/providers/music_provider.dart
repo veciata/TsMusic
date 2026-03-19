@@ -14,7 +14,6 @@ import 'package:sqflite/sqflite.dart';
 import '../models/song.dart';
 import '../models/song_sort_option.dart';
 import '../services/audio_notification_service.dart';
-import '../services/metadata_enrichment_service.dart';
 import '../database/database_helper.dart';
 
 /// Main music provider class for managing music playback and library
@@ -34,14 +33,14 @@ class MusicProvider extends ChangeNotifier {
   final ValueNotifier<bool> _loadingNotifier = ValueNotifier<bool>(false);
   List<Song> _playlist = [];
   List<Song> _displayedSongs = [];
-  List<Song> _filteredSongs = [];
+  final List<Song> _filteredSongs = [];
   int _currentIndex = 0;
   String? _error;
   SongSortOption _currentSortOption = SongSortOption.title;
   bool _sortAscending = true;
   StreamSubscription<Duration>? _positionSubscription;
-  bool _isEnriching = false;
-  int _enrichedCount = 0;
+  final bool _isEnriching = false;
+  final int _enrichedCount = 0;
   bool _shuffleEnabled = false;
   LoopMode _loopMode = LoopMode.off;
 
@@ -77,9 +76,11 @@ class MusicProvider extends ChangeNotifier {
   // Collection getters
   List<String> get albums {
     final albumSet = <String>{};
-    for (final song in _playlist) {
-      if (song.album != null && song.album!.isNotEmpty && song.album!.toLowerCase() != 'unknown album') {
-        albumSet.add(song.album!);
+    if (songs.isNotEmpty) {
+      for (final song in _playlist) {
+        if (song.album != null && song.album!.isNotEmpty && song.album!.toLowerCase() != 'unknown album') {
+          albumSet.add(song.album!);
+        }
       }
     }
     return albumSet.toList()..sort((a, b) => a.compareTo(b));
@@ -127,8 +128,11 @@ class MusicProvider extends ChangeNotifier {
           await _audioPlayer.seek(Duration.zero);
           await _audioPlayer.play();
         } else if (_loopMode == LoopMode.all) {
-          if (_currentIndex == _playlist.length - 1) _currentIndex = 0;
-          else _currentIndex++;
+          if (_currentIndex == _playlist.length - 1) {
+            _currentIndex = 0;
+          } else {
+            _currentIndex++;
+          }
           await _setAudioSource(_playlist[_currentIndex]);
           await _audioPlayer.play();
           await _updateNotification();
@@ -384,9 +388,13 @@ class MusicProvider extends ChangeNotifier {
     if (_shuffleEnabled) {
       int nextIndex = _currentIndex;
       final random = Random();
-      while (nextIndex == _currentIndex && _playlist.length > 1) nextIndex = random.nextInt(_playlist.length);
+      while (nextIndex == _currentIndex && _playlist.length > 1) {
+        nextIndex = random.nextInt(_playlist.length);
+      }
       _currentIndex = nextIndex;
-    } else _currentIndex = (_currentIndex + 1) % _playlist.length;
+    } else {
+      _currentIndex = (_currentIndex + 1) % _playlist.length;
+    }
     await _setAudioSource(_playlist[_currentIndex]);
     await _audioPlayer.play();
     await _updateNotification();
@@ -478,7 +486,7 @@ class MusicProvider extends ChangeNotifier {
             compare = a.duration.compareTo(b.duration);
             break;
           case SongSortOption.dateAdded:
-            compare = (a.dateAdded ?? DateTime.now()).compareTo(b.dateAdded ?? DateTime.now());
+            compare = a.dateAdded.compareTo(b.dateAdded);
             break;
         }
         return ascending ? compare : -compare;

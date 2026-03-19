@@ -29,8 +29,8 @@ class Song {
 
   Song({
     required this.id,
-    required String title,
-    required List<String> artists,
+    required this.title,
+    required this.artists,
     this.album,
     this.albumArtUrl,
     required this.url,
@@ -40,9 +40,7 @@ class Song {
     List<String>? tags,
     this.trackNumber,
     DateTime? dateAdded,
-  })  : title = title,
-        artists = artists,
-        tags = tags ?? [],
+  })  : tags = tags ?? [],
         dateAdded = dateAdded ?? DateTime.now();
 
   Song copyWith({
@@ -58,8 +56,7 @@ class Song {
     List<String>? tags,
     int? trackNumber,
     DateTime? dateAdded,
-  }) {
-    return Song(
+  }) => Song(
       id: id ?? this.id,
       title: title ?? this.title,
       artists: artists ?? this.artists,
@@ -73,7 +70,6 @@ class Song {
       trackNumber: trackNumber ?? this.trackNumber,
       dateAdded: dateAdded ?? this.dateAdded,
     );
-  }
 
   factory Song.fromJson(Map<String, dynamic> json) {
     // Handle both int and String IDs for robustness
@@ -106,8 +102,7 @@ class Song {
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'id': id,
       'title': title,
       'artists': artists,
@@ -121,7 +116,6 @@ class Song {
       'trackNumber': trackNumber,
       'dateAdded': dateAdded.toIso8601String(),
     };
-  }
 
   Map<String, dynamic> toJson() => toMap();
 }

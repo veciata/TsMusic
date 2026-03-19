@@ -39,8 +39,6 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _loadingYouTubeId;
   final ScrollController _scrollController = ScrollController();
   final ScrollController _searchScrollController = ScrollController();
-  bool _isLoadingMore = false;
-  String _lastQuery = '';
 
   @override
   void initState() {
@@ -158,7 +156,6 @@ class _SearchScreenState extends State<SearchScreen> {
             _youtubeResults = response;
           }
           _hasMoreYouTubeResults = response.isNotEmpty;
-          _lastQuery = query;
         });
       }
     } catch (_) {
@@ -178,42 +175,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _loadMoreYouTube() async {
-    if (_isLoadingMore || !_hasMoreYouTubeResults || _lastQuery.isEmpty) return;
-    setState(() => _isLoadingMore = true);
-
-    try {
-      final List<YouTubeAudio> more = await _youTubeService.searchAudioNextPage(_lastQuery);
-      if (!mounted) return;
-
-      if (more.isEmpty) {
-        setState(() {
-          _hasMoreYouTubeResults = false;
-          _isLoadingMore = false;
-        });
-        return;
-      }
-
-      setState(() {
-        _youtubeResults.addAll(more);
-        _isLoadingMore = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingMore = false);
-    }
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-
-    const threshold = 300.0;
-    final position = _scrollController.position;
-
-    if (position.pixels >= position.maxScrollExtent - threshold) {
-      _loadMoreYouTube();
-    }
-  }
-
+  
+  
 
 
   Widget _buildSearchResults(List<model.Song> localSongs, music_provider.MusicProvider provider,

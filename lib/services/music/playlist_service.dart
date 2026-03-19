@@ -19,7 +19,7 @@ class PlaylistService {
   void setPlaylist(List<Song> songs, {int? initialIndex}) {
     // Ensure all songs have a dateAdded field
     _playlist = songs.map((song) => song.copyWith(
-      dateAdded: song.dateAdded ?? DateTime.now(),
+      dateAdded: song.dateAdded,
     )).toList();
     _currentIndex = initialIndex ?? (_playlist.isNotEmpty ? 0 : -1);
   }
@@ -27,7 +27,7 @@ class PlaylistService {
   void addToPlaylist(Song song) {
     // Ensure the song has a dateAdded field
     final songWithDate = song.copyWith(
-      dateAdded: song.dateAdded ?? DateTime.now(),
+      dateAdded: song.dateAdded,
     );
     _playlist.add(songWithDate);
     if (_currentIndex == -1) _currentIndex = 0;

@@ -201,7 +201,7 @@ class YouTubeService with ChangeNotifier {
 
       final audioStream = manifest.audioOnly.withHighestBitrate() ??
           manifest.muxed.withHighestBitrate();
-      return audioStream?.url.toString();
+      return audioStream.url.toString();
     } catch (e) {
       debugPrint('Failed to get audio stream: $e');
       rethrow;
@@ -349,11 +349,6 @@ class YouTubeService with ChangeNotifier {
     try {
       StreamManifest manifest;
       try {
-        manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      } catch (e) {
-        debugPrint(
-          'Failed to get manifest with default client: $e. Trying alternative clients.',
-        );
         manifest = await _yt.videos.streamsClient.getManifest(
           videoId,
           ytClients: [
@@ -361,77 +356,88 @@ class YouTubeService with ChangeNotifier {
             YoutubeApiClient.ios,
           ],
         );
+      } catch (e) {
+        debugPrint(
+          'Failed to get manifest with preferred clients: $e. Trying default client.',
+        );
+        manifest = await _yt.videos.streamsClient.getManifest(videoId);
       }
 
-      final streamInfo = manifest.audioOnly.withHighestBitrate();
-      if (streamInfo == null) {
-        throw Exception('No suitable audio stream found.');
-      }
+      final streamInfo = manifest.audioOnly.first;
 
       final musicDir = await _getMusicDirectory();
       final safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final finalFile = File(
         path.join(
           musicDir.path,
-          '${safeTitle}_${streamInfo.bitrate.bitsPerSecond}.${streamInfo.container.name}',
+          '${safeTitle}_${streamInfo.bitrate.bitsPerSecond}.mp4',
         ),
       );
 
       if (await finalFile.exists()) {
-        debugPrint('downloadAudio: File already exists: ${finalFile.path}. Skipping.');
-        _completeDownload(videoId);
-        return DownloadResult(
-          filePath: finalFile.path,
-          song: await _addDownloadedSongToLibrary(
-            videoId: videoId,
+        final fileSize = await finalFile.length();
+        if (fileSize > 0) {
+          debugPrint('downloadAudio: File already exists and is valid: ${finalFile.path}. Skipping.');
+          _completeDownload(videoId);
+          return DownloadResult(
             filePath: finalFile.path,
-            title: video.title,
-            author: video.author,
-            duration: video.duration?.inMilliseconds ?? 0,
-          ),
-        );
+            song: await _addDownloadedSongToLibrary(
+              videoId: videoId,
+              filePath: finalFile.path,
+              title: video.title,
+              author: video.author,
+              duration: video.duration?.inMilliseconds ?? 0,
+            ),
+          );
+        } else {
+          debugPrint('downloadAudio: Empty file found: ${finalFile.path}. Deleting and re-downloading.');
+          await finalFile.delete();
+        }
       }
 
       final downloadProgress = _activeDownloads[videoId];
+      debugPrint('downloadAudio: Getting stream for videoId: $videoId');
+      
+      // Use YouTube Explode example pattern: get stream and pipe to file
       final stream = _yt.videos.streamsClient.get(streamInfo);
       final contentLength = streamInfo.size.totalBytes;
+      debugPrint('downloadAudio: Expected content length: $contentLength bytes');
       var receivedBytes = 0;
       final fileSink = finalFile.openWrite();
       final completer = Completer<void>();
 
-      final sub = stream.listen(
-        (chunk) {
-          if (downloadProgress?.cancelRequested == true) {
-            if (!completer.isCompleted) {
-              completer.completeError(Exception('Canceled by user'));
-            }
-            return;
-          }
-          fileSink.add(chunk);
-          receivedBytes += chunk.length;
-          if (contentLength > 0) {
-            final progress = receivedBytes / contentLength;
-            _updateDownloadProgress(videoId, progress);
-            onProgress?.call(progress);
-          }
-        },
-        onError: (e) {
-          debugPrint('downloadAudio: Stream error for $videoId: $e');
-          if (!completer.isCompleted) completer.completeError(e);
-        },
-        onDone: () {
-          if (!completer.isCompleted) completer.complete();
-        },
-        cancelOnError: true,
-      );
+      // Add timeout to prevent hanging downloads
+      final timeout = Timer(const Duration(minutes: 5), () {
+        if (!completer.isCompleted) {
+          completer.completeError(TimeoutException('Download timeout after 5 minutes', const Duration(minutes: 5)));
+        }
+      });
 
-      if (downloadProgress != null) {
-        downloadProgress.subscription = sub;
+      // Pipe stream to file directly (example pattern)
+      await for (final chunk in stream) {
+        if (downloadProgress?.cancelRequested == true) {
+          timeout.cancel();
+          if (!completer.isCompleted) {
+            completer.completeError(Exception('Canceled by user'));
+          }
+          break;
+        }
+        fileSink.add(chunk);
+        receivedBytes += chunk.length;
+        debugPrint('downloadAudio: Received chunk of ${chunk.length} bytes, total: $receivedBytes');
+        if (contentLength > 0) {
+          final progress = receivedBytes / contentLength;
+          _updateDownloadProgress(videoId, progress);
+          onProgress?.call(progress);
+        }
       }
-
-      await completer.future;
+      
+      timeout.cancel();
       await fileSink.flush();
       await fileSink.close();
+      
+      final finalFileSize = await finalFile.length();
+      debugPrint('downloadAudio: Download completed. Final file size: $finalFileSize bytes');
 
       if (downloadProgress?.cancelRequested == true) {
         if (await finalFile.exists()) {

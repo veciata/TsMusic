@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
             compare = a.duration.compareTo(b.duration);
             break;
           case SongSortOption.dateAdded:
-            compare = (a.dateAdded ?? DateTime.now()).compareTo(b.dateAdded ?? DateTime.now());
+            compare = a.dateAdded.compareTo(b.dateAdded);
             break;
         }
         return provider.sortAscending ? compare : -compare;
