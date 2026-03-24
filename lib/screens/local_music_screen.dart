@@ -19,7 +19,7 @@ class LocalMusicScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => musicProvider.loadLocalMusic(),
+            onPressed: musicProvider.loadLocalMusic,
           ),
         ],
       ),
@@ -124,7 +124,7 @@ class LocalMusicScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => musicProvider.loadLocalMusic(),
+        onPressed: musicProvider.loadLocalMusic,
         tooltip: 'Refresh music library',
         child: const Icon(Icons.refresh),
       ),

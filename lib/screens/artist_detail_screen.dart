@@ -12,10 +12,10 @@ class ArtistDetailScreen extends StatefulWidget {
   final ValueNotifier<String?> artistImageUrlNotifier;
 
   ArtistDetailScreen({
-    Key? key,
+    super.key,
     required this.artistName,
     ValueNotifier<String?>? artistImageUrl,
-  }) : artistImageUrlNotifier = artistImageUrl ?? ValueNotifier<String?>(null), super(key: key);
+  }) : artistImageUrlNotifier = artistImageUrl ?? ValueNotifier<String?>(null);
 
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
@@ -62,7 +62,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         if (song.thumbnailUrl != null && song.thumbnailUrl!.isNotEmpty) {
           _artistImageCache[widget.artistName] = song.thumbnailUrl!;
           setState(() {
-            widget.artistImageUrlNotifier.value = song.thumbnailUrl!;
+            widget.artistImageUrlNotifier.value = song.thumbnailUrl;
           });
           break;
         }
@@ -205,15 +205,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
     return Scaffold(
       body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverAppBar(
               expandedHeight: 200.0,
               pinned: true,
               flexibleSpace: ValueListenableBuilder<String?>(
                 valueListenable: widget.artistImageUrlNotifier,
-                builder: (context, artistImageUrl, child) {
-                  return FlexibleSpaceBar(
+                builder: (context, artistImageUrl, child) => FlexibleSpaceBar(
                     title: Text(
                       widget.artistName,
                       style: const TextStyle(
@@ -230,8 +228,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                             errorWidget: (context, url, error) => _buildPlaceholderImage(),
                           )
                         : _buildPlaceholderImage(),
-                  );
-                },
+                  ),
               ),
               bottom: TabBar(
                 controller: _tabController,
@@ -241,8 +238,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                 ],
               ),
             ),
-          ];
-        },
+          ],
         body: TabBarView(
           controller: _tabController,
           children: [
@@ -437,19 +433,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     );
   }
 
-  Widget _buildLoadingIndicator() {
-    return const Padding(
+  Widget _buildLoadingIndicator() => const Padding(
       padding: EdgeInsets.all(16.0),
       child: Center(child: CircularProgressIndicator()),
     );
-  }
 
-  Widget _buildPlaceholderImage() {
-    return Container(
+  Widget _buildPlaceholderImage() => Container(
       color: Colors.grey[800],
       child: Center(
         child: Icon(Icons.person, size: 120, color: Colors.grey[600]),
       ),
     );
-  }
 }

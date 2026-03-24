@@ -4,10 +4,13 @@ import '../models/audio_format.dart';
 
 class SettingsProvider with ChangeNotifier {
   static const String _audioFormatKey = 'audioFormat';
+  static const String _languageKey = 'language';
 
-  AudioFormat _audioFormat = AudioFormat.auto; // Default value
+  AudioFormat _audioFormat = AudioFormat.auto;
+  Locale _locale = const Locale('en', 'US');
 
   AudioFormat get audioFormat => _audioFormat;
+  Locale get locale => _locale;
 
   SettingsProvider() {
     _loadSettings();
@@ -15,6 +18,8 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Load audio format
     final audioFormatString = prefs.getString(_audioFormatKey);
     if (audioFormatString != null) {
       _audioFormat = AudioFormat.values.firstWhere(
@@ -22,6 +27,13 @@ class SettingsProvider with ChangeNotifier {
         orElse: () => AudioFormat.auto,
       );
     }
+    
+    // Load language
+    final languageCode = prefs.getString(_languageKey);
+    if (languageCode != null) {
+      _locale = Locale(languageCode);
+    }
+    
     notifyListeners();
   }
 
@@ -30,6 +42,15 @@ class SettingsProvider with ChangeNotifier {
       _audioFormat = format;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_audioFormatKey, format.name);
+      notifyListeners();
+    }
+  }
+
+  Future<void> setLanguage(Locale locale) async {
+    if (_locale != locale) {
+      _locale = locale;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languageKey, locale.languageCode);
       notifyListeners();
     }
   }
@@ -44,6 +65,14 @@ class SettingsProvider with ChangeNotifier {
     } else if (format == AudioFormat.auto) {
       return 'Auto (App decides)';
     }
-    return 'Unknown Format'; // Should not happen
+    return 'Unknown Format';
+  }
+
+  String getLanguageName(Locale locale) {
+    if (locale.languageCode == 'tr') {
+      return 'Türkçe';
+    } else {
+      return 'English';
+    }
   }
 }

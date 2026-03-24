@@ -58,7 +58,5 @@ class SongSearchService {
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
   }
 
-  List<Song> getSongsByArtist(List<Song> songs, String artistName) {
-    return songs.where((song) => song.artists.any((artist) => artist == artistName)).toList();
-  }
+  List<Song> getSongsByArtist(List<Song> songs, String artistName) => songs.where((song) => song.artists.any((artist) => artist == artistName)).toList();
 }

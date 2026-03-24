@@ -12,7 +12,7 @@ void main() {
   testWidgets('smoke test: renders a basic widget', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: Scaffold(body: Text('Hello')),
-    ));
+    ),);
 
     expect(find.text('Hello'), findsOneWidget);
   });

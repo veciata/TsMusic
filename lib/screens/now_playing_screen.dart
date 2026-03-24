@@ -67,8 +67,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     return '$minutes:$remainingSeconds';
   }
 
-  Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title) {
-    return AnimatedBuilder(
+  Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title) => AnimatedBuilder(
       animation: _albumArtController ?? AnimationController(vsync: this, duration: const Duration(seconds: 20)),
       builder: (context, child) {
         final controller = _albumArtController ?? AnimationController(vsync: this, duration: const Duration(seconds: 20));
@@ -108,23 +107,19 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         );
       },
     );
-  }
 
   Widget _buildControlButton({
     required IconData icon,
     required VoidCallback onPressed,
     double size = 24,
     Color? color,
-  }) {
-    return IconButton(
+  }) => IconButton(
       icon: Icon(icon, size: size),
       color: color,
       onPressed: onPressed,
     );
-  }
 
-  Widget _buildVolumeControl(ThemeData theme) {
-    return AnimatedContainer(
+  Widget _buildVolumeControl(ThemeData theme) => AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: _showVolumeSlider ? 200 : 48,
       height: 48,
@@ -164,7 +159,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               onPressed: () => setState(() => _showVolumeSlider = true),
             ),
     );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +201,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final albumArtUrl = currentSong.albumArtUrl;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -263,8 +257,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   const SizedBox(height: 8),
                   Wrap(
                     alignment: WrapAlignment.center,
-                    children: currentSong.artists.map((artist) {
-                      return GestureDetector(
+                    children: currentSong.artists.map((artist) => GestureDetector(
                         onTap: () {
                           Navigator.push(
                             context,
@@ -300,8 +293,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      );
-                    }).toList(),
+                      )).toList(),
                   ),
                 ],
               ),
@@ -314,7 +306,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 children: [
                   Slider(
                     value: _currentPosition,
-                    min: 0,
                     max: duration.toDouble(),
                     onChanged: (value) {
                       setState(() {

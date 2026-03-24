@@ -45,7 +45,7 @@ class MusicScannerService {
       // Skip hidden directories
       if (path.basename(dir.path).startsWith('.')) return;
 
-      await for (var entity in dir.list(recursive: false)) {
+      await for (var entity in dir.list()) {
         if (entity is File) {
           await _processFile(entity);
         } else if (entity is Directory) {
@@ -127,17 +127,17 @@ class MusicScannerService {
     // Start a transaction
     await db.transaction((txn) async {
       // Insert or get artist
-      int artistId = await _getOrCreateArtist(txn, songData['artist']);
+      final int artistId = await _getOrCreateArtist(txn, songData['artist']);
       
       // Insert or get genre
-      int genreId = await _getOrCreateGenre(txn, songData['genre']);
+      final int genreId = await _getOrCreateGenre(txn, songData['genre']);
       
       // Insert or get album
-      int albumId = await _getOrCreateAlbum(
+      final int albumId = await _getOrCreateAlbum(
         txn, 
         songData['album'], 
         artistId,
-        songData['year']
+        songData['year'],
       );
       
       // Insert song
@@ -216,7 +216,7 @@ class MusicScannerService {
     Transaction txn, 
     String albumName, 
     int artistId, 
-    int? year
+    int? year,
   ) async {
     final albums = await txn.query(
       DatabaseHelper.tableAlbums,

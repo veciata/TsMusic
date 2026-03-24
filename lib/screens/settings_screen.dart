@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/theme_provider.dart';
-import '../providers/settings_provider.dart'; // Import SettingsProvider
-import '../models/audio_format.dart'; // Import AudioFormat enum
+import '../providers/settings_provider.dart';
+import '../models/audio_format.dart';
 import '../utils/package_info_utils.dart';
+import '../localization/app_localizations.dart';
 
 
 class SettingsSection extends StatelessWidget {
@@ -20,8 +22,7 @@ class SettingsSection extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
+  Widget build(BuildContext context) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -50,7 +51,6 @@ class SettingsSection extends StatelessWidget {
         const SizedBox(height: 8),
       ],
     );
-  }
 }
 
 class ColorSelector extends StatelessWidget {
@@ -66,8 +66,7 @@ class ColorSelector extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
+  Widget build(BuildContext context) => GestureDetector(
       onTap: onTap,
       child: Container(
         width: 40,
@@ -91,15 +90,14 @@ class ColorSelector extends StatelessWidget {
         child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
       ),
     );
-  }
 }
 
 void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
+  final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Select Player Style'),
+    builder: (context) => AlertDialog(
+        title: Text(l10n.selectPlayerStyle),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView(
@@ -136,20 +134,19 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('CANCEL'),
+            child: Text(l10n.cancel),
           ),
         ],
-      );
-    },
+      ),
   );
 }
 
 void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvider) {
+  final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Select Audio Download Format'),
+    builder: (context) => AlertDialog(
+        title: Text(l10n.selectAudioFormat),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView(
@@ -186,14 +183,60 @@ void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvi
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('CANCEL'),
+            child: Text(l10n.cancel),
           ),
         ],
-      );
-    },
+      ),
   );
 }
 
+void _showLanguageDialog(BuildContext context, SettingsProvider settingsProvider) {
+  final l10n = AppLocalizations.of(context);
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+        title: Text(l10n.selectLanguage),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: AppLocalizations.supportedLocales.map((locale) {
+              final isSelected = locale == settingsProvider.locale;
+              return ListTile(
+                title: Text(
+                  settingsProvider.getLanguageName(locale),
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                ),
+                leading: Radio<Locale>(
+                  value: locale,
+                  groupValue: settingsProvider.locale,
+                  onChanged: (Locale? newLocale) {
+                    if (newLocale != null) {
+                      settingsProvider.setLanguage(newLocale);
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+                onTap: () {
+                  settingsProvider.setLanguage(locale);
+                  Navigator.of(context).pop();
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.cancel),
+          ),
+        ],
+      ),
+  );
+}
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -202,20 +245,21 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(l10n.settings),
       ),
       body: ListView(
         children: [
           // Appearance Section
           SettingsSection(
-            title: 'Appearance',
+            title: l10n.appearance,
             icon: Icons.palette,
             children: [
               SwitchListTile(
-                title: const Text('Dark Mode'),
+                title: Text(l10n.darkMode),
                 value: isDarkMode,
                 onChanged: (value) {
                   themeProvider.setThemeMode(
@@ -224,50 +268,68 @@ class SettingsScreen extends StatelessWidget {
                 },
                 secondary: const Icon(Icons.dark_mode),
               ),
-if (kDebugMode) ...[
-  const Divider(height: 1),
-  ListTile(
-    title: const Text('Player Style'),
-    leading: const Icon(Icons.style),
-    trailing: Text(
-      themeProvider.getPlayerStyleName(themeProvider.playerStyle),
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    ),
-    onTap: () {
-      _showPlayerStyleDialog(context, themeProvider);
-    },
-  ),
-],
               const Divider(height: 1),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                child: Text('Accent Color'),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: themeProvider.availableColors.map((color) {
-                    return ColorSelector(
-                      color: color,
-                      isSelected:
-                          themeProvider.primaryColor.value == color.value,
-                      onTap: () => themeProvider.setPrimaryColor(color),
-                    );
-                  }).toList(),
+              ListTile(
+                title: Text(l10n.language),
+                leading: const Icon(Icons.language),
+                trailing: Text(
+                  settingsProvider.getLanguageName(settingsProvider.locale),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
+                onTap: () {
+                  _showLanguageDialog(context, settingsProvider);
+                },
               ),
             ],
           ),
+          if (kDebugMode) ...[
+            const Divider(height: 1),
+            SettingsSection(
+              title: l10n.debug,
+              icon: Icons.bug_report,
+              children: [
+                ListTile(
+                  title: Text(l10n.playerStyle),
+                  leading: const Icon(Icons.style),
+                  trailing: Text(
+                    themeProvider.getPlayerStyleName(themeProvider.playerStyle),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  onTap: () {
+                    _showPlayerStyleDialog(context, themeProvider);
+                  },
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                  child: Text(l10n.accentColor),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: themeProvider.availableColors.map((color) => ColorSelector(
+                        color: color,
+                        isSelected:
+                            themeProvider.primaryColor.value == color.value,
+                        onTap: () => themeProvider.setPrimaryColor(color),
+                      )).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ],
           // Downloads Section
           SettingsSection(
-            title: 'Downloads',
+            title: l10n.downloads,
             icon: Icons.download,
             children: [
               ListTile(
-                title: const Text('Audio Download Format'),
+                title: Text(l10n.audioDownloadFormat),
                 leading: const Icon(Icons.audiotrack),
                 trailing: Text(
                   settingsProvider.getAudioFormatName(settingsProvider.audioFormat),
@@ -283,11 +345,11 @@ if (kDebugMode) ...[
           ),
           // About Section
           SettingsSection(
-            title: 'About',
+            title: l10n.about,
             icon: Icons.info_outline,
             children: [
               ListTile(
-                title: const Text('Version'),
+                title: Text(l10n.version),
                 subtitle: Text(PackageInfoUtils.version),
 
                 leading: const Icon(Icons.info_outline),
@@ -295,7 +357,7 @@ if (kDebugMode) ...[
                   showAboutDialog(
                     context: context,
                     applicationName: 'TS Music',
-                    applicationVersion: '${PackageInfoUtils.version}',
+                    applicationVersion: PackageInfoUtils.version,
                     applicationIcon: const Icon(Icons.music_note, size: 50),
                     children: const [
                       Text('A beautiful music player app'),
@@ -307,11 +369,14 @@ if (kDebugMode) ...[
               ),
               const Divider(height: 1),
               ListTile(
-                title: const Text('Help & Support'),
+                title: Text(l10n.helpSupport),
                 leading: const Icon(Icons.help_outline),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Show help & support
+                onTap: () async {
+                  final uri = Uri.parse('https://github.com/veciata/TsMusic/issues');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
                 },
               ),
             ],

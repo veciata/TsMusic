@@ -94,7 +94,7 @@ class DatabaseHelper {
         artists: artists,
         tags: tags,
         dateAdded: DateTime.parse(map['created_at'] as String),
-      ));
+      ),);
     }
     return songs;
   }
@@ -103,7 +103,7 @@ class DatabaseHelper {
   Future<bool> isDatabaseEmpty() async {
     final db = await database;
     final count = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM $tableSongs')
+      await db.rawQuery('SELECT COUNT(*) FROM $tableSongs'),
     );
     return count == 0 || count == null;
   }
@@ -514,7 +514,7 @@ class DatabaseHelper {
       INNER JOIN $tableArtistGenre ag ON g.id = ag.genre_id
       WHERE ag.artist_id = ?
       ORDER BY g.name
-    ''', [artistId]);
+    ''', [artistId],);
   }
 
   Future<List<Map<String, dynamic>>> getArtistsForSong(int songId) async {
@@ -524,7 +524,7 @@ class DatabaseHelper {
       INNER JOIN $tableSongArtist sa ON a.id = sa.artist_id
       WHERE sa.song_id = ?
       ORDER BY a.name
-    ''', [songId]);
+    ''', [songId],);
   }
 
   Future<List<Map<String, dynamic>>> getSongsByArtist(int artistId) async {
@@ -534,7 +534,7 @@ class DatabaseHelper {
       INNER JOIN $tableSongArtist sa ON s.id = sa.song_id
       WHERE sa.artist_id = ?
       ORDER BY s.title
-    ''', [artistId]);
+    ''', [artistId],);
   }
 
   Future<List<Map<String, dynamic>>> getSongsByGenre(int genreId) async {
@@ -543,7 +543,7 @@ class DatabaseHelper {
       SELECT s.* FROM $tableSongs s
       JOIN $tableSongGenre sg ON s.$columnId = sg.song_id
       WHERE sg.genre_id = ?
-    ''', [genreId]);
+    ''', [genreId],);
   }
   
   /// Search for songs by title, artist, or album
@@ -561,7 +561,7 @@ class DatabaseHelper {
          OR s.album LIKE ?
          OR a.name LIKE ?
       ORDER BY s.title
-    ''', [searchTerm, searchTerm, searchTerm]);
+    ''', [searchTerm, searchTerm, searchTerm],);
   }
 
   Future<List<Map<String, dynamic>>> getGenresForSong(int songId) async {
@@ -571,7 +571,7 @@ class DatabaseHelper {
       INNER JOIN $tableSongGenre sg ON g.id = sg.genre_id
       WHERE sg.song_id = ?
       ORDER BY g.name
-    ''', [songId]);
+    ''', [songId],);
   }
 
   Future<List<Map<String, dynamic>>> getTagsForSong(int songId) async {
@@ -581,7 +581,7 @@ class DatabaseHelper {
       INNER JOIN $tableSongTags st ON t.id = st.tag_id
       WHERE st.song_id = ?
       ORDER BY t.name
-    ''', [songId]);
+    ''', [songId],);
   }
 
   /// Updates a song's metadata and artist relation using the unique file_path as key
@@ -882,7 +882,7 @@ class DatabaseHelper {
         SELECT COALESCE(MAX(position), 0) as max_position 
         FROM $tablePlaylistSongs 
         WHERE playlist_id = ?
-      ''', [playlistId]);
+      ''', [playlistId],);
       
       int position = (result.first['max_position'] as int?) ?? 0;
       
@@ -933,7 +933,7 @@ class DatabaseHelper {
       INNER JOIN $tablePlaylistSongs ps ON s.$columnId = ps.song_id
       WHERE ps.playlist_id = ?
       ORDER BY ps.position ASC
-    ''', [playlistId]);
+    ''', [playlistId],);
   }
   
   /// Updates the Now Playing playlist with new song IDs

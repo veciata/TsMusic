@@ -64,7 +64,7 @@ class AudioPlayerTask extends BaseAudioHandler {
       bufferedPosition: _player.bufferedPosition,
       speed: _player.speed,
       queueIndex: _player.currentIndex,
-    ));
+    ),);
   }
 
   AudioProcessingState _getProcessingState() {
@@ -87,7 +87,7 @@ class AudioPlayerTask extends BaseAudioHandler {
         title: song.title,
         artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
         artUri: song.albumArtUrl != null ? Uri.parse(song.albumArtUrl!) : null,
-      ));
+      ),);
       onCurrentSongChanged(song);
     }
   }

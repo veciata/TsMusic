@@ -20,7 +20,7 @@ class PlaylistService {
     // Ensure all songs have a dateAdded field
     _playlist = songs.map((song) => song.copyWith(
       dateAdded: song.dateAdded,
-    )).toList();
+    ),).toList();
     _currentIndex = initialIndex ?? (_playlist.isNotEmpty ? 0 : -1);
   }
   

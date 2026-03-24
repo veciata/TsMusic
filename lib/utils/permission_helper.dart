@@ -150,8 +150,7 @@ class PermissionHelper {
   }
 
   /// Show a dialog explaining why the permission is needed
-  static Future<bool> showPermissionRationale(BuildContext context, {String? message}) async {
-    return await showDialog<bool>(
+  static Future<bool> showPermissionRationale(BuildContext context, {String? message}) async => await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
@@ -169,7 +168,6 @@ class PermissionHelper {
         ],
       ),
     ) ?? false;
-  }
 
   /// Get the appropriate storage permission based on Android version
   static Future<Permission> _getStoragePermission() async {

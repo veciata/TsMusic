@@ -126,7 +126,7 @@ class YouTubeService with ChangeNotifier {
       _audioPlayer.stop();
       
       // Try different methods to get the audio stream
-      String? audioUrl = await _getAudioStream(audio.id);
+      final String? audioUrl = await _getAudioStream(audio.id);
       
       if (audioUrl == null) {
         throw Exception('Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.');
@@ -146,7 +146,6 @@ class YouTubeService with ChangeNotifier {
               artUri: audio.thumbnailUrl != null ? Uri.parse(audio.thumbnailUrl!) : null,
             ),
           ),
-          preload: true, // Preload the audio for better performance
         );
 
         // Wait for the audio to be ready
@@ -199,8 +198,7 @@ class YouTubeService with ChangeNotifier {
         );
       }
 
-      final audioStream = manifest.audioOnly.withHighestBitrate() ??
-          manifest.muxed.withHighestBitrate();
+      final audioStream = manifest.audioOnly.withHighestBitrate();
       return audioStream.url.toString();
     } catch (e) {
       debugPrint('Failed to get audio stream: $e');
@@ -230,8 +228,6 @@ class YouTubeService with ChangeNotifier {
     _activeDownloads[videoId] = DownloadProgress(
       videoId: videoId,
       title: title,
-      progress: 0.0,
-      isDownloading: true,
       completer: Completer<void>(),
     );
     _notifyProgressUpdate();
@@ -287,7 +283,7 @@ class YouTubeService with ChangeNotifier {
       final searchResults = await _yt.search.search(query);
       _searchPages[query] = searchResults;
       final videos = searchResults.whereType<Video>().toList();
-      return videos.map((video) => YouTubeAudio.fromVideo(video)).toList();
+      return videos.map(YouTubeAudio.fromVideo).toList();
     } catch (e) {
       debugPrint('Error searching YouTube: $e');
       rethrow;
@@ -302,7 +298,7 @@ class YouTubeService with ChangeNotifier {
       if (next == null) return [];
       _searchPages[query] = next;
       final videos = next.whereType<Video>().toList();
-      return videos.map((video) => YouTubeAudio.fromVideo(video)).toList();
+      return videos.map(YouTubeAudio.fromVideo).toList();
     } catch (e) {
       debugPrint('Error loading next page for "$query": $e');
       rethrow;

@@ -43,17 +43,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(
         title: const Text('Downloads'),
       ),
       body: _buildDownloadsList(),
     );
-  }
 
-  Widget _buildDownloadsList() {
-    return Consumer2<YouTubeService, music_provider.MusicProvider>(
+  Widget _buildDownloadsList() => Consumer2<YouTubeService, music_provider.MusicProvider>(
       builder: (context, youTubeService, musicProvider, _) {
         final activeDownloads = youTubeService.activeDownloads;
         final downloadedSongs = musicProvider.youtubeSongs;
@@ -104,12 +101,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         );
       },
     );
-  }
 
 
 
-  Widget _buildDownloadItem(dynamic download) {
-    return Card(
+  Widget _buildDownloadItem(dynamic download) => Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
         leading: const Icon(Icons.downloading, size: 32),
@@ -182,10 +177,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ),
       ),
     );
-  }
 
-  Widget _buildSongItem(Song song) {
-    return Card(
+  Widget _buildSongItem(Song song) => Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
         leading: song.albumArtUrl?.isNotEmpty == true
@@ -237,7 +230,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         },
       ),
     );
-  }
 
 
 

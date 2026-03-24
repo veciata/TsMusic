@@ -414,8 +414,11 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause() async {
-    if (_audioPlayer.playing) await _audioPlayer.pause();
-    else await _audioPlayer.play();
+    if (_audioPlayer.playing) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.play();
+    }
     await _updateNotification();
     await _updateNowPlayingPlaylist();
     notifyListeners();
@@ -440,16 +443,12 @@ class MusicProvider extends ChangeNotifier {
     return null;
     }
 
-  List<Song> getSongsByArtist(String artistName) {
-    return _playlist.where((song) => song.artists.any((artist) => artist == artistName)).toList();
-  }
+  List<Song> getSongsByArtist(String artistName) => _playlist.where((song) => song.artists.any((artist) => artist == artistName)).toList();
 
-  List<Song> getSongsByAlbum(String albumName, {String? artistName}) {
-    return _playlist.where((song) =>
+  List<Song> getSongsByAlbum(String albumName, {String? artistName}) => _playlist.where((song) =>
       song.album == albumName &&
       (artistName == null || song.artists.any((artist) => artist == artistName))
     ).toList();
-  }
 
   List<String> getAlbumsByArtist(String artistName) {
     final albumSet = <String>{};
@@ -556,27 +555,23 @@ class MusicProvider extends ChangeNotifier {
             dateAdded: songData['created_at'] != null
                 ? DateTime.parse(songData['created_at'] as String)
                 : DateTime.now(),
-          ));
+          ),);
         }
         _displayedSongs = searchedSongs;
       } else {
         // Fallback to in-memory search if no results from database
         final lowerQuery = query.toLowerCase();
-        _displayedSongs = _playlist.where((song) {
-          return song.title.toLowerCase().contains(lowerQuery) ||
+        _displayedSongs = _playlist.where((song) => song.title.toLowerCase().contains(lowerQuery) ||
                  song.artists.any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-                 (song.album?.toLowerCase().contains(lowerQuery) ?? false);
-        }).toList();
+                 (song.album?.toLowerCase().contains(lowerQuery) ?? false)).toList();
       }
     } catch (e) {
       debugPrint('Error searching songs: $e');
       // Fallback to in-memory search on error
       final lowerQuery = query.toLowerCase();
-      _displayedSongs = _playlist.where((song) {
-        return song.title.toLowerCase().contains(lowerQuery) ||
+      _displayedSongs = _playlist.where((song) => song.title.toLowerCase().contains(lowerQuery) ||
                song.artists.any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-               (song.album?.toLowerCase().contains(lowerQuery) ?? false);
-      }).toList();
+               (song.album?.toLowerCase().contains(lowerQuery) ?? false)).toList();
     }
 
     notifyListeners();
@@ -725,8 +720,11 @@ class MusicProvider extends ChangeNotifier {
 
   /// Set audio source for playback
   Future<void> _setAudioSource(Song song) async {
-    if (song.url.startsWith('http')) await _audioPlayer.setUrl(song.url);
-    else await _audioPlayer.setFilePath(song.url);
+    if (song.url.startsWith('http')) {
+      await _audioPlayer.setUrl(song.url);
+    } else {
+      await _audioPlayer.setFilePath(song.url);
+    }
     await _updateNotification();
   }
 
@@ -735,8 +733,11 @@ class MusicProvider extends ChangeNotifier {
     final audioHandler = AudioNotificationService.audioHandler;
     if (audioHandler != null && currentSong != null) {
       await audioHandler.setAudioSource(AudioSource.uri(Uri.parse(currentSong!.url)), song: currentSong);
-      if (_audioPlayer.playing) await audioHandler.play();
-      else await audioHandler.pause();
+      if (_audioPlayer.playing) {
+        await audioHandler.play();
+      } else {
+        await audioHandler.pause();
+      }
     }
   }
 
@@ -882,7 +883,7 @@ class MusicProvider extends ChangeNotifier {
       // First, check for deleted files and clean database
       await _cleanupDeletedSongs();
 
-      bool hasPermission = await _checkStoragePermission();
+      final bool hasPermission = await _checkStoragePermission();
 
       if (!hasPermission) {
         _error = 'Storage permission is required to scan for music.';
@@ -1329,14 +1330,12 @@ class MusicProvider extends ChangeNotifier {
       final fileName = path.basenameWithoutExtension(file.path);
 
       // Clean up filename
-      String cleanFileName(String fileName) {
-        return fileName
+      String cleanFileName(String fileName) => fileName
             .replaceAll(RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false), '')
             .replaceAll(RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps', caseSensitive: false), '')
             .replaceAll(RegExp(r'\b(official|music|video|lyrics|hd|clear|audio)\b', caseSensitive: false), '')
             .replaceAll(RegExp(r'\s{2,}'), ' ')
             .trim();
-      }
 
       final cleanedName = cleanFileName(fileName);
       String title = cleanedName;
@@ -1347,7 +1346,7 @@ class MusicProvider extends ChangeNotifier {
       final match = mainPattern.firstMatch(fileName);
 
       if (match != null) {
-        String mainArtist = match.group(1)?.trim() ?? 'Unknown Artist';
+        final String mainArtist = match.group(1)?.trim() ?? 'Unknown Artist';
         String rawTitle = match.group(2)?.trim() ?? fileName;
 
         artistsList = [mainArtist];
@@ -1398,7 +1397,6 @@ class MusicProvider extends ChangeNotifier {
         title: title.isNotEmpty ? title : path.basenameWithoutExtension(file.path),
         artists: artistsList,
         album: 'Unknown Album',
-        albumArtUrl: null,
         url: file.path,
         duration: duration.inMilliseconds,
         tags: isTSMusic ? ['tsmusic'] : [],
@@ -1423,7 +1421,7 @@ class MusicProvider extends ChangeNotifier {
 
       final fileSize = await file.length();
       if (fileSize < 1024) { // File too small to be valid audio
-        debugPrint('File too small to be valid audio: $filePath (${fileSize} bytes)');
+        debugPrint('File too small to be valid audio: $filePath ($fileSize bytes)');
         return Duration.zero;
       }
 

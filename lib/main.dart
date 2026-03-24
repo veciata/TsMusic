@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:window_manager/window_manager.dart';
@@ -17,6 +18,7 @@ import 'providers/music_provider.dart' as music_provider;
 import 'services/permission_service.dart';
 import 'services/youtube_service.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 import 'utils/package_info_utils.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
@@ -32,7 +34,7 @@ Future<void> main() async {
   runApp(MusicPlayerApp(
     youTubeService: youTubeService,
     hasPermission: hasPermission,
-  ));
+  ),);
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
@@ -105,15 +107,27 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
             ),
           );
 
-          return MaterialApp(
-            title: 'TS Music',
-            debugShowCheckedModeBanner: false,
-            theme: lightTheme.copyWith(textTheme: textTheme),
-            darkTheme: darkTheme.copyWith(textTheme: textTheme),
-            themeMode: themeProvider.themeMode,
-            home: _hasPermission
-                ? const MainNavigationScreen()
-                : WelcomeScreen(onPermissionGranted: _onPermissionGranted),
+          return Consumer<SettingsProvider>(
+            builder: (context, settingsProvider, _) {
+              return MaterialApp(
+                title: 'TS Music',
+                debugShowCheckedModeBanner: false,
+                theme: lightTheme.copyWith(textTheme: textTheme),
+                darkTheme: darkTheme.copyWith(textTheme: textTheme),
+                themeMode: themeProvider.themeMode,
+                locale: settingsProvider.locale,
+                localizationsDelegates: const [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: _hasPermission
+                    ? const MainNavigationScreen()
+                    : WelcomeScreen(onPermissionGranted: _onPermissionGranted),
+              );
+            },
           );
         },
       ),
@@ -188,17 +202,18 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   String _getTitle() {
+    final l10n = AppLocalizations.of(context);
     switch (_selectedIndex) {
       case 0:
-        return 'Home';
+        return l10n.home;
       case 1:
-        return 'Downloads';
+        return l10n.downloads;
       case 2:
-        return 'Settings';
+        return l10n.settings;
       case 3:
-        return 'Sql';
+        return l10n.sql;
       default:
-        return 'TS Music';
+        return l10n.tsMusic;
     }
   }
 
@@ -209,13 +224,12 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(
         title: Text(_getTitle()),
         centerTitle: true,
         actions: [
-          if (_selectedIndex == 0) // Sadece Home ekranında göster
+          if (_selectedIndex == 0)
             IconButton(
               icon: const Icon(Icons.search),
               onPressed: () {
@@ -226,6 +240,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                   ),
                 );
               },
+              tooltip: AppLocalizations.of(context).search,
             ),
         ],
       ),
@@ -239,28 +254,30 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.home),
+            label: AppLocalizations.of(context).home,
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.download),
-            label: 'Downloads',
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.download),
+            label: AppLocalizations.of(context).downloads,
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.settings),
+            label: AppLocalizations.of(context).settings,
           ),
           if (kDebugMode)
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.storage),
-              label: 'Sql',
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.storage),
+              label: AppLocalizations.of(context).sql,
             ),
         ],
       ),
       bottomSheet: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProv, _) {
           final currentSong = musicProv.currentSong;
+          final textStyle = const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16,);
           return GestureDetector(
             onTap: () {
               if (currentSong != null) {
@@ -305,14 +322,15 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          currentSong?.title ?? 'Not Playing',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
+                          currentSong?.title ?? AppLocalizations.of(context).notPlaying,
+                          style: textStyle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          currentSong?.artists.isNotEmpty == true ? currentSong!.artists.join(' & ') : 'Select a song to play',
+                          currentSong?.artists.isNotEmpty == true 
+                              ? currentSong!.artists.join(' & ') 
+                              : AppLocalizations.of(context).selectSongToPlay,
                           style: TextStyle(
                             color:
                                 Theme.of(context).textTheme.bodySmall?.color,
@@ -354,5 +372,4 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         },
       ),
     );
-  }
 }

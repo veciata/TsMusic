@@ -8,8 +8,7 @@ class NowPlayingBottomSheet extends StatelessWidget {
   const NowPlayingBottomSheet({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer<music_provider.MusicProvider>(
+  Widget build(BuildContext context) => Consumer<music_provider.MusicProvider>(
       builder: (context, musicProvider, _) {
         final currentSong = musicProvider.currentSong;
         if (currentSong == null) {
@@ -250,7 +249,6 @@ class NowPlayingBottomSheet extends StatelessWidget {
         );
       },
     );
-  }
 
 
 

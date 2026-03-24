@@ -180,7 +180,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
 
   Widget _buildSearchResults(List<model.Song> localSongs, music_provider.MusicProvider provider,
-      model.Song? currentSong, bool isPlaying) {
+      model.Song? currentSong, bool isPlaying,) {
     if (_searchController.text.isEmpty) {
       return const Center(
         child: Text('Search for songs...'),
@@ -188,11 +188,9 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     final query = _searchController.text.toLowerCase();
-    final filteredLocalSongs = localSongs.where((song) {
-      return song.title.toLowerCase().contains(query) ||
+    final filteredLocalSongs = localSongs.where((song) => song.title.toLowerCase().contains(query) ||
           song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
-          (song.album?.toLowerCase().contains(query) ?? false);
-    }).toList();
+          (song.album?.toLowerCase().contains(query) ?? false)).toList();
 
     final isLoadingYouTube = _isSearchingYouTube && _youtubeResults.isEmpty;
     final hasYouTubeResults = _youtubeResults.isNotEmpty;
@@ -246,7 +244,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 }
               },
             );
-          }).toList(),
+          }),
           const Divider(height: 1),
         ],
         
@@ -264,7 +262,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-          ..._youtubeResults.map((audio) => _buildYouTubeResultItem(audio)).toList(),
+          ..._youtubeResults.map(_buildYouTubeResultItem),
         ] else if (_searchController.text.isNotEmpty && filteredLocalSongs.isEmpty) ...[
           const Center(
             child: Padding(
@@ -456,8 +454,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     ValueListenableBuilder<bool>(
                       valueListenable: _youTubeService.isLoading,
-                      builder: (context, isLoading, child) {
-                        return IconButton(
+                      builder: (context, isLoading, child) => IconButton(
                           icon: isLoading
                               ? const SizedBox(
                                   width: 24,
@@ -489,8 +486,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               await _playAudio(youtubeAudio);
                             }
                           },
-                        );
-                      },
+                        ),
                     ),
                   ],
                 ),

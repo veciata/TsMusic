@@ -18,6 +18,10 @@ A modern, cross-platform music player with local library support and YouTube int
 - Responsive layout for mobile and desktop
 - Internationalization support
 
+## Screenshots
+
+![TS Music Screenshot](screenshot.png)
+
 ## Getting Started
 
 ### Prerequisites

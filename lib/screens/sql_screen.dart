@@ -60,7 +60,7 @@ class _SqlScreenState extends State<SqlScreen> {
             JOIN ${DatabaseHelper.tablePlaylistSongs} ps ON s.id = ps.song_id
             WHERE ps.playlist_id = ?
             ORDER BY ps.position
-          ''', [playlistId]);
+          ''', [playlistId],);
           playlistSongs[playlistId] = songs;
         } catch (e) {
           debugPrint('Error fetching songs for playlist $playlistId: $e');
@@ -93,8 +93,7 @@ class _SqlScreenState extends State<SqlScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(
         title: const Text('SQL Explorer'),
         actions: [
@@ -189,10 +188,8 @@ class _SqlScreenState extends State<SqlScreen> {
         },
       ),
     );
-  }
 
-  Widget _buildPlaylistsTab(BuildContext context, _DbOverview data) {
-    return ListView.builder(
+  Widget _buildPlaylistsTab(BuildContext context, _DbOverview data) => ListView.builder(
       padding: const EdgeInsets.all(8.0),
       itemCount: data.playlists.length,
       itemBuilder: (context, index) {
@@ -249,7 +246,6 @@ class _SqlScreenState extends State<SqlScreen> {
         );
       },
     );
-  }
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -264,8 +260,7 @@ class _SqlScreenState extends State<SqlScreen> {
     }
   }
 
-  Widget _buildSchemaTab(BuildContext context, _DbOverview data) {
-    return ListView(
+  Widget _buildSchemaTab(BuildContext context, _DbOverview data) => ListView(
       padding: const EdgeInsets.all(8.0),
       children: [
         const Text('Tables', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -276,7 +271,6 @@ class _SqlScreenState extends State<SqlScreen> {
         )).toList(),
       ],
     );
-  }
 }
 
 class _TablesTab extends StatelessWidget {
@@ -285,8 +279,7 @@ class _TablesTab extends StatelessWidget {
   const _TablesTab({required this.tableNames, required this.counts});
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
+  Widget build(BuildContext context) => ListView.separated(
       itemCount: tableNames.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
@@ -320,7 +313,6 @@ class _TablesTab extends StatelessWidget {
         );
       },
     );
-  }
 }
 
 class _RowsScreen extends StatelessWidget {
@@ -351,7 +343,7 @@ class _RowsScreen extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 3,
                               ),
-                            )),
+                            ),),
                         ],
                       ),
                     )
@@ -374,8 +366,7 @@ class _SimpleListTab extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
+  Widget build(BuildContext context) => ListView.separated(
       itemCount: rows.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
@@ -391,7 +382,6 @@ class _SimpleListTab extends StatelessWidget {
         );
       },
     );
-  }
 }
 
 class _DbOverview {

@@ -152,8 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$minutes:$seconds';
   }
 
-  Widget _buildNoMusicFound() {
-    return Center(
+  Widget _buildNoMusicFound() => Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -179,7 +178,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -214,10 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {
-                  // Reload from database only
-                  musicProvider.loadFromDatabaseOnly();
-                },
+                onPressed: musicProvider.loadFromDatabaseOnly,
                 child: const Text('Try Again'),
               ),
             ],
@@ -253,13 +248,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: const Icon(Icons.music_note),
                       ),
                       title: Text(song.title.isNotEmpty ? song.title : 'Unknown Title',
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,),
                       subtitle: Text(
                         _getArtistsText(song.artists),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7)),
+                            color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),),
                       ),
                       trailing: Text(_formatDuration(song.duration)),
                       onTap: () => musicProvider.playSong(song),

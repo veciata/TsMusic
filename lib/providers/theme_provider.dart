@@ -108,19 +108,14 @@ class ThemeProvider with ChangeNotifier {
       primary: _primaryColor,
       primaryContainer: _primaryColor.withOpacity(0.8),
       secondary: _primaryColor.withOpacity(0.6),
-      surface: Colors.white,
-      background: Colors.grey[50]!,
-      onPrimary: Colors.white,
       onSurface: Colors.black87,
-      brightness: Brightness.light,
     );
 
     return baseTheme.copyWith(
       colorScheme: colorScheme,
-      useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: _primaryColor,
-      scaffoldBackgroundColor: colorScheme.background,
+      scaffoldBackgroundColor: colorScheme.surface,
       cardColor: colorScheme.surface,
       dividerColor: Colors.grey[300],
       
@@ -167,18 +162,14 @@ class ThemeProvider with ChangeNotifier {
       primaryContainer: _primaryColor.withOpacity(0.8),
       secondary: _primaryColor.withOpacity(0.6),
       surface: Colors.grey[850]!,
-      background: Colors.grey[900]!,
       onPrimary: Colors.white,
-      onSurface: Colors.white,
-      brightness: Brightness.dark,
     );
 
     return baseTheme.copyWith(
       colorScheme: colorScheme,
-      useMaterial3: true,
       brightness: Brightness.dark,
       primaryColor: _primaryColor,
-      scaffoldBackgroundColor: colorScheme.background,
+      scaffoldBackgroundColor: colorScheme.surface,
       cardColor: colorScheme.surface,
       dividerColor: Colors.grey[700],
       
