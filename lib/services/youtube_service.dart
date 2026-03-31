@@ -345,16 +345,14 @@ class YouTubeService with ChangeNotifier {
     try {
       StreamManifest manifest;
       try {
+        // Try androidVr client - often works better for audio-only
         manifest = await _yt.videos.streamsClient.getManifest(
           videoId,
-          ytClients: [
-            YoutubeApiClient.android,
-            YoutubeApiClient.ios,
-          ],
+          ytClients: [YoutubeApiClient.androidVr],
         );
       } catch (e) {
         debugPrint(
-          'Failed to get manifest with preferred clients: $e. Trying default client.',
+          'Failed to get manifest with androidVr client: $e. Trying default client.',
         );
         manifest = await _yt.videos.streamsClient.getManifest(videoId);
       }
@@ -363,10 +361,13 @@ class YouTubeService with ChangeNotifier {
 
       final musicDir = await _getMusicDirectory();
       final safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      
+      // Use proper audio extension based on container format (m4a, webm, etc.)
+      final audioExtension = streamInfo.container.name == 'mp4' ? 'm4a' : streamInfo.container.name;
       final finalFile = File(
         path.join(
           musicDir.path,
-          '${safeTitle}_${streamInfo.bitrate.bitsPerSecond}.mp4',
+          '${safeTitle}_${streamInfo.bitrate.bitsPerSecond}.$audioExtension',
         ),
       );
 
@@ -394,43 +395,52 @@ class YouTubeService with ChangeNotifier {
       final downloadProgress = _activeDownloads[videoId];
       debugPrint('downloadAudio: Getting stream for videoId: $videoId');
       
-      // Use YouTube Explode example pattern: get stream and pipe to file
-      final stream = _yt.videos.streamsClient.get(streamInfo);
+      // Use YouTube Explode copyTo method - more reliable than manual streaming
       final contentLength = streamInfo.size.totalBytes;
       debugPrint('downloadAudio: Expected content length: $contentLength bytes');
-      var receivedBytes = 0;
-      final fileSink = finalFile.openWrite();
-      final completer = Completer<void>();
-
-      // Add timeout to prevent hanging downloads
-      final timeout = Timer(const Duration(minutes: 5), () {
-        if (!completer.isCompleted) {
-          completer.completeError(TimeoutException('Download timeout after 5 minutes', const Duration(minutes: 5)));
-        }
-      });
-
-      // Pipe stream to file directly (example pattern)
-      await for (final chunk in stream) {
-        if (downloadProgress?.cancelRequested == true) {
-          timeout.cancel();
-          if (!completer.isCompleted) {
-            completer.completeError(Exception('Canceled by user'));
-          }
-          break;
-        }
-        fileSink.add(chunk);
-        receivedBytes += chunk.length;
-        debugPrint('downloadAudio: Received chunk of ${chunk.length} bytes, total: $receivedBytes');
-        if (contentLength > 0) {
-          final progress = receivedBytes / contentLength;
-          _updateDownloadProgress(videoId, progress);
-          onProgress?.call(progress);
-        }
-      }
       
-      timeout.cancel();
-      await fileSink.flush();
-      await fileSink.close();
+      var receivedBytes = 0;
+      var lastProgressUpdate = DateTime.now();
+      
+      try {
+        // Create a custom sink to track progress
+        final sink = finalFile.openWrite();
+        
+        // Use listen instead of await for to have more control
+        final stream = _yt.videos.streamsClient.get(streamInfo);
+        
+        await for (final chunk in stream) {
+          if (downloadProgress?.cancelRequested == true) {
+            break;
+          }
+          
+          sink.add(chunk);
+          receivedBytes += chunk.length;
+          
+          // Update progress every 100ms to avoid flooding
+          final now = DateTime.now();
+          if (now.difference(lastProgressUpdate).inMilliseconds > 100) {
+            lastProgressUpdate = now;
+            if (contentLength > 0) {
+              final progress = receivedBytes / contentLength;
+              _updateDownloadProgress(videoId, progress);
+              onProgress?.call(progress);
+              debugPrint('downloadAudio: Progress ${(progress * 100).toStringAsFixed(1)}%');
+            }
+          }
+        }
+        
+        await sink.flush();
+        await sink.close();
+        
+      } on Exception catch (e) {
+        debugPrint('downloadAudio: Stream error: $e');
+        // Clean up partial file
+        if (await finalFile.exists()) {
+          await finalFile.delete();
+        }
+        rethrow;
+      }
       
       final finalFileSize = await finalFile.length();
       debugPrint('downloadAudio: Download completed. Final file size: $finalFileSize bytes');

@@ -177,6 +177,62 @@ class PermissionHelper {
     return Permission.storage;
   }
 
+  /// Request file management permission for Android 11+ (API 30+)
+  static Future<bool> requestFileManagementPermission() async {
+    try {
+      if (!await _isAndroid()) return true;
+      
+      final sdkInt = await _getSdkInt();
+      
+      // On Android 11+ (API 30+), request manage external storage
+      if (sdkInt >= 30) {
+        var status = await Permission.manageExternalStorage.status;
+        if (status.isDenied) {
+          status = await Permission.manageExternalStorage.request();
+        }
+        return status.isGranted;
+      }
+      
+      // On older versions, storage permission covers file operations
+      return true;
+    } catch (e) {
+      debugPrint('Error requesting file management permission: $e');
+      return false;
+    }
+  }
+
+  /// Check if file management permission is granted
+  static Future<bool> hasFileManagementPermission() async {
+    try {
+      if (!await _isAndroid()) return true;
+      
+      final sdkInt = await _getSdkInt();
+      
+      // On Android 11+ (API 30+), check manage external storage
+      if (sdkInt >= 30) {
+        final status = await Permission.manageExternalStorage.status;
+        return status.isGranted;
+      }
+      
+      // On older versions, storage permission covers file operations
+      return true;
+    } catch (e) {
+      debugPrint('Error checking file management permission: $e');
+      return false;
+    }
+  }
+
+  static Future<int> _getSdkInt() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.version.sdkInt;
+    } catch (e) {
+      debugPrint('Error getting SDK version: $e');
+      return 0;
+    }
+  }
+
   /// Check if we need to request storage permission
   static Future<bool> _shouldRequestPermission() async {
     if (!await _isAndroid()) {
