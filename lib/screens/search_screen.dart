@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
+import '../providers/settings_provider.dart';
 import '../models/song.dart' as model;
 import '../services/youtube_service.dart';
 
@@ -107,8 +108,11 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
+      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
       final result = await _youTubeService.downloadAudio(
         videoId: audio.id,
+        preferredFormat: settingsProvider.audioFormat,
+        downloadLocation: settingsProvider.downloadLocation,
       );
       if (result != null && mounted) {
         // Immediately add the song to the provider to update the UI

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_provider.dart' as music_provider;
+import '../providers/settings_provider.dart';
 import '../services/youtube_service.dart';
 import '../models/song.dart';
 import 'downloads_screen.dart';
@@ -159,8 +160,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     }
 
     try {
+      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
       final result = await _youTubeService.downloadAudio(
         videoId: audio.id,
+        preferredFormat: settingsProvider.audioFormat,
+        downloadLocation: settingsProvider.downloadLocation,
       );
       if (result != null && mounted) {
         await Provider.of<music_provider.MusicProvider>(context, listen: false)

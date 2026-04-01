@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path/path.dart' as path;
 import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
 
 class DownloadResult {
@@ -315,11 +316,8 @@ class YouTubeService with ChangeNotifier {
       if (streams.isNotEmpty) {
         return streams.withHighestBitrate().url.toString();
       }
-      // Fallback for streams that are not audio-only
-      final muxedStreams = manifest.muxed;
-      if (muxedStreams.isNotEmpty) {
-        return muxedStreams.withHighestBitrate().url.toString();
-      }
+      // Audio-only streams required - no video fallback
+      debugPrint('getAudioStreamUrl: No audio-only streams available for videoId: $videoId');
       return null;
     } catch (e) {
       debugPrint('Error getting audio stream URL: $e');
@@ -330,6 +328,8 @@ class YouTubeService with ChangeNotifier {
   Future<DownloadResult?> downloadAudio({
     required String videoId,
     void Function(double)? onProgress,
+    AudioFormat preferredFormat = AudioFormat.auto,
+    String downloadLocation = 'internal',
   }) async {
     if (_activeDownloads.containsKey(videoId)) {
       debugPrint(
@@ -357,17 +357,49 @@ class YouTubeService with ChangeNotifier {
         manifest = await _yt.videos.streamsClient.getManifest(videoId);
       }
 
-      final streamInfo = manifest.audioOnly.first;
+      // Select stream based on preferred format
+      StreamInfo streamInfo;
+      final audioStreams = manifest.audioOnly.toList();
+      
+      if (preferredFormat == AudioFormat.auto || preferredFormat == AudioFormat.all) {
+        // Auto: pick highest bitrate
+        streamInfo = audioStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+      } else {
+        // Filter by container type
+        final preferredContainer = preferredFormat.name; // m4a, opus, mp3
+        final matchingStreams = audioStreams.where((s) => 
+          s.container.name.toLowerCase() == preferredContainer ||
+          (preferredFormat == AudioFormat.m4a && s.container.name == 'mp4') ||
+          (preferredFormat == AudioFormat.opus && s.container.name == 'webm')
+        ).toList();
+        
+        if (matchingStreams.isNotEmpty) {
+          streamInfo = matchingStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint('downloadAudio: Selected ${streamInfo.container.name} format as requested');
+        } else {
+          // Fallback to best available
+          streamInfo = audioStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint('downloadAudio: Preferred format $preferredContainer not available, using ${streamInfo.container.name}');
+        }
+      }
 
-      final musicDir = await _getMusicDirectory();
+      final musicDir = await _getMusicDirectory(downloadLocation);
       final safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       
-      // Use proper audio extension based on container format (m4a, webm, etc.)
-      final audioExtension = streamInfo.container.name == 'mp4' ? 'm4a' : streamInfo.container.name;
+      // Use proper audio extension based on container format
+      String audioExtension;
+      if (streamInfo.container.name == 'mp4') {
+        audioExtension = 'm4a';
+      } else if (streamInfo.container.name == 'webm') {
+        audioExtension = 'webm';
+      } else {
+        audioExtension = streamInfo.container.name;
+      }
+      
       final finalFile = File(
         path.join(
           musicDir.path,
-          '${safeTitle}_${streamInfo.bitrate.bitsPerSecond}.$audioExtension',
+          '${safeTitle}_${videoId}_${streamInfo.bitrate.bitsPerSecond}.$audioExtension',
         ),
       );
 
@@ -480,31 +512,40 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  Future<Directory> _getMusicDirectory() async {
+  Future<Directory> _getMusicDirectory(String downloadLocation) async {
     if (kIsWeb) {
       throw UnsupportedError('Downloads are not supported on Web.');
     }
 
-    if (Platform.isAndroid || Platform.isIOS) {
-      // Store downloads inside the app's documents directory so they remain sandboxed
-      final appDocDir = await getApplicationDocumentsDirectory();
-      final musicDir = Directory(path.join(appDocDir.path, 'tsmusic'));
-      if (!await musicDir.exists()) {
-        await musicDir.create(recursive: true);
+    Directory? baseDir;
+    
+    if (Platform.isAndroid) {
+      if (downloadLocation == 'downloads') {
+        // Use public Downloads folder
+        baseDir = Directory('/storage/emulated/0/Download');
+      } else if (downloadLocation == 'music') {
+        // Use public Music folder
+        baseDir = Directory('/storage/emulated/0/Music');
+      } else {
+        // internal - use app documents directory
+        baseDir = await getApplicationDocumentsDirectory();
       }
-      return musicDir;
+    } else if (Platform.isIOS) {
+      // iOS only supports internal app storage
+      baseDir = await getApplicationDocumentsDirectory();
     } else {
-      // For desktop platforms, use the downloads directory
-      final downloadsDir = await getDownloadsDirectory();
-      if (downloadsDir == null) {
+      // Desktop platforms
+      baseDir = await getDownloadsDirectory();
+      if (baseDir == null) {
         throw Exception('Could not get downloads directory.');
       }
-      final musicDir = Directory(path.join(downloadsDir.path, 'tsmusic'));
-      if (!await musicDir.exists()) {
-        await musicDir.create(recursive: true);
-      }
-      return musicDir;
     }
+
+    final musicDir = Directory(path.join(baseDir.path, 'tsmusic'));
+    if (!await musicDir.exists()) {
+      await musicDir.create(recursive: true);
+    }
+    return musicDir;
   }
 
 

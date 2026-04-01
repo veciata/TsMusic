@@ -141,6 +141,56 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   );
 }
 
+void _showDownloadLocationDialog(BuildContext context, SettingsProvider settingsProvider) {
+  final l10n = AppLocalizations.of(context);
+  final locations = ['internal', 'downloads', 'music'];
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Select Download Location'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: locations.map((location) {
+            final isSelected = location == settingsProvider.downloadLocation;
+            return ListTile(
+              title: Text(
+                settingsProvider.getDownloadLocationName(location),
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                ),
+              ),
+              leading: Radio<String>(
+                value: location,
+                groupValue: settingsProvider.downloadLocation,
+                onChanged: (String? newLocation) {
+                  if (newLocation != null) {
+                    settingsProvider.setDownloadLocation(newLocation);
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              onTap: () {
+                settingsProvider.setDownloadLocation(location);
+                Navigator.of(context).pop();
+              },
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    ),
+  );
+}
+
 void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
@@ -339,6 +389,20 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 onTap: () {
                   _showAudioFormatDialog(context, settingsProvider);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                title: const Text('Download Location'),
+                leading: const Icon(Icons.folder),
+                trailing: Text(
+                  settingsProvider.getDownloadLocationName(settingsProvider.downloadLocation),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                onTap: () {
+                  _showDownloadLocationDialog(context, settingsProvider);
                 },
               ),
             ],

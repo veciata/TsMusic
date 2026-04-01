@@ -718,6 +718,12 @@ class MusicProvider extends ChangeNotifier {
     }
   }
 
+  /// Public method to add a song to playlist (used by DownloadsScreen)
+  void addSongToPlaylist(Song song) {
+    _addSongIfNotExists(song);
+    notifyListeners();
+  }
+
   /// Set audio source for playback
   Future<void> _setAudioSource(Song song) async {
     if (song.url.startsWith('http')) {

@@ -5,12 +5,15 @@ import '../models/audio_format.dart';
 class SettingsProvider with ChangeNotifier {
   static const String _audioFormatKey = 'audioFormat';
   static const String _languageKey = 'language';
+  static const String _downloadLocationKey = 'downloadLocation';
 
   AudioFormat _audioFormat = AudioFormat.auto;
   Locale _locale = const Locale('en', 'US');
+  String _downloadLocation = 'internal';
 
   AudioFormat get audioFormat => _audioFormat;
   Locale get locale => _locale;
+  String get downloadLocation => _downloadLocation;
 
   SettingsProvider() {
     _loadSettings();
@@ -66,6 +69,26 @@ class SettingsProvider with ChangeNotifier {
       return 'Auto (App decides)';
     }
     return 'Unknown Format';
+  }
+
+  Future<void> setDownloadLocation(String location) async {
+    if (_downloadLocation != location) {
+      _downloadLocation = location;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_downloadLocationKey, location);
+      notifyListeners();
+    }
+  }
+
+  String getDownloadLocationName(String location) {
+    if (location == 'internal') {
+      return 'Internal Storage (App folder)';
+    } else if (location == 'downloads') {
+      return 'Downloads folder';
+    } else if (location == 'music') {
+      return 'Music folder';
+    }
+    return 'Unknown Location';
   }
 
   String getLanguageName(Locale locale) {
