@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +26,9 @@ final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize MediaKit for audio playback
+  MediaKit.ensureInitialized();
   await PackageInfoUtils.init();
 
   final youTubeService = YouTubeService();

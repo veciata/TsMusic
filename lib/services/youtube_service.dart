@@ -5,8 +5,7 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb, ChangeNotifier
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as path;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/audio_format.dart';
@@ -86,7 +85,7 @@ class DownloadProgress {
 class YouTubeService with ChangeNotifier {
   final YoutubeExplode _yt;
   final http.Client _httpClient;
-  final AudioPlayer _audioPlayer;
+  final Player _player;
 
   final Map<String, DownloadProgress> _activeDownloads = {};
   YouTubeAudio? _currentAudio;
@@ -97,22 +96,20 @@ class YouTubeService with ChangeNotifier {
   // Getters
   List<DownloadProgress> get activeDownloads => _activeDownloads.values.toList();
   YouTubeAudio? get currentAudio => _currentAudio;
-  bool get isPlaying => _audioPlayer.playing;
+  bool get isPlaying => _player.state.playing;
 
   // Public constructor
-  YouTubeService({YoutubeExplode? yt, http.Client? httpClient, AudioPlayer? audioPlayer})
+  YouTubeService({YoutubeExplode? yt, http.Client? httpClient, Player? player})
       : _yt = yt ?? YoutubeExplode(),
         _httpClient = httpClient ?? http.Client(),
-        _audioPlayer = audioPlayer ?? AudioPlayer() {
+        _player = player ?? Player() {
     _init();
   }
 
   void _init() {
     // Initialize audio player
-    _audioPlayer.playbackEventStream.listen((event) {
-
+    _player.stream.playing.listen((playing) {
       notifyListeners();
-
     });
   }
 
@@ -124,7 +121,7 @@ class YouTubeService with ChangeNotifier {
       notifyListeners();
 
       // Clear any previous errors
-      _audioPlayer.stop();
+      await _player.stop();
       
       // Try different methods to get the audio stream
       final String? audioUrl = await _getAudioStream(audio.id);
@@ -137,23 +134,8 @@ class YouTubeService with ChangeNotifier {
       
       // Set audio source with better error handling
       try {
-        await _audioPlayer.setAudioSource(
-          AudioSource.uri(
-            Uri.parse(audioUrl),
-            tag: MediaItem(
-              id: audio.id,
-              title: audio.title,
-              artist: audio.author,
-              artUri: audio.thumbnailUrl != null ? Uri.parse(audio.thumbnailUrl!) : null,
-            ),
-          ),
-        );
-
-        // Wait for the audio to be ready
-        await _audioPlayer.load();
-        
-        // Start playing
-        _audioPlayer.play();
+        await _player.open(Media(audioUrl));
+        await _player.play();
 
         
         debugPrint('Audio playback started successfully');
@@ -209,13 +191,13 @@ class YouTubeService with ChangeNotifier {
   
   // Pause audio
   Future<void> pause() async {
-    await _audioPlayer.pause();
+    await _player.pause();
     notifyListeners();
   }
   
   // Stop audio
   Future<void> stop() async {
-    await _audioPlayer.stop();
+    await _player.stop();
     _currentAudio = null;
     notifyListeners();
   }
@@ -358,15 +340,24 @@ class YouTubeService with ChangeNotifier {
       }
 
       // Select stream based on preferred format
+      // Prefer m4a (mp4) format for best compatibility with audio players
       StreamInfo streamInfo;
       final audioStreams = manifest.audioOnly.toList();
       
-      if (preferredFormat == AudioFormat.auto || preferredFormat == AudioFormat.all) {
-        // Auto: pick highest bitrate
+      // Try to find m4a/mp4 stream first (best compatibility)
+      final m4aStreams = audioStreams.where((s) => s.container.name == 'mp4').toList();
+      
+      if (m4aStreams.isNotEmpty) {
+        // Use highest bitrate m4a stream
+        streamInfo = m4aStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+        debugPrint('downloadAudio: Selected m4a format for best compatibility');
+      } else if (preferredFormat == AudioFormat.auto || preferredFormat == AudioFormat.all) {
+        // Auto: pick highest bitrate from available
         streamInfo = audioStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+        debugPrint('downloadAudio: No m4a available, using ${streamInfo.container.name}');
       } else {
-        // Filter by container type
-        final preferredContainer = preferredFormat.name; // m4a, opus, mp3
+        // Filter by container type as requested
+        final preferredContainer = preferredFormat.name;
         final matchingStreams = audioStreams.where((s) => 
           s.container.name.toLowerCase() == preferredContainer ||
           (preferredFormat == AudioFormat.m4a && s.container.name == 'mp4') ||
@@ -582,7 +573,7 @@ class YouTubeService with ChangeNotifier {
       download.completer?.completeError('Service disposed');
     }
     _activeDownloads.clear();
-    _audioPlayer.dispose();
+    _player.dispose();
     _httpClient.close(); // Close the http client
     isLoading.dispose();
     super.dispose();

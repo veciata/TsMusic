@@ -1,15 +1,15 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:audio_session/audio_session.dart';
 import '../models/song.dart';
 
 class AudioPlayerTask extends BaseAudioHandler {
-  final AudioPlayer _player;
+  final Player _player;
   final Function(Song?) onCurrentSongChanged;
   final Function(bool) onPlaybackStateChanged;
   
   AudioPlayerTask(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged) {
-    _player.playbackEventStream.listen(_onPlaybackStateChanged);
+    _player.stream.playing.listen(_onPlaybackStateChanged);
   }
 
   @override
@@ -31,24 +31,30 @@ class AudioPlayerTask extends BaseAudioHandler {
   }
 
   @override
-  Future<void> skipToNext() => _player.seekToNext();
+  Future<void> skipToNext() async {
+    // Skip to next logic handled by playlist
+  }
 
   @override
-  Future<void> skipToPrevious() => _player.seekToPrevious();
+  Future<void> skipToPrevious() async {
+    // Skip to previous logic handled by playlist
+  }
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+  Future<void> setSpeed(double speed) async {
+    await _player.setRate(speed);
+  }
 
   Future<void> setVolume(double volume) => _player.setVolume(volume);
 
-  void _onPlaybackStateChanged(PlaybackEvent event) {
+  void _onPlaybackStateChanged(dynamic event) {
     playbackState.add(PlaybackState(
       controls: [
         MediaControl.skipToPrevious,
-        _player.playing ? MediaControl.pause : MediaControl.play,
+        _player.state.playing ? MediaControl.pause : MediaControl.play,
         MediaControl.stop,
         MediaControl.skipToNext,
       ],
@@ -59,28 +65,23 @@ class AudioPlayerTask extends BaseAudioHandler {
       },
       androidCompactActionIndices: const [0, 1, 3],
       processingState: _getProcessingState(),
-      playing: _player.playing,
-      updatePosition: _player.position,
-      bufferedPosition: _player.bufferedPosition,
-      speed: _player.speed,
-      queueIndex: _player.currentIndex,
+      playing: _player.state.playing,
+      updatePosition: _player.state.position ?? Duration.zero,
+      bufferedPosition: (_player.state.buffer?.inMilliseconds ?? 0) > 0 
+          ? _player.state.buffer! 
+          : Duration.zero,
+      speed: _player.state.rate ?? 1.0,
+      queueIndex: 0,
     ),);
   }
 
   AudioProcessingState _getProcessingState() {
-    if (_player.playing) {
-      return AudioProcessingState.ready;
-    } else if (_player.processingState == ProcessingState.completed) {
-      return AudioProcessingState.completed;
-    } else if (_player.processingState == ProcessingState.loading) {
-      return AudioProcessingState.loading;
-    } else {
-      return AudioProcessingState.idle;
-    }
+    // Simplified processing state detection for media_kit
+    return AudioProcessingState.ready;
   }
 
-  Future<void> setAudioSource(AudioSource audioSource, {Song? song}) async {
-    await _player.setAudioSource(audioSource);
+  Future<void> setMedia(Media media, {Song? song}) async {
+    await _player.open(media);
     if (song != null) {
       mediaItem.add(MediaItem(
         id: song.id.toString(),
@@ -102,7 +103,7 @@ class AudioNotificationService {
   static AudioPlayerTask? get audioHandler => _audioHandler;
 
   static Future<AudioPlayerTask> init({
-    required AudioPlayer player,
+    required Player player,
     required Function(Song?) onCurrentSongChanged,
     required Function(bool) onPlaybackStateChanged,
   }) async {

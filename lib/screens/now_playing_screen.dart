@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import '../providers/music_provider.dart';
 import 'artist_detail_screen.dart';
 
@@ -397,11 +397,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
                   // Repeat
                   _buildControlButton(
-                    icon: musicProvider.loopMode == LoopMode.one
+                    icon: musicProvider.loopMode == PlaylistMode.single
                         ? Icons.repeat_one
                         : Icons.repeat,
                     onPressed: musicProvider.cycleRepeatMode,
-                    color: musicProvider.loopMode != LoopMode.off
+                    color: musicProvider.loopMode != PlaylistMode.none
                         ? theme.colorScheme.primary 
                         : theme.colorScheme.onSurface.withOpacity(0.7),
                   ),

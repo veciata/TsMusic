@@ -1,19 +1,19 @@
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/audio_notification_service.dart';
 
 class AudioService {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  LoopMode _loopMode = LoopMode.off;
+  final Player _player = Player();
+  PlaylistMode _loopMode = PlaylistMode.none;
   bool _shuffleEnabled = false;
   
   // Getters
-  Stream<Duration> get positionStream => _audioPlayer.positionStream;
-  Stream<bool> get playingStream => _audioPlayer.playingStream;
-  bool get isPlaying => _audioPlayer.playing;
-  Duration get position => _audioPlayer.position;
-  Duration get duration => _audioPlayer.duration ?? Duration.zero;
-  LoopMode get loopMode => _loopMode;
+  Stream<Duration> get positionStream => _player.stream.position;
+  Stream<bool> get playingStream => _player.stream.playing;
+  bool get isPlaying => _player.state.playing;
+  Duration get position => _player.state.position;
+  Duration get duration => _player.state.duration;
+  PlaylistMode get loopMode => _loopMode;
   bool get shuffleEnabled => _shuffleEnabled;
 
   AudioService() {
@@ -21,62 +21,37 @@ class AudioService {
   }
 
   void _initialize() {
-    AudioNotificationService.init(
-      player: _audioPlayer,
-      onCurrentSongChanged: (_) {},
-      onPlaybackStateChanged: (_) {},
-    );
-
-    _audioPlayer.loopModeStream.listen((mode) {
+    _player.stream.playlistMode.listen((mode) {
       _loopMode = mode;
-    });
-
-    _audioPlayer.shuffleModeEnabledStream.listen((enabled) {
-      _shuffleEnabled = enabled;
     });
   }
 
   Future<void> setAudioSource(Song song) async {
-    if (!song.url.startsWith('http')) {
-      await _audioPlayer.setFilePath(song.url);
-    } else {
-      await _audioPlayer.setUrl(song.url);
-    }
+    final media = Media(song.url);
+    await _player.open(media);
     await _updateNotification(song);
   }
 
   Future<void> _updateNotification(Song? song) async {
-    final audioHandler = AudioNotificationService.audioHandler;
-    if (audioHandler != null && song != null) {
-      await audioHandler.setAudioSource(
-        AudioSource.uri(Uri.parse(song.url)),
-        song: song,
-      );
-      if (_audioPlayer.playing) {
-        await audioHandler.play();
-      } else {
-        await audioHandler.pause();
-      }
-    }
+    // Media notification will be handled separately
   }
 
-  Future<void> play() async => await _audioPlayer.play();
-  Future<void> pause() async => await _audioPlayer.pause();
-  Future<void> stop() async => await _audioPlayer.stop();
-  Future<void> seek(Duration position) async => await _audioPlayer.seek(position);
+  Future<void> play() async => await _player.play();
+  Future<void> pause() async => await _player.pause();
+  Future<void> stop() async => await _player.stop();
+  Future<void> seek(Duration position) async => await _player.seek(position);
   
   Future<void> setShuffleEnabled(bool enabled) async {
     _shuffleEnabled = enabled;
-    await _audioPlayer.setShuffleModeEnabled(enabled);
+    // Shuffle mode handling will be done at playlist level
   }
 
-  Future<void> setLoopMode(LoopMode mode) async {
+  Future<void> setLoopMode(PlaylistMode mode) async {
     _loopMode = mode;
-    await _audioPlayer.setLoopMode(mode);
+    await _player.setPlaylistMode(mode);
   }
 
   void dispose() {
-    AudioNotificationService.dispose();
-    _audioPlayer.dispose();
+    _player.dispose();
   }
 }

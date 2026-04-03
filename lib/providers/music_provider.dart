@@ -5,7 +5,7 @@ import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -19,7 +19,7 @@ import '../database/database_helper.dart';
 /// Main music provider class for managing music playback and library
 class MusicProvider extends ChangeNotifier {
   // ===== CORE DEPENDENCIES =====
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final Player _player = Player();
 
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
@@ -42,7 +42,7 @@ class MusicProvider extends ChangeNotifier {
   final bool _isEnriching = false;
   final int _enrichedCount = 0;
   bool _shuffleEnabled = false;
-  LoopMode _loopMode = LoopMode.off;
+  PlaylistMode _loopMode = PlaylistMode.none;
 
   // Auto-retry tracking
   int _retryCount = 0;
@@ -62,12 +62,12 @@ class MusicProvider extends ChangeNotifier {
   bool get isEnriching => _isEnriching;
   int get enrichedCount => _enrichedCount;
   bool get shuffleEnabled => _shuffleEnabled;
-  LoopMode get loopMode => _loopMode;
-  Stream<Duration> get positionStream => _audioPlayer.positionStream;
-  Stream<bool> get playingStream => _audioPlayer.playingStream;
-  bool get isPlaying => _audioPlayer.playing;
-  Duration get position => _audioPlayer.position;
-  Duration get duration => _audioPlayer.duration ?? Duration.zero;
+  PlaylistMode get loopMode => _loopMode;
+  Stream<Duration> get positionStream => _player.stream.position;
+  Stream<bool> get playingStream => _player.stream.playing;
+  bool get isPlaying => _player.state.playing;
+  Duration get position => _player.state.position;
+  Duration get duration => _player.state.duration;
   Song? get currentSong => _playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length
       ? _playlist[_currentIndex]
       : null;
@@ -110,37 +110,26 @@ class MusicProvider extends ChangeNotifier {
 
   // ===== INITIALIZATION =====
   MusicProvider() {
-
-    AudioNotificationService.init(
-      player: _audioPlayer,
-      onCurrentSongChanged: (_) => notifyListeners(),
-      onPlaybackStateChanged: (_) => notifyListeners(),
-    );
-
-    _audioPlayer.loopModeStream.listen((mode) {
+    // Listen to playlist mode changes
+    _player.stream.playlistMode.listen((mode) {
       _loopMode = mode;
       notifyListeners();
     });
 
-    _audioPlayer.shuffleModeEnabledStream.listen((enabled) {
-      _shuffleEnabled = enabled;
-      notifyListeners();
-    });
-
-    _audioPlayer.playerStateStream.listen((state) async {
-      if (state.processingState == ProcessingState.completed) {
-        if (_loopMode == LoopMode.one) {
-          await _audioPlayer.seek(Duration.zero);
-          await _audioPlayer.play();
-        } else if (_loopMode == LoopMode.all) {
+    // Listen to playback completion
+    _player.stream.completed.listen((completed) async {
+      if (completed) {
+        if (_loopMode == PlaylistMode.single) {
+          await _player.seek(Duration.zero);
+          await _player.play();
+        } else if (_loopMode == PlaylistMode.loop) {
           if (_currentIndex == _playlist.length - 1) {
             _currentIndex = 0;
           } else {
             _currentIndex++;
           }
           await _setAudioSource(_playlist[_currentIndex]);
-          await _audioPlayer.play();
-          await _updateNotification();
+          await _player.play();
           notifyListeners();
         } else if (_playlist.length > 1 && _currentIndex < _playlist.length - 1) {
           await next();
@@ -167,7 +156,7 @@ class MusicProvider extends ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      await _audioPlayer.play();
+      await _player.play();
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -175,30 +164,37 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> pause() async {
-    await _audioPlayer.pause();
+    await _player.pause();
     notifyListeners();
   }
 
   Future<void> stop() async {
-    await _audioPlayer.stop();
+    await _player.stop();
     notifyListeners();
   }
 
   Future<void> seek(Duration position) async {
-    await _audioPlayer.seek(position);
+    await _player.seek(position);
     notifyListeners();
   }
 
   // ===== PLAYBACK SETTINGS =====
   void toggleShuffle() {
     _shuffleEnabled = !_shuffleEnabled;
-    _audioPlayer.setShuffleModeEnabled(_shuffleEnabled);
+    // Shuffle is handled manually in next() method
     notifyListeners();
   }
 
   void cycleRepeatMode() {
-    _loopMode = LoopMode.values[(_loopMode.index + 1) % LoopMode.values.length];
-    _audioPlayer.setLoopMode(_loopMode);
+    // Cycle through: none -> single -> loop -> none
+    if (_loopMode == PlaylistMode.none) {
+      _loopMode = PlaylistMode.single;
+    } else if (_loopMode == PlaylistMode.single) {
+      _loopMode = PlaylistMode.loop;
+    } else {
+      _loopMode = PlaylistMode.none;
+    }
+    _player.setPlaylistMode(_loopMode);
     notifyListeners();
   }
 
@@ -492,11 +488,18 @@ class MusicProvider extends ChangeNotifier {
 
   // ===== PLAYLIST MANAGEMENT =====
   Future<void> playSong(Song song) async {
-    final index = _playlist.indexWhere((s) => s.id == song.id);
+    var index = _playlist.indexWhere((s) => s.id == song.id);
+    
+    // If song not in playlist, add it
+    if (index == -1) {
+      _addSongIfNotExists(song);
+      index = _playlist.indexWhere((s) => s.id == song.id);
+    }
+    
     if (index != -1) {
       _currentIndex = index;
       await _setAudioSource(song);
-      await _audioPlayer.play();
+      await _player.play();
       await _updateNotification();
       await _updateNowPlayingPlaylist();
       notifyListeners();
@@ -516,7 +519,7 @@ class MusicProvider extends ChangeNotifier {
       _currentIndex = (_currentIndex + 1) % _playlist.length;
     }
     await _setAudioSource(_playlist[_currentIndex]);
-    await _audioPlayer.play();
+    await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
     notifyListeners();
@@ -527,17 +530,17 @@ class MusicProvider extends ChangeNotifier {
     _currentIndex = (_currentIndex - 1) % _playlist.length;
     if (_currentIndex < 0) _currentIndex = _playlist.length - 1;
     await _setAudioSource(_playlist[_currentIndex]);
-    await _audioPlayer.play();
+    await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
     notifyListeners();
   }
 
   Future<void> togglePlayPause() async {
-    if (_audioPlayer.playing) {
-      await _audioPlayer.pause();
+    if (_player.state.playing) {
+      await _player.pause();
     } else {
-      await _audioPlayer.play();
+      await _player.play();
     }
     await _updateNotification();
     await _updateNowPlayingPlaylist();
@@ -855,11 +858,9 @@ class MusicProvider extends ChangeNotifier {
 
   /// Set audio source for playback
   Future<void> _setAudioSource(Song song) async {
-    if (song.url.startsWith('http')) {
-      await _audioPlayer.setUrl(song.url);
-    } else {
-      await _audioPlayer.setFilePath(song.url);
-    }
+    final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
+    final media = Media(mediaPath);
+    await _player.open(media);
     await _updateNotification();
   }
 
@@ -867,8 +868,8 @@ class MusicProvider extends ChangeNotifier {
   Future<void> _updateNotification() async {
     final audioHandler = AudioNotificationService.audioHandler;
     if (audioHandler != null && currentSong != null) {
-      await audioHandler.setAudioSource(AudioSource.uri(Uri.parse(currentSong!.url)), song: currentSong);
-      if (_audioPlayer.playing) {
+      await audioHandler.setMedia(Media(currentSong!.url), song: currentSong);
+      if (_player.state.playing) {
         await audioHandler.play();
       } else {
         await audioHandler.pause();
@@ -1563,10 +1564,10 @@ class MusicProvider extends ChangeNotifier {
         return Duration.zero;
       }
 
-      final audioPlayer = AudioPlayer();
+      final audioPlayer = Player();
       try {
         // Set file path and wait for it to load
-        await audioPlayer.setFilePath(filePath);
+        await audioPlayer.open(Media(filePath));
 
         // Wait for metadata to load with timeout
         Duration? duration;
@@ -1574,8 +1575,8 @@ class MusicProvider extends ChangeNotifier {
         const maxAttempts = 10;
 
         while (duration == null && attempts < maxAttempts) {
-          duration = audioPlayer.duration;
-          if (duration == null) {
+          duration = audioPlayer.state.duration;
+          if (duration == null || duration == Duration.zero) {
             await Future.delayed(const Duration(milliseconds: 100));
             attempts++;
           }
@@ -1603,9 +1604,9 @@ class MusicProvider extends ChangeNotifier {
 
         // For other errors, try a shorter timeout
         try {
-          await audioPlayer.setFilePath(filePath);
+          await audioPlayer.open(Media(filePath));
           await Future.delayed(const Duration(milliseconds: 200));
-          final duration = audioPlayer.duration;
+          final duration = audioPlayer.state.duration;
           return duration ?? Duration.zero;
         } catch (retryError) {
           debugPrint('Retry failed for $filePath: $retryError');
@@ -1654,7 +1655,7 @@ class MusicProvider extends ChangeNotifier {
   void dispose() {
     _positionSubscription?.cancel();
     AudioNotificationService.dispose();
-    _audioPlayer.dispose();
+    _player.dispose();
     _loadingNotifier.dispose();
     super.dispose();
   }
@@ -1685,8 +1686,8 @@ class MusicProvider extends ChangeNotifier {
   void playAt(int index) {
     if (index >= 0 && index < _playlist.length) {
       _currentIndex = index;
-      _audioPlayer.seek(Duration.zero);
-      _audioPlayer.play();
+      _player.seek(Duration.zero);
+      _player.play();
       notifyListeners();
     }
   }

@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 
 class MusicScannerService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final Player _audioPlayer = Player();
 
   // Supported audio file extensions
   static const List<String> _supportedExtensions = [
@@ -88,7 +88,7 @@ class MusicScannerService {
   Future<Map<String, dynamic>> _extractMetadata(File file) async {
     try {
       // Load the audio file to get metadata
-      await _audioPlayer.setFilePath(file.path);
+      await _audioPlayer.open(Media(file.path);
       final source = _audioPlayer.audioSource;
       final audioMetadata = source?.sequence.firstOrNull?.tag;
       
@@ -100,7 +100,7 @@ class MusicScannerService {
             ? audioMetadata!.genre 
             : 'Unknown Genre',
         'file_path': file.path,
-        'duration': _audioPlayer.duration?.inMilliseconds ?? 0,
+        'duration': _audioPlayer.state.duration?.inMilliseconds ?? 0,
         'track_number': audioMetadata?.trackNumber ?? 0,
         'year': audioMetadata?.publishDate?.year,
       };

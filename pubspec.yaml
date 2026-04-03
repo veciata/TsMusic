@@ -2,7 +2,7 @@ name: tsmusic
 description: "A Flutter app for playing and downloading music."
 publish_to: "none"
 
-version: 1.0.3+2
+version: 1.0.3b+3
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -16,9 +16,11 @@ dependencies:
   flutter_svg: ^2.0.11
 
   # Audio
-  just_audio: ^0.9.40
+  media_kit: ^1.1.10+1
+  media_kit_libs_audio: ^1.0.4
+  # just_audio: ^0.9.40
   audio_session: ^0.1.21
-  just_audio_background: ^0.0.1-beta.14
+  # just_audio_background: ^0.0.1-beta.14
   audio_service: ^0.18.18
 
   # File Access
