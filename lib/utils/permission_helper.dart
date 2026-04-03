@@ -169,12 +169,80 @@ class PermissionHelper {
       ),
     ) ?? false;
 
-  /// Get the appropriate storage permission based on Android version
-  static Future<Permission> _getStoragePermission() async {
-    if (await _isAndroid13OrHigher()) {
-      return Permission.audio;
+  /// Check if running on Android 11+ (API 30+)
+  static Future<bool> _isAndroid11OrHigher() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.version.sdkInt >= 30;
+    } catch (e) {
+      debugPrint('Error checking Android version: $e');
+      return false;
     }
-    return Permission.storage;
+  }
+
+  /// Request MANAGE_EXTERNAL_STORAGE permission for Android 11+
+  /// This is needed to access files in public directories (Downloads, Music)
+  static Future<bool> requestManageExternalStorage() async {
+    try {
+      if (!await _isAndroid11OrHigher()) {
+        return true; // Not needed on older Android
+      }
+
+      final status = await Permission.manageExternalStorage.status;
+      
+      if (status.isGranted) {
+        return true;
+      }
+      
+      if (status.isPermanentlyDenied) {
+        // User denied permanently, need to go to settings
+        if (navigatorKey.currentContext != null) {
+          final openSettings = await showDialog<bool>(
+            context: navigatorKey.currentContext!,
+            builder: (context) => AlertDialog(
+              title: const Text('All Files Access Required'),
+              content: const Text(
+                'To manage music files in Downloads and Music folders, '
+                'this app needs "All Files Access" permission. '
+                'Please enable it in app settings.'
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+          
+          if (openSettings == true) {
+            await openAppSettings();
+          }
+        }
+        return false;
+      }
+      
+      // Request the permission
+      final result = await Permission.manageExternalStorage.request();
+      return result.isGranted;
+    } catch (e) {
+      debugPrint('Error requesting manage external storage: $e');
+      return false;
+    }
+  }
+
+  /// Check if manage external storage permission is granted
+  static Future<bool> hasManageExternalStorage() async {
+    if (!await _isAndroid11OrHigher()) {
+      return true;
+    }
+    final status = await Permission.manageExternalStorage.status;
+    return status.isGranted;
   }
 
   /// Request file management permission for Android 11+ (API 30+)
@@ -267,5 +335,13 @@ class PermissionHelper {
       debugPrint('Error checking Android version: $e');
       return false;
     }
+  }
+
+  /// Get the appropriate storage permission based on Android version
+  static Future<Permission> _getStoragePermission() async {
+    if (await _isAndroid13OrHigher()) {
+      return Permission.audio;
+    }
+    return Permission.storage;
   }
 }

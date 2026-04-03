@@ -120,29 +120,73 @@ class DatabaseHelper {
   
   Future<void> _verifyDatabaseSchema(Database db) async {
     try {
-      // Check if playlists table exists
+      // Get all existing tables
       final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
-      final playlistsTableExists = tables.any((table) => table['name'] == tablePlaylists);
+      final existingTables = tables.map((t) => t['name'] as String).toSet();
       
-      if (!playlistsTableExists) {
-        debugPrint('Playlists table missing - recreating database schema');
-        // Drop and recreate the database
+      // List of required tables
+      final requiredTables = [
+        tableArtists,
+        tableGenres,
+        tableSongs,
+        tableAlbums,
+        tablePlaylists,
+        tablePlaylistSongs,
+        tableTags,
+        tableSongTags,
+        tableArtistGenre,
+        tableSongArtist,
+        tableSongGenre,
+      ];
+      
+      // Check if all required tables exist
+      final missingTables = requiredTables.where((t) => !existingTables.contains(t)).toList();
+      
+      if (missingTables.isNotEmpty) {
+        debugPrint('Missing tables detected: $missingTables - Recreating database');
+        // Close and delete the database
         await db.close();
         final path = join(await getDatabasesPath(), 'music_player.db');
         await deleteDatabase(path);
+        _database = null;
         _database = await _initDatabase();
-      } else {
-        // Check if we need to upgrade
-        final version = await db.getVersion();
-        if (version < databaseVersion) {
-          debugPrint('Database needs upgrade from $version to $databaseVersion');
-          await _onUpgrade(db, version, databaseVersion);
-          await db.setVersion(databaseVersion);
-        }
+        return;
       }
+      
+      // Check database version
+      final version = await db.getVersion();
+      if (version < databaseVersion) {
+        debugPrint('Database needs upgrade from $version to $databaseVersion');
+        await _onUpgrade(db, version, databaseVersion);
+        await db.setVersion(databaseVersion);
+      }
+      
+      debugPrint('Database schema verified successfully');
     } catch (e) {
       debugPrint('Error verifying database schema: $e');
-      rethrow;
+      // Attempt recovery
+      try {
+        await db.close();
+        final path = join(await getDatabasesPath(), 'music_player.db');
+        await deleteDatabase(path);
+        _database = null;
+        _database = await _initDatabase();
+      } catch (recoveryError) {
+        debugPrint('Database recovery failed: $recoveryError');
+        rethrow;
+      }
+    }
+  }
+
+  /// Public method to verify and repair database tables
+  Future<bool> verifyAndRepairTables() async {
+    try {
+      final db = await database;
+      await _verifyDatabaseSchema(db);
+      return true;
+    } catch (e) {
+      debugPrint('Database repair failed: $e');
+      return false;
     }
   }
 

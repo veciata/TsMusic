@@ -391,7 +391,8 @@ class YouTubeService with ChangeNotifier {
       if (streamInfo.container.name == 'mp4') {
         audioExtension = 'm4a';
       } else if (streamInfo.container.name == 'webm') {
-        audioExtension = 'webm';
+        // WebM audio-only files typically use Opus codec, save as .opus
+        audioExtension = 'opus';
       } else {
         audioExtension = streamInfo.container.name;
       }

@@ -44,6 +44,11 @@ class MusicProvider extends ChangeNotifier {
   bool _shuffleEnabled = false;
   LoopMode _loopMode = LoopMode.off;
 
+  // Auto-retry tracking
+  int _retryCount = 0;
+  static const int _maxRetries = 3;
+  static const int _baseRetryDelay = 3; // seconds
+
   // Cache for songs to avoid repeated database queries
   static final Map<String, Song> _songsMap = {};
   static List<Song> get _cachedSongs => _songsMap.values.toList();
@@ -70,7 +75,7 @@ class MusicProvider extends ChangeNotifier {
       ? _currentIndex
       : null;
   List<Song> get queue => List.unmodifiable(_playlist);
-  List<Song> get allSongs => _songsMap.values.toList();
+  List<Song> get allSongs => _playlist;
   List<Song> get youtubeSongs => _playlist.where((song) => song.hasTag('tsmusic')).toList();
 
   // Collection getters
@@ -197,7 +202,117 @@ class MusicProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===== SONG MANAGEMENT =====
+  // ===== SORTING METHODS =====
+  void setSortOption(SongSortOption option) {
+    _currentSortOption = option;
+    _applySorting();
+    notifyListeners();
+  }
+
+  void toggleSortDirection() {
+    _sortAscending = !_sortAscending;
+    _applySorting();
+    notifyListeners();
+  }
+
+  void _applySorting() {
+    switch (_currentSortOption) {
+      case SongSortOption.title:
+        _displayedSongs.sort((a, b) => _sortAscending 
+          ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+          : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        break;
+      case SongSortOption.artist:
+        _displayedSongs.sort((a, b) {
+          final artistA = a.artists.isNotEmpty ? a.artists.first.toLowerCase() : '';
+          final artistB = b.artists.isNotEmpty ? b.artists.first.toLowerCase() : '';
+          return _sortAscending 
+            ? artistA.compareTo(artistB)
+            : artistB.compareTo(artistA);
+        });
+        break;
+      case SongSortOption.dateAdded:
+        // Assuming newer songs are at the end of the list
+        if (!_sortAscending) {
+          _displayedSongs = _displayedSongs.reversed.toList();
+        }
+        break;
+      case SongSortOption.album:
+        // Sort by album name if available
+        _displayedSongs.sort((a, b) {
+          final albumA = a.album?.toLowerCase() ?? '';
+          final albumB = b.album?.toLowerCase() ?? '';
+          return _sortAscending 
+            ? albumA.compareTo(albumB)
+            : albumB.compareTo(albumA);
+        });
+        break;
+      case SongSortOption.duration:
+        // Sort by duration
+        _displayedSongs.sort((a, b) => _sortAscending 
+          ? a.duration.compareTo(b.duration)
+          : b.duration.compareTo(a.duration));
+        break;
+    }
+  }
+
+  Future<void> refreshSongs() async {
+    debugPrint('MusicProvider: refreshSongs() called');
+    try {
+      await _loadSongsFromDatabase();
+      _displayedSongs = List.from(_playlist);
+      _applySorting();
+      notifyListeners();
+      debugPrint('MusicProvider: refreshSongs() completed - ${_playlist.length} songs loaded');
+    } catch (e) {
+      debugPrint('Error refreshing songs: $e');
+    }
+  }
+
+  // ===== AUTO-RETRY LOGIC =====
+  String? _lastError;
+  
+  /// Attempts to load music with automatic retry on failure
+  Future<void> loadLocalMusicWithRetry({bool forceRescan = false}) async {
+    try {
+      await loadLocalMusic(forceRescan: forceRescan);
+      // Reset retry count on success
+      _retryCount = 0;
+      _lastError = null;
+    } catch (e) {
+      debugPrint('MusicProvider: Error loading music (attempt ${_retryCount + 1}/$_maxRetries): $e');
+      _lastError = e.toString();
+      
+      if (_retryCount < _maxRetries) {
+        _retryCount++;
+        final delaySeconds = _baseRetryDelay * _retryCount;
+        
+        _error = 'Error: $_lastError\n\nRetrying in ${delaySeconds}s... (attempt $_retryCount/$_maxRetries)';
+        notifyListeners();
+        
+        debugPrint('MusicProvider: Auto-retrying in ${delaySeconds} seconds...');
+        await Future.delayed(Duration(seconds: delaySeconds));
+        
+        // Recursive retry
+        await loadLocalMusicWithRetry(forceRescan: forceRescan);
+      } else {
+        _error = 'Error loading music:\n$_lastError\n\nPlease try again.';
+        _retryCount = 0;
+        _isLoading = false;
+        _loadingNotifier.value = false;
+        notifyListeners();
+        debugPrint('MusicProvider: All retry attempts exhausted');
+      }
+    }
+  }
+  
+  /// Manual retry - resets retry count and tries again
+  Future<void> retryLoading() async {
+    _retryCount = 0;
+    _error = null;
+    notifyListeners();
+    await loadLocalMusicWithRetry(forceRescan: true);
+  }
   Future<void> addSong(Song song) async {
     final existingIndex = _playlist.indexWhere((s) => s.id == song.id);
     if (existingIndex != -1) {
@@ -327,6 +442,7 @@ class MusicProvider extends ChangeNotifier {
 
         _isLoading = false;
         _loadingNotifier.value = false;
+        _error = null; // Clear error on success
         notifyListeners();
         return;
       }
@@ -344,6 +460,7 @@ class MusicProvider extends ChangeNotifier {
         _displayedSongs = List.from(_playlist);
         _isLoading = false;
         _loadingNotifier.value = false;
+        _error = null; // Clear error on success
         notifyListeners();
 
         // Check for new music in background
@@ -351,6 +468,9 @@ class MusicProvider extends ChangeNotifier {
       } else {
         // If no songs in database, do a full scan
         await _scanLocalStorageForMusic();
+        
+        // Ensure all scanned songs are saved to database
+        await _ensureCachedSongsInDatabase();
       }
 
     } catch (e) {
@@ -580,14 +700,22 @@ class MusicProvider extends ChangeNotifier {
   // ===== PRIVATE HELPER METHODS =====
   /// Load songs from database with optimized queries
   Future<void> _loadSongsFromDatabase() async {
+    debugPrint('🔍 _loadSongsFromDatabase called, _songsMap.isNotEmpty=${_songsMap.isNotEmpty}, _songsMap.length=${_songsMap.length}');
+    
     if (_songsMap.isNotEmpty) {
       _playlist = _cachedSongs;
+      debugPrint('⚡ Using cached songs: ${_playlist.length} songs');
       return;
     }
 
     try {
       // Get all songs in a single query
       final db = await _databaseHelper.database;
+
+      // First, just count total songs in database
+      final countResult = await db.rawQuery('SELECT COUNT(*) as count FROM ${DatabaseHelper.tableSongs}');
+      final totalCount = Sqflite.firstIntValue(countResult) ?? 0;
+      debugPrint('📊 Total songs in database table: $totalCount');
 
       // Get all songs with their artists and genres in a single query
       final songsQuery = '''
@@ -603,6 +731,7 @@ class MusicProvider extends ChangeNotifier {
       ''';
 
       final songs = await db.rawQuery(songsQuery);
+      debugPrint('📊 SQL query returned ${songs.length} songs');
 
       // Clear current data
       _playlist.clear();
@@ -1292,6 +1421,9 @@ class MusicProvider extends ChangeNotifier {
     await _updateNowPlayingPlaylist();
 
     debugPrint('🎉 SUCCESSFULLY ADDED ${validSongs.length} SONGS TO DATABASE');
+    
+    // Ensure all songs are saved to database for consistency
+    await _ensureCachedSongsInDatabase();
   }
 
   /// Helper method to get or create artist

@@ -7,6 +7,7 @@ import '../providers/music_provider.dart' as music_provider;
 import '../providers/settings_provider.dart';
 import '../models/song.dart';
 import '../services/youtube_service.dart';
+import '../utils/permission_helper.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
@@ -288,6 +289,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Future<void> _scanLocalFiles() async {
     try {
+      // Request necessary permissions first
+      final hasPermission = await PermissionHelper.requestFileManagementPermission();
+      if (!hasPermission) {
+        debugPrint('File management permission not granted');
+        return;
+      }
+      
       // Scan ALL locations, not just current one
       final locations = ['internal', 'downloads', 'music'];
       final List<Song> allSongs = [];
