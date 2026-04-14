@@ -21,6 +21,7 @@ import 'services/youtube_service.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'utils/package_info_utils.dart';
+import 'widgets/bottom_navigation_widget.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
@@ -253,29 +254,9 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         physics: const NeverScrollableScrollPhysics(),
         children: _pages,
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: BottomNavigationWidget(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home),
-            label: AppLocalizations.of(context).home,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.download),
-            label: AppLocalizations.of(context).downloads,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.settings),
-            label: AppLocalizations.of(context).settings,
-          ),
-          if (kDebugMode)
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.storage),
-              label: AppLocalizations.of(context).sql,
-            ),
-        ],
       ),
       bottomSheet: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProv, _) {

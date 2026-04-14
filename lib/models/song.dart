@@ -1,5 +1,6 @@
 class Song {
   final int id;
+  final String? youtubeId; // YouTube video ID for matching with search results
   final String title;
   final List<String> artists;
   final String? album;
@@ -29,6 +30,7 @@ class Song {
 
   Song({
     required this.id,
+    this.youtubeId,
     required this.title,
     required this.artists,
     this.album,
@@ -45,6 +47,7 @@ class Song {
 
   Song copyWith({
     int? id,
+    String? youtubeId,
     String? title,
     List<String>? artists,
     String? album,
@@ -58,6 +61,7 @@ class Song {
     DateTime? dateAdded,
   }) => Song(
       id: id ?? this.id,
+      youtubeId: youtubeId ?? this.youtubeId,
       title: title ?? this.title,
       artists: artists ?? this.artists,
       album: album ?? this.album,
@@ -84,6 +88,7 @@ class Song {
 
     return Song(
       id: songId,
+      youtubeId: json['youtubeId'] as String?,
       title: json['title'] as String,
       artists: json['artists'] is List 
           ? List<String>.from(json['artists'])
@@ -104,6 +109,7 @@ class Song {
 
   Map<String, dynamic> toMap() => {
       'id': id,
+      'youtubeId': youtubeId,
       'title': title,
       'artists': artists,
       'album': album,

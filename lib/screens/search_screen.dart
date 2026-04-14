@@ -6,6 +6,7 @@ import '../providers/music_provider.dart' as music_provider;
 import '../providers/settings_provider.dart';
 import '../models/song.dart' as model;
 import '../services/youtube_service.dart';
+import '../widgets/bottom_navigation_widget.dart';
 
 import 'downloads_screen.dart';
 
@@ -17,18 +18,6 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  // Helper method to navigate to downloads screen
-  void _navigateToDownloads() {
-    if (!mounted) return;
-    
-    // Navigate directly to DownloadsScreen
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const DownloadsScreen(),
-      ),
-    );
-  }
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late final YouTubeService _youTubeService;
@@ -66,13 +55,16 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _loadingYouTubeId = audio.id);
     
     try {
-      // YouTube servisi üzerinden sadece sesi çal
-      await _youTubeService.playAudio(audio);
+      // YouTube servisi üzerinden sadece sesi çal - timeout ekle
+      await _youTubeService.playAudio(audio).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw TimeoutException('Bağlantı zaman aşımına uğradı');
+        },
+      );
       
       if (mounted) {
-        setState(() {
-          _loadingYouTubeId = null;
-        });
+        setState(() => _loadingYouTubeId = null);
       }
     } catch (e) {
       debugPrint('Error playing audio: $e');
@@ -80,10 +72,9 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) {
         setState(() => _loadingYouTubeId = null);
         
-        // Kullanıcıya hata mesajı göster
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Ses çalınamadı'),
+            content: Text('Ses çalınamadı: $e'),
             action: SnackBarAction(
               label: 'Tekrar Dene',
               onPressed: () => _playAudio(audio),
@@ -103,7 +94,6 @@ class _SearchScreenState extends State<SearchScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Download already in progress')),
       );
-      _navigateToDownloads();
       return;
     }
 
@@ -115,14 +105,13 @@ class _SearchScreenState extends State<SearchScreen> {
         downloadLocation: settingsProvider.downloadLocation,
       );
       if (result != null && mounted) {
-        // Immediately add the song to the provider to update the UI
+        // Reload songs from database to update UI
         await Provider.of<music_provider.MusicProvider>(context, listen: false)
             .loadFromDatabaseOnly();
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download started: ${audio.title}')),
+          SnackBar(content: Text('Download completed: ${audio.title}')),
         );
-        _navigateToDownloads();
       }
     } catch (e) {
       if (mounted) {
@@ -237,6 +226,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 },
               ),
               onTap: () {
+                debugPrint('🔍 SearchScreen onTap: ${song.title}');
                 if (isCurrent) {
                   if (isSongPlaying) {
                     provider.pause();
@@ -280,19 +270,24 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildYouTubeResultItem(YouTubeAudio audio) {
+    final isLoading = _loadingYouTubeId == audio.id;
+    
+    // Listen to YouTubeService for download changes
     final youTubeService = Provider.of<YouTubeService>(context);
     final isCurrent = youTubeService.currentAudio?.id == audio.id;
     final isPlaying = youTubeService.isPlaying && isCurrent;
-    final isLoading = _loadingYouTubeId == audio.id;
     
     // Check if this audio is in the download queue
     final downloadProgress = youTubeService.activeDownloads
         .where((d) => d.videoId == audio.id)
         .firstOrNull;
 
-    final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
     final isDownloaded = musicProvider.songs
-        .any((s) => s.id == audio.id && s.isDownloaded);
+        .any((s) => s.youtubeId == audio.id && s.isDownloaded);
+    
+    // Debug logging
+    debugPrint('🔍 Icon check for ${audio.id}: isDownloaded=$isDownloaded, songs=${musicProvider.songs.length}, downloadProgress=$downloadProgress');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -358,15 +353,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   return;
                 }
                 if (downloadProgress != null) {
-                  // Already downloading, navigate to downloads screen
-                  _navigateToDownloads();
+                  // Already downloading, do nothing
                   return;
                 }
-                // Start download and navigate to downloads
+                // Start download and stay on search screen
                 await _handleDownload(audio);
-                if (mounted) {
-                  _navigateToDownloads();
-                }
               },
             ),
           ],
@@ -496,6 +487,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
           ],
+        ),
+        bottomNavigationBar: BottomNavigationWidget(
+          currentIndex: -1,
+          onTap: (index) {},
         ),
       ),
     );

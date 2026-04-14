@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb, ChangeNotifier;
@@ -10,6 +11,18 @@ import 'package:path/path.dart' as path;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
+
+/// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
+/// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
+Map<String, String> _youtubePlaybackHttpHeaders() => {
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://www.youtube.com/',
+      'Origin': 'https://www.youtube.com',
+      'Cookie': 'CONSENT=YES+cb',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.5',
+    };
 
 class DownloadResult {
   final String filePath;
@@ -123,24 +136,21 @@ class YouTubeService with ChangeNotifier {
       // Clear any previous errors
       await _player.stop();
       
-      // Try different methods to get the audio stream
       final String? audioUrl = await _getAudioStream(audio.id);
-      
+
       if (audioUrl == null) {
         throw Exception('Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.');
       }
 
       debugPrint('Playing audio from URL: $audioUrl');
-      
-      // Set audio source with better error handling
-      try {
-        await _player.open(Media(audioUrl));
-        await _player.play();
 
-        
-        debugPrint('Audio playback started successfully');
+      try {
+        final headers = _youtubePlaybackHttpHeaders();
+        await _player.open(Media(audioUrl, httpHeaders: headers));
+        await _player.play();
+        debugPrint('✅ Audio playback started successfully');
       } catch (e) {
-        debugPrint('Error setting audio source: $e');
+        debugPrint('❌ Error setting audio source: $e');
         throw Exception('Ses çalınamadı: ${e.toString()}');
       }
       
@@ -164,28 +174,44 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  // Get audio stream using YouTube Explode
+  /// İndirme ile aynı mantık: önce androidVr, sonra varsayılan; mümkünse m4a (mp4).
   Future<String?> _getAudioStream(String videoId) async {
     try {
+      debugPrint('🔧 Getting YouTube stream URL: $videoId');
+
       StreamManifest manifest;
       try {
-        manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      } catch (e) {
-        debugPrint('Failed to get manifest with default client: $e. Trying alternative clients.');
         manifest = await _yt.videos.streamsClient.getManifest(
           videoId,
-          ytClients: [
-            YoutubeApiClient.android,
-            YoutubeApiClient.ios,
-          ],
+          ytClients: [YoutubeApiClient.androidVr],
         );
+      } catch (e) {
+        debugPrint('Manifest androidVr ile alınamadı, varsayılan deneniyor: $e');
+        manifest = await _yt.videos.streamsClient.getManifest(videoId);
       }
 
-      final audioStream = manifest.audioOnly.withHighestBitrate();
-      return audioStream.url.toString();
+      final audioStreams = manifest.audioOnly.toList();
+      if (audioStreams.isEmpty) {
+        debugPrint('❌ Ses akışı yok');
+        return null;
+      }
+
+      final m4aStreams =
+          audioStreams.where((s) => s.container.name == 'mp4').toList();
+      final StreamInfo streamInfo = m4aStreams.isNotEmpty
+          ? m4aStreams.reduce(
+              (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+            )
+          : audioStreams.reduce(
+              (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+            );
+
+      final streamUrl = streamInfo.url.toString();
+      debugPrint('✅ Got YouTube stream URL (${streamInfo.container.name})');
+      return streamUrl;
     } catch (e) {
-      debugPrint('Failed to get audio stream: $e');
-      rethrow;
+      debugPrint('❌ Stream extraction failed: $e');
+      return null;
     }
   }
   
@@ -552,6 +578,7 @@ class YouTubeService with ChangeNotifier {
     try {
       final dbHelper = DatabaseHelper();
       return await dbHelper.addSongFromYouTube(
+        videoId: videoId,
         filePath: filePath,
         title: title,
         author: author,

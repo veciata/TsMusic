@@ -671,6 +671,7 @@ class MusicProvider extends ChangeNotifier {
           
           searchedSongs.add(Song(
             id: songId,
+            youtubeId: songData['youtube_id'] as String?,
             title: songData['title'] as String,
             url: songData['file_path'] as String,
             duration: songData['duration'] as int,
@@ -767,6 +768,7 @@ class MusicProvider extends ChangeNotifier {
 
           final song = Song(
             id: songData['id'] as int,
+            youtubeId: songData['youtube_id'] as String?,
             title: songData['title'] as String? ?? 'Unknown Title',
             artists: artists,
             url: songData['file_path'] as String,
@@ -811,9 +813,10 @@ class MusicProvider extends ChangeNotifier {
 
         final song = Song(
           id: songId,
-          title: songData['title'] as String,
+          youtubeId: songData['youtube_id'] as String?,
+          title: songData['title'] as String? ?? 'Unknown Title',
           url: songData['file_path'] as String,
-          duration: songData['duration'] as int,
+          duration: songData['duration'] as int? ?? 0,
           artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
           dateAdded: songData['created_at'] != null
               ? DateTime.parse(songData['created_at'] as String)

@@ -191,7 +191,7 @@ class DatabaseHelper {
   }
 
   // Increment this version when making schema changes
-  static const int databaseVersion = 3;
+  static const int databaseVersion = 4;
 
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), 'music_player.db');
@@ -266,6 +266,15 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 4) {
+      // Version 4: Add youtube_id column to songs table
+      try {
+        await db.execute('ALTER TABLE $tableSongs ADD COLUMN youtube_id TEXT');
+        debugPrint('Successfully added youtube_id column to songs table');
+      } catch (e) {
+        debugPrint('Note: youtube_id column may already exist: $e');
+      }
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -329,6 +338,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $tableSongs (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
+        youtube_id TEXT,
         title TEXT NOT NULL,
         file_path TEXT NOT NULL UNIQUE,
         duration INTEGER,
@@ -486,6 +496,7 @@ class DatabaseHelper {
     final db = await database;
     return await db.rawQuery('''
       SELECT s.$columnId as song_id,
+             s.youtube_id as youtube_id,
              s.title as title,
              s.file_path as file_path,
              s.duration as duration,
@@ -1047,6 +1058,7 @@ class DatabaseHelper {
   }
 
   Future<Song> addSongFromYouTube({
+    required String videoId,
     required String filePath,
     required String title,
     required String author,
@@ -1070,6 +1082,7 @@ class DatabaseHelper {
           'title': title,
           'file_path': filePath,
           'duration': duration,
+          'youtube_id': videoId,
           'created_at': DateTime.now().toIso8601String(),
         };
 

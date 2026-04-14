@@ -7,6 +7,7 @@ import '../providers/music_provider.dart' as music_provider;
 import '../providers/settings_provider.dart';
 import '../models/song.dart';
 import '../services/youtube_service.dart';
+import '../widgets/bottom_navigation_widget.dart';
 import '../utils/permission_helper.dart';
 
 class DownloadsScreen extends StatefulWidget {
@@ -63,6 +64,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         title: const Text('Downloads'),
       ),
       body: _buildDownloadsList(),
+      bottomNavigationBar: BottomNavigationWidget(
+        currentIndex: 1,
+        onTap: (index) {},
+      ),
     );
 
   Widget _buildDownloadsList() => Consumer2<YouTubeService, music_provider.MusicProvider>(
