@@ -508,18 +508,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed == true) {
       try {
+        // Delete physical file first
         final file = File(song.url);
         if (await file.exists()) {
           await file.delete();
         }
-        await provider.refreshSongs();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Song deleted')),
-        );
+        // Remove from DB + in-memory collections via provider
+        await provider.deleteSong(song);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Song deleted')),
+          );
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting: $e')),
+          );
+        }
       }
     }
   }

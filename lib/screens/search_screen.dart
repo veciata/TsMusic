@@ -105,9 +105,10 @@ class _SearchScreenState extends State<SearchScreen> {
         downloadLocation: settingsProvider.downloadLocation,
       );
       if (result != null && mounted) {
-        // Reload songs from database to update UI
-        await Provider.of<music_provider.MusicProvider>(context, listen: false)
-            .loadFromDatabaseOnly();
+        // Add the downloaded song directly to the library so the icon updates
+        // immediately without a full database reload.
+        Provider.of<music_provider.MusicProvider>(context, listen: false)
+            .addDownloadedSongToLibrary(result.song);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download completed: ${audio.title}')),
@@ -283,10 +284,11 @@ class _SearchScreenState extends State<SearchScreen> {
         .firstOrNull;
 
     final musicProvider = Provider.of<music_provider.MusicProvider>(context);
+    // isDownloaded is true when the 'tsmusic' tag is present (set during download
+    // and persisted in the DB, so it survives app restarts).
     final isDownloaded = musicProvider.songs
-        .any((s) => s.youtubeId == audio.id && s.isDownloaded);
+        .any((s) => s.youtubeId == audio.id && s.tags.contains('tsmusic'));
     
-    // Debug logging
     debugPrint('🔍 Icon check for ${audio.id}: isDownloaded=$isDownloaded, songs=${musicProvider.songs.length}, downloadProgress=$downloadProgress');
 
     return Card(

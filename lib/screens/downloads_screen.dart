@@ -451,22 +451,33 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     
     if (confirmed == true) {
       try {
+        // Delete physical file
         final file = File(song.url);
         if (await file.exists()) {
           await file.delete();
         }
         
-        // Refresh UI
+        // Remove from DB + in-memory via provider
+        if (mounted) {
+          await Provider.of<music_provider.MusicProvider>(context, listen: false)
+              .deleteSong(song);
+        }
+        
+        // Refresh local file list
         await _scanLocalFiles();
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${song.title}" deleted')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('"${song.title}" deleted')),
+          );
+        }
       } catch (e) {
         debugPrint('Error deleting song: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: $e')),
+          );
+        }
       }
     }
   }

@@ -1057,6 +1057,19 @@ class DatabaseHelper {
     await db.close();
   }
 
+  /// Deletes a song by its ID from the database.
+  /// Related rows in junction tables (song_artist, song_genre, song_tags,
+  /// playlist_songs) are removed automatically via ON DELETE CASCADE.
+  Future<void> deleteSong(int songId) async {
+    final db = await database;
+    await db.delete(
+      tableSongs,
+      where: '$columnId = ?',
+      whereArgs: [songId],
+    );
+    debugPrint('🗑️ Deleted song $songId from database');
+  }
+
   Future<Song> addSongFromYouTube({
     required String videoId,
     required String filePath,
@@ -1131,6 +1144,7 @@ class DatabaseHelper {
     // We need to manually map the fields.
     return Song(
       id: map['id'] as int,
+      youtubeId: map['youtube_id'] as String?,
       title: map['title'] as String,
       url: map['file_path'] as String,
       duration: map['duration'] as int,

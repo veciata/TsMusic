@@ -255,13 +255,49 @@ class MusicProvider extends ChangeNotifier {
   Future<void> refreshSongs() async {
     debugPrint('MusicProvider: refreshSongs() called');
     try {
+      // Always clear static cache so a fresh DB query is performed
+      _songsMap.clear();
+      _playlist.clear();
+      _displayedSongs.clear();
       await _loadSongsFromDatabase();
-      _displayedSongs = List.from(_playlist);
       _applySorting();
       notifyListeners();
       debugPrint('MusicProvider: refreshSongs() completed - ${_playlist.length} songs loaded');
     } catch (e) {
       debugPrint('Error refreshing songs: $e');
+    }
+  }
+
+  /// Deletes a song from both the database and in-memory collections.
+  Future<void> deleteSong(Song song) async {
+    try {
+      // Remove from database first
+      await _databaseHelper.deleteSong(song.id);
+
+      // Remove from in-memory collections
+      _playlist.removeWhere((s) => s.id == song.id);
+      _displayedSongs.removeWhere((s) => s.id == song.id);
+      _songsMap.remove(song.url);
+
+      notifyListeners();
+      debugPrint('🗑️ MusicProvider: removed song "${song.title}" from memory and DB');
+    } catch (e) {
+      debugPrint('Error deleting song: $e');
+      rethrow;
+    }
+  }
+
+  /// Adds a newly downloaded song directly to the in-memory library
+  /// so the UI updates without requiring a full database reload.
+  void addDownloadedSongToLibrary(Song song) {
+    if (!_songsMap.containsKey(song.url)) {
+      _songsMap[song.url] = song;
+      _playlist.add(song);
+      _displayedSongs.add(song);
+      notifyListeners();
+      debugPrint('✅ MusicProvider: added downloaded song "${song.title}" to library');
+    } else {
+      debugPrint('ℹ️ MusicProvider: song "${song.title}" already in library, skipping add');
     }
   }
 
@@ -384,7 +420,8 @@ class MusicProvider extends ChangeNotifier {
       _error = 'Loading music from database...';
       notifyListeners();
 
-      // Clear current lists
+      // Clear static cache AND in-memory collections so we always get fresh data
+      _songsMap.clear();
       _playlist.clear();
       _displayedSongs.clear();
 
@@ -775,6 +812,8 @@ class MusicProvider extends ChangeNotifier {
             duration: songData['duration'] as int? ?? 0,
             tags: tags,
             trackNumber: songData['track_number'] as int?,
+            // A song is considered downloaded if it carries the 'tsmusic' tag
+            isDownloaded: tags.contains('tsmusic'),
             dateAdded: songData['created_at'] != null
                 ? DateTime.parse(songData['created_at'] as String)
                 : DateTime.now(),
