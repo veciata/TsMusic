@@ -74,7 +74,7 @@ lib/
 - **Framework**: Flutter
 - **Language**: Dart
 - **State Management**: Provider
-- **Audio Playback**: just_audio
+- **Audio Playback**: media_kit
 - **Database**: sqflite
 - **Networking**: http
 - **YouTube Integration**: youtube_explode_dart
@@ -106,10 +106,18 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## TODO
+
+- [ ] Playlist download and auto playlist generation
+- [ ] Improved UI and color scheme support
+- [ ] New player screen styles
+- [ ] Auto detect language support
+- [ ] More language support
+
 ## Acknowledgments
 
 - [Flutter](https://flutter.dev/) team for the amazing framework
-- [just_audio](https://pub.dev/packages/just_audio) for audio playback
+- [media_kit](https://pub.dev/packages/media_kit) for audio playback
 - [youtube_explode_dart](https://pub.dev/packages/youtube_explode_dart) for YouTube integration
 - All contributors who have helped improve this project
 
