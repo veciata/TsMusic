@@ -1,5 +1,3 @@
-
-
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +7,13 @@ import 'package:provider/provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/widgets/skeleton_widgets.dart';
+import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 
 import 'search_screen.dart';
+import 'artist_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onSettingsTap;
@@ -22,45 +24,59 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final Set<int> _selectedSongs = {};
   bool _isMultiSelectMode = false;
-
-
+  late TabController _tabController;
+  List<Map<String, dynamic>> _playlists = [];
+  bool _isLoadingPlaylists = false;
 
   @override
   void initState() {
     super.initState();
-    // Music is already loaded by MainNavigationScreen, no need to load here
+    _tabController = TabController(length: 3, vsync: this);
+    _loadPlaylists();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPlaylists() async {
+    setState(() => _isLoadingPlaylists = true);
+    try {
+      final playlists = await DatabaseHelper().getAllPlaylists();
+      if (mounted) {
+        setState(() {
+          _playlists = playlists;
+          _isLoadingPlaylists = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingPlaylists = false);
+      }
+    }
   }
 
   List<Song> _getSortedSongs(music_provider.MusicProvider provider) {
     try {
-      // Use a case-insensitive map to track unique songs by their file path
       final Map<int, Song> uniqueSongs = {};
-      
-      // Track seen file paths for duplicate detection
       final Set<String> seenPaths = {};
-      
-      // Helper function to get a normalized file path for comparison
+
       String getNormalizedPath(String filePath) {
         try {
-          // Convert to lowercase and remove any query parameters or fragments
-          String path = filePath.split('?')[0].split('#')[0].toLowerCase().trim();
-          
-          // Handle different path formats that point to the same location
+          String path =
+              filePath.split('?')[0].split('#')[0].toLowerCase().trim();
           const String emulatedPrefix = '/storage/emulated/0/';
-          
-          // Convert /storage/emulated/0/ to /sdcard/ for consistency
           if (path.startsWith(emulatedPrefix)) {
             path = '/sdcard/${path.substring(emulatedPrefix.length)}';
           }
-          
-          // Remove any redundant path segments
           final uri = Uri.file(path);
           final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-          
-          // Rebuild path with normalized segments
           return '/${segments.join('/')}';
         } catch (e) {
           if (kDebugMode) {
@@ -70,39 +86,23 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // Process each song
-      for (final song in provider.allSongs) {
+      for (final song in provider.librarySongs) {
         try {
           if (song.url.isEmpty) continue;
-          
           final normalizedPath = getNormalizedPath(song.url);
           if (normalizedPath.isEmpty) continue;
-          
-          // Skip if we've already seen this exact path
-          if (seenPaths.contains(normalizedPath)) {
-            if (kDebugMode) {
-              print('Skipping duplicate song by path: ${song.title} (${song.url})');
-            }
-            continue;
-          }
-          
-          // Add to our unique songs and seen paths
-          uniqueSongs[song.id] = song;
+          if (seenPaths.contains(normalizedPath)) continue;
           seenPaths.add(normalizedPath);
-          
-          if (kDebugMode) {
-            print('Adding song to UI: ${song.title} (${song.url})');
-          }
+          uniqueSongs[song.id] = song;
         } catch (e) {
           if (kDebugMode) {
             print('Error processing song ${song.id}: $e');
           }
         }
       }
-      
-      // Convert to list and sort
+
       final songs = uniqueSongs.values.toList();
-      
+
       songs.sort((a, b) {
         int compare;
         switch (provider.currentSortOption) {
@@ -126,22 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         return provider.sortAscending ? compare : -compare;
       });
-      
-      if (kDebugMode) {
-        print('Displaying ${songs.length} unique songs in UI');
-        // Print first few songs for verification
-        final count = songs.length > 5 ? 5 : songs.length;
-        for (var i = 0; i < count; i++) {
-          print('Song ${i + 1}: ${songs[i].title} (${songs[i].url})');
-        }
-      }
-      
+
       return songs;
     } catch (e) {
       if (kDebugMode) {
         print('Error in _getSortedSongs: $e');
       }
-      // Return empty list on error to prevent crashes
       return [];
     }
   }
@@ -158,7 +148,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$minutes:$seconds';
   }
 
-  Widget _buildFilterBar(music_provider.MusicProvider musicProvider, BuildContext context) {
+  Widget _buildFilterBar(
+      music_provider.MusicProvider musicProvider, BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -176,7 +168,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Icon(Icons.sort_by_alpha, size: 18),
                         const SizedBox(width: 8),
-                        Text('Sort by Title', style: Theme.of(context).textTheme.bodySmall),
+                        Text(l10n.sortByTitle,
+                            style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -186,7 +179,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Icon(Icons.person, size: 18),
                         const SizedBox(width: 8),
-                        Text('Sort by Artist', style: Theme.of(context).textTheme.bodySmall),
+                        Text(l10n.sortByArtist,
+                            style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -196,7 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Icon(Icons.calendar_today, size: 18),
                         const SizedBox(width: 8),
-                        Text('Sort by Date', style: Theme.of(context).textTheme.bodySmall),
+                        Text(l10n.sortByDate,
+                            style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -211,16 +206,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: Icon(
-              musicProvider.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+              musicProvider.sortAscending
+                  ? Icons.arrow_upward
+                  : Icons.arrow_downward,
               size: 20,
             ),
             onPressed: () => musicProvider.toggleSortDirection(),
-            tooltip: musicProvider.sortAscending ? 'Ascending' : 'Descending',
+            tooltip:
+                musicProvider.sortAscending ? l10n.ascending : l10n.descending,
           ),
           IconButton(
             icon: const Icon(Icons.refresh, size: 20),
             onPressed: () => musicProvider.refreshSongs(),
-            tooltip: 'Refresh',
+            tooltip: l10n.refresh,
           ),
         ],
       ),
@@ -228,10 +226,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSongTile(Song song, music_provider.MusicProvider musicProvider) {
-    final isLocal = song.url.startsWith('/storage/emulated/0') || song.url.startsWith('/data/user/');
+    final isLocal = song.url.startsWith('/storage/emulated/0') ||
+        song.url.startsWith('/data/user/');
     final isDownloaded = song.tags.contains('tsmusic');
     final isSelected = _selectedSongs.contains(song.id);
-    
+    final l10n = AppLocalizations.of(context);
+
     return ListTile(
       leading: _isMultiSelectMode
           ? Checkbox(
@@ -253,14 +253,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: isDownloaded 
+              child: isDownloaded
                   ? const Icon(Icons.download_done, color: Colors.green)
-                  : isLocal 
+                  : isLocal
                       ? const Icon(Icons.folder, color: Colors.orange)
                       : const Icon(Icons.music_note),
             ),
       title: Text(
-        song.title.isNotEmpty ? song.title : 'Unknown Title',
+        song.title.isNotEmpty ? song.title : l10n.unknownTitle,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -269,43 +269,49 @@ class _HomeScreenState extends State<HomeScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-        ),
+              color: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.color
+                  ?.withOpacity(0.7),
+            ),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(_formatDuration(song.duration)),
           PopupMenuButton<String>(
-            onSelected: (value) => _handleSongAction(value, song, musicProvider),
+            onSelected: (value) =>
+                _handleSongAction(value, song, musicProvider),
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'move',
                 child: Row(
                   children: [
-                    Icon(Icons.drive_file_move_outline),
-                    SizedBox(width: 8),
-                    Text('Move'),
+                    const Icon(Icons.drive_file_move_outline),
+                    const SizedBox(width: 8),
+                    Text(l10n.move),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_outline, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
+                    const Icon(Icons.delete_outline, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(l10n.delete,
+                        style: const TextStyle(color: Colors.red)),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'add_to_playlist',
                 child: Row(
                   children: [
-                    Icon(Icons.playlist_add),
-                    SizedBox(width: 8),
-                    Text('Add to Playlist'),
+                    const Icon(Icons.playlist_add),
+                    const SizedBox(width: 8),
+                    Text(l10n.addToPlaylist),
                   ],
                 ),
               ),
@@ -317,18 +323,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNoMusicFound() => Center(
+  Widget _buildNoMusicFound() {
+    final l10n = AppLocalizations.of(context);
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.music_off, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
-          const Text(
-            'No music found',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            l10n.noMusicFound,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          const Text('Add music to your device or download some'),
+          Text(l10n.addMusicToDevice),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
@@ -338,16 +346,236 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
             icon: const Icon(Icons.search),
-            label: const Text('Search and Download Music'),
+            label: Text(l10n.searchAndDownload),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMusicTab(music_provider.MusicProvider musicProvider) {
+    final sortedSongs = _getSortedSongs(musicProvider);
+
+    if (sortedSongs.isEmpty) {
+      return _buildNoMusicFound();
+    }
+
+    return Column(
+      children: [
+        _buildFilterBar(musicProvider, context),
+        Expanded(
+          child: ListView.builder(
+            itemCount: sortedSongs.length,
+            itemBuilder: (context, index) {
+              final song = sortedSongs[index];
+              return _buildSongTile(song, musicProvider);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArtistsTab(music_provider.MusicProvider musicProvider) {
+    final l10n = AppLocalizations.of(context);
+    final artists = musicProvider.artists;
+
+    if (artists.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              l10n.noArtists,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: artists.length,
+      itemBuilder: (context, index) {
+        final artistName = artists[index];
+        final artistSongs = musicProvider.getSongsByArtist(artistName);
+        final imageUrl = musicProvider.getArtistImageUrl(artistName);
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ArtistDetailScreen(
+                  artistName: artistName,
+                  artistImageUrl: ValueNotifier<String?>(imageUrl),
+                ),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                  backgroundImage:
+                      imageUrl != null ? NetworkImage(imageUrl) : null,
+                  child: imageUrl == null
+                      ? Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  artistName,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${artistSongs.length} ${l10n.songs.toLowerCase()}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.color
+                            ?.withOpacity(0.7),
+                      ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlaylistsTab(music_provider.MusicProvider musicProvider) {
+    final l10n = AppLocalizations.of(context);
+
+    if (_isLoadingPlaylists) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final userPlaylists = _playlists
+        .where((p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId)
+        .toList();
+
+    return Column(
+      children: [
+        Expanded(
+          child: userPlaylists.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.queue_music,
+                          size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.noPlaylists,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: userPlaylists.length,
+                  itemBuilder: (context, index) {
+                    final playlist = userPlaylists[index];
+                    return ListTile(
+                      leading: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondary
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.queue_music,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                      ),
+                      title: Text(playlist['name'] ?? 'Unnamed'),
+                      subtitle: playlist['description'] != null
+                          ? Text(
+                              playlist['description']!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                      trailing: IconButton(
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(l10n.deletePlaylist),
+                              content: Text(
+                                  '${l10n.confirmDelete} "${playlist['name']}"?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: Text(l10n.cancel),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: Colors.red),
+                                  child: Text(l10n.delete),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            await DatabaseHelper()
+                                .deletePlaylist(playlist['id'] as int);
+                            await _loadPlaylists();
+                          }
+                        },
+                      ),
+                      onTap: () async {
+                        await musicProvider
+                            .loadPlaylistAsQueue(playlist['id'] as int);
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final musicProvider = context.watch<music_provider.MusicProvider>();
-    final sortedSongs = _getSortedSongs(musicProvider);
+    final l10n = AppLocalizations.of(context);
 
     if (musicProvider.isLoading) {
       return const SkeletonHomeScreen();
@@ -364,7 +592,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Icon(Icons.error_outline, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(
-                  'Error loading music',
+                  l10n.errorLoadingMusic,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
@@ -382,9 +610,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       musicProvider.error!,
                       textAlign: TextAlign.left,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        color: Colors.red.shade300,
-                      ),
+                            fontFamily: 'monospace',
+                            color: Colors.red.shade300,
+                          ),
                     ),
                   ),
                 ),
@@ -392,15 +620,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ElevatedButton.icon(
                   onPressed: musicProvider.loadFromDatabaseOnly,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
+                  label: Text(l10n.tryAgain),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () {
-                    // Clear error and go to empty state
                     musicProvider.refreshSongs();
                   },
-                  child: const Text('Skip and continue'),
+                  child: Text(l10n.skip),
                 ),
               ],
             ),
@@ -408,26 +635,26 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    
-    if (sortedSongs.isEmpty) {
-      return Scaffold(
-        body: _buildNoMusicFound(),
-      );
-    }
 
     return Scaffold(
       body: Column(
         children: [
-          // Sort and Filter Bar
-          _buildFilterBar(musicProvider, context),
-          // Song List
+          TabBar(
+            controller: _tabController,
+            tabs: [
+              Tab(text: l10n.music),
+              Tab(text: l10n.artists),
+              Tab(text: l10n.playlists),
+            ],
+          ),
           Expanded(
-            child: ListView.builder(
-              itemCount: sortedSongs.length,
-              itemBuilder: (context, index) {
-                final song = sortedSongs[index];
-                return _buildSongTile(song, musicProvider);
-              },
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildMusicTab(musicProvider),
+                _buildArtistsTab(musicProvider),
+                _buildPlaylistsTab(musicProvider),
+              ],
             ),
           ),
         ],
@@ -435,7 +662,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _handleSongAction(String action, Song song, music_provider.MusicProvider provider) async {
+  void _handleSongAction(
+      String action, Song song, music_provider.MusicProvider provider) async {
+    final l10n = AppLocalizations.of(context);
     switch (action) {
       case 'move':
         await _showMoveDialog(song);
@@ -444,28 +673,31 @@ class _HomeScreenState extends State<HomeScreen> {
         await _showDeleteConfirmation(song, provider);
         break;
       case 'add_to_playlist':
-        await _showPlaylistDialog(song);
+        showPlaylistSelector(context);
         break;
     }
   }
 
   Future<void> _showMoveDialog(Song song) async {
+    final l10n = AppLocalizations.of(context);
     final locations = [
-      {'label': 'Internal Storage', 'path': '/storage/emulated/0/Music'},
-      {'label': 'Downloads', 'path': '/storage/emulated/0/Download'},
-      {'label': 'Music Folder', 'path': '/storage/emulated/0/Music'},
+      {'label': l10n.internalStorage, 'path': '/storage/emulated/0/Music'},
+      {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
+      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music'},
     ];
 
     final selected = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Move to'),
+        title: Text(l10n.moveTo),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: locations.map((loc) => ListTile(
-            title: Text(loc['label']!),
-            onTap: () => Navigator.pop(context, loc['path']),
-          )).toList(),
+          children: locations
+              .map((loc) => ListTile(
+                    title: Text(loc['label']!),
+                    onTap: () => Navigator.pop(context, loc['path']),
+                  ))
+              .toList(),
         ),
       ),
     );
@@ -475,32 +707,38 @@ class _HomeScreenState extends State<HomeScreen> {
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
         await file.rename(newPath);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Moved to $selected')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.move}: $selected')),
+          );
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error moving file: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.errorMovingFile}: $e')),
+          );
+        }
       }
     }
   }
 
-  Future<void> _showDeleteConfirmation(Song song, music_provider.MusicProvider provider) async {
+  Future<void> _showDeleteConfirmation(
+      Song song, music_provider.MusicProvider provider) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Song'),
-        content: Text('Are you sure you want to delete "${song.title}"?'),
+        title: Text(l10n.deleteSong),
+        content: Text('${l10n.confirmDelete} "${song.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -508,41 +746,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed == true) {
       try {
-        // Delete physical file first
-        final file = File(song.url);
-        if (await file.exists()) {
-          await file.delete();
-        }
-        // Remove from DB + in-memory collections via provider
         await provider.deleteSong(song);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Song deleted')),
+            SnackBar(content: Text(l10n.songDeleted)),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting: $e')),
+            SnackBar(content: Text('${l10n.error}: $e')),
           );
         }
       }
     }
-  }
-
-  Future<void> _showPlaylistDialog(Song song) async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add to Playlist'),
-        content: const Text('Playlist feature coming soon'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 }

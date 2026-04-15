@@ -8,7 +8,6 @@ import '../models/audio_format.dart';
 import '../utils/package_info_utils.dart';
 import '../localization/app_localizations.dart';
 
-
 class SettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -23,34 +22,35 @@ class SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            children: [
-              if (icon != null) ...[
-                Icon(icon,
-                    size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon,
+                      size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ],
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ],
+            ),
           ),
-        ),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-          child: Column(children: children),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: Column(children: children),
+          ),
+          const SizedBox(height: 8),
+        ],
+      );
 }
 
 class ColorSelector extends StatelessWidget {
@@ -67,29 +67,30 @@ class ColorSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        margin: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isSelected ? Colors.white : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isSelected ? Colors.white : Colors.transparent,
+              width: 2,
             ),
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child:
+              isSelected ? const Icon(Icons.check, color: Colors.white) : null,
         ),
-        child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
-      ),
-    );
+      );
 }
 
 void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
@@ -97,54 +98,55 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-        title: Text(l10n.selectPlayerStyle),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: PlayerStyle.values.map((style) {
-              final isSelected = style == themeProvider.playerStyle;
-              return ListTile(
-                title: Text(
-                  themeProvider.getPlayerStyleName(style),
-                  style: TextStyle(
-                    fontWeight:                        isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
+      title: Text(l10n.selectPlayerStyle),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: PlayerStyle.values.map((style) {
+            final isSelected = style == themeProvider.playerStyle;
+            return ListTile(
+              title: Text(
+                themeProvider.getPlayerStyleName(style),
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color:
+                      isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
-                leading: Radio<PlayerStyle>(
-                  value: style,
-                  groupValue: themeProvider.playerStyle,
-                  onChanged: (PlayerStyle? newStyle) {
-                    if (newStyle != null) {
-                      themeProvider.setPlayerStyle(newStyle);
-                      Navigator.of(context).pop();
-                    }
-                  },
-                ),
-                onTap: () {
-                  themeProvider.setPlayerStyle(style);
-                  Navigator.of(context).pop();
+              ),
+              leading: Radio<PlayerStyle>(
+                value: style,
+                groupValue: themeProvider.playerStyle,
+                onChanged: (PlayerStyle? newStyle) {
+                  if (newStyle != null) {
+                    themeProvider.setPlayerStyle(newStyle);
+                    Navigator.of(context).pop();
+                  }
                 },
-              );
-            }).toList(),
-          ),
+              ),
+              onTap: () {
+                themeProvider.setPlayerStyle(style);
+                Navigator.of(context).pop();
+              },
+            );
+          }).toList(),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.cancel),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    ),
   );
 }
 
-void _showDownloadLocationDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showDownloadLocationDialog(
+    BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   final locations = ['internal', 'downloads', 'music'];
-  
+
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
@@ -160,7 +162,8 @@ void _showDownloadLocationDialog(BuildContext context, SettingsProvider settings
                 settingsProvider.getDownloadLocationName(location),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color:
+                      isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
               ),
               leading: Radio<String>(
@@ -191,102 +194,106 @@ void _showDownloadLocationDialog(BuildContext context, SettingsProvider settings
   );
 }
 
-void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showAudioFormatDialog(
+    BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-        title: Text(l10n.selectAudioFormat),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: AudioFormat.values.map((format) {
-              final isSelected = format == settingsProvider.audioFormat;
-              return ListTile(
-                title: Text(
-                  settingsProvider.getAudioFormatName(format),
-                  style: TextStyle(
-                    fontWeight:                        isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
+      title: Text(l10n.selectAudioFormat),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: AudioFormat.values.map((format) {
+            final isSelected = format == settingsProvider.audioFormat;
+            return ListTile(
+              title: Text(
+                settingsProvider.getAudioFormatName(format),
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color:
+                      isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
-                leading: Radio<AudioFormat>(
-                  value: format,
-                  groupValue: settingsProvider.audioFormat,
-                  onChanged: (AudioFormat? newFormat) {
-                    if (newFormat != null) {
-                      settingsProvider.setAudioFormat(newFormat);
-                      Navigator.of(context).pop();
-                    }
-                  },
-                ),
-                onTap: () {
-                  settingsProvider.setAudioFormat(format);
-                  Navigator.of(context).pop();
+              ),
+              leading: Radio<AudioFormat>(
+                value: format,
+                groupValue: settingsProvider.audioFormat,
+                onChanged: (AudioFormat? newFormat) {
+                  if (newFormat != null) {
+                    settingsProvider.setAudioFormat(newFormat);
+                    Navigator.of(context).pop();
+                  }
                 },
-              );
-            }).toList(),
-          ),
+              ),
+              onTap: () {
+                settingsProvider.setAudioFormat(format);
+                Navigator.of(context).pop();
+              },
+            );
+          }).toList(),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.cancel),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    ),
   );
 }
 
-void _showLanguageDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showLanguageDialog(
+    BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-        title: Text(l10n.selectLanguage),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: AppLocalizations.supportedLocales.map((locale) {
-              final isSelected = locale == settingsProvider.locale;
-              return ListTile(
-                title: Text(
-                  settingsProvider.getLanguageName(locale),
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? Theme.of(context).colorScheme.primary : null,
-                  ),
+      title: Text(l10n.selectLanguage),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: AppLocalizations.supportedLocales.map((locale) {
+            final isSelected = locale == settingsProvider.locale;
+            return ListTile(
+              title: Text(
+                settingsProvider.getLanguageName(locale),
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color:
+                      isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
-                leading: Radio<Locale>(
-                  value: locale,
-                  groupValue: settingsProvider.locale,
-                  onChanged: (Locale? newLocale) {
-                    if (newLocale != null) {
-                      settingsProvider.setLanguage(newLocale);
-                      Navigator.of(context).pop();
-                    }
-                  },
-                ),
-                onTap: () {
-                  settingsProvider.setLanguage(locale);
-                  Navigator.of(context).pop();
+              ),
+              leading: Radio<Locale>(
+                value: locale,
+                groupValue: settingsProvider.locale,
+                onChanged: (Locale? newLocale) {
+                  if (newLocale != null) {
+                    settingsProvider.setLanguage(newLocale);
+                    Navigator.of(context).pop();
+                  }
                 },
-              );
-            }).toList(),
-          ),
+              ),
+              onTap: () {
+                settingsProvider.setLanguage(locale);
+                Navigator.of(context).pop();
+              },
+            );
+          }).toList(),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.cancel),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    ),
   );
 }
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -355,19 +362,22 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 8.0, horizontal: 16.0),
                   child: Text(l10n.accentColor),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: themeProvider.availableColors.map((color) => ColorSelector(
-                        color: color,
-                        isSelected:
-                            themeProvider.primaryColor.value == color.value,
-                        onTap: () => themeProvider.setPrimaryColor(color),
-                      )).toList(),
+                    children: themeProvider.availableColors
+                        .map((color) => ColorSelector(
+                              color: color,
+                              isSelected: themeProvider.primaryColor.value ==
+                                  color.value,
+                              onTap: () => themeProvider.setPrimaryColor(color),
+                            ))
+                        .toList(),
                   ),
                 ),
               ],
@@ -382,7 +392,8 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(l10n.audioDownloadFormat),
                 leading: const Icon(Icons.audiotrack),
                 trailing: Text(
-                  settingsProvider.getAudioFormatName(settingsProvider.audioFormat),
+                  settingsProvider
+                      .getAudioFormatName(settingsProvider.audioFormat),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -396,7 +407,8 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('Download Location'),
                 leading: const Icon(Icons.folder),
                 trailing: Text(
-                  settingsProvider.getDownloadLocationName(settingsProvider.downloadLocation),
+                  settingsProvider.getDownloadLocationName(
+                      settingsProvider.downloadLocation),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -415,7 +427,6 @@ class SettingsScreen extends StatelessWidget {
               ListTile(
                 title: Text(l10n.version),
                 subtitle: Text(PackageInfoUtils.version),
-
                 leading: const Icon(Icons.info_outline),
                 onTap: () {
                   showAboutDialog(
@@ -436,11 +447,45 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(l10n.helpSupport),
                 leading: const Icon(Icons.help_outline),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  final uri = Uri.parse('https://github.com/veciata/TsMusic/issues');
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('TsMusic'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.createdBy),
+                          const SizedBox(height: 16),
+                          Text(
+                            l10n.supportFeedback,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: Text(l10n.cancel),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final uri = Uri.parse(
+                                'https://github.com/veciata/TsMusic/issues');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            }
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          },
+                          child: Text(l10n.openGitHub),
+                        ),
+                      ],
+                    ),
+                  );
                 },
               ),
             ],

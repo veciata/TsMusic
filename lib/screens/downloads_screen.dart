@@ -7,7 +7,6 @@ import '../providers/music_provider.dart' as music_provider;
 import '../providers/settings_provider.dart';
 import '../models/song.dart';
 import '../services/youtube_service.dart';
-import '../widgets/bottom_navigation_widget.dart';
 import '../utils/permission_helper.dart';
 
 class DownloadsScreen extends StatefulWidget {
@@ -22,15 +21,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   late SettingsProvider _settingsProvider;
   final Map<String, double> _downloadProgress = {};
   List<Song> _localFiles = [];
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     final newSettingsProvider = Provider.of<SettingsProvider>(context);
-    
+
     // Rescan if settings provider changed or location changed
-    if (_localFiles.isEmpty || (_settingsProvider.downloadLocation != newSettingsProvider.downloadLocation)) {
+    if (_localFiles.isEmpty ||
+        (_settingsProvider.downloadLocation !=
+            newSettingsProvider.downloadLocation)) {
       _settingsProvider = newSettingsProvider;
       _scanLocalFiles();
     } else {
@@ -57,265 +58,274 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(
-        title: const Text('Downloads'),
-      ),
-      body: _buildDownloadsList(),
-      bottomNavigationBar: BottomNavigationWidget(
-        currentIndex: 1,
-        onTap: (index) {},
-      ),
-    );
+        appBar: AppBar(
+          title: const Text('Downloads'),
+        ),
+        body: _buildDownloadsList(),
+      );
 
-  Widget _buildDownloadsList() => Consumer2<YouTubeService, music_provider.MusicProvider>(
-      builder: (context, youTubeService, musicProvider, _) {
-        final activeDownloads = youTubeService.activeDownloads;
-        final downloadedSongs = musicProvider.youtubeSongs;
-        final allSongs = {...downloadedSongs, ..._localFiles}.toList();
-        
-        if (activeDownloads.isEmpty && allSongs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.music_off,
-                  size: 64,
-                  color: Theme.of(context).disabledColor,
+  Widget _buildDownloadsList() =>
+      Consumer2<YouTubeService, music_provider.MusicProvider>(
+        builder: (context, youTubeService, musicProvider, _) {
+          final activeDownloads = youTubeService.activeDownloads;
+          final downloadedSongs = musicProvider.youtubeSongs;
+          final allSongs = {...downloadedSongs, ..._localFiles}.toList();
+
+          if (activeDownloads.isEmpty && allSongs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.music_off,
+                    size: 64,
+                    color: Theme.of(context).disabledColor,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No downloads yet',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Download songs from the search tab',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView(
+            children: [
+              if (activeDownloads.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Downloading...',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'No downloads yet',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Download songs from the search tab',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                ...activeDownloads
+                    .map((download) => _buildDownloadItem(download))
+                    .toList(),
+                const Divider(),
               ],
-            ),
+              if (allSongs.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Downloaded',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                ...allSongs.map((song) => _buildSongItem(song)).toList(),
+              ],
+            ],
           );
-        }
-
-        return ListView(
-          children: [
-            if (activeDownloads.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Downloading...', 
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-              ...activeDownloads.map((download) => _buildDownloadItem(download)).toList(),
-              const Divider(),
-            ],
-            if (allSongs.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Downloaded', 
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-              ...allSongs.map((song) => _buildSongItem(song)).toList(),
-            ],
-          ],
-        );
-      },
-    );
-
-
+        },
+      );
 
   Widget _buildDownloadItem(dynamic download) => Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        leading: const Icon(Icons.downloading, size: 32),
-        title: Text(
-          download.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: download.cancelRequested
-            ? const Padding(
-                padding: EdgeInsets.only(right: 12.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                  ),
-                ),
-              )
-            : IconButton(
-                icon: const Icon(Icons.cancel, color: Colors.red),
-                onPressed: () => _youTubeService.cancelDownload(download.videoId),
-                tooltip: 'Cancel download',
-              ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: download.progress > 0 ? download.progress : null,
-              minHeight: 4,
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                download.cancelRequested 
-                    ? Colors.orange 
-                    : Theme.of(context).primaryColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  download.progress > 0 ? '${(download.progress * 100).toStringAsFixed(1)}%' : 'Downloading...',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (download.cancelRequested)
-                  Text(
-                    'Canceling...',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: const Icon(Icons.downloading, size: 32),
+          title: Text(
+            download.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: download.cancelRequested
+              ? const Padding(
+                  padding: EdgeInsets.only(right: 12.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
                     ),
                   ),
-              ],
-            ),
-            if (download.error != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                download.error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 12,
+                )
+              : IconButton(
+                  icon: const Icon(Icons.cancel, color: Colors.red),
+                  onPressed: () =>
+                      _youTubeService.cancelDownload(download.videoId),
+                  tooltip: 'Cancel download',
+                ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: download.progress > 0 ? download.progress : null,
+                minHeight: 4,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  download.cancelRequested
+                      ? Colors.orange
+                      : Theme.of(context).primaryColor,
                 ),
               ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    download.progress > 0
+                        ? '${(download.progress * 100).toStringAsFixed(1)}%'
+                        : 'Downloading...',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (download.cancelRequested)
+                    Text(
+                      'Canceling...',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                ],
+              ),
+              if (download.error != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  download.error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-    );
+      );
 
   Widget _buildSongItem(Song song) => Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        leading: song.albumArtUrl?.isNotEmpty == true
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: CachedNetworkImage(
-                  imageUrl: song.albumArtUrl!,
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: song.albumArtUrl?.isNotEmpty == true
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: CachedNetworkImage(
+                    imageUrl: song.albumArtUrl!,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 50,
+                      height: 50,
+                      color: Colors.grey[300],
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 50,
+                      height: 50,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.music_note),
+                    ),
+                  ),
+                )
+              : Container(
                   width: 50,
                   height: 50,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    width: 50,
-                    height: 50,
-                    color: Colors.grey[300],
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    width: 50,
-                    height: 50,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.music_note),
-                  ),
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.music_note),
                 ),
-              )
-            : Container(
-                width: 50,
-                height: 50,
-                color: Colors.grey[300],
-                child: const Icon(Icons.music_note),
+          title: Text(
+            song.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          subtitle: Text(
+            song.artists.isNotEmpty
+                ? song.artists.join(' & ')
+                : 'Unknown Artist',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(song.formattedDuration),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'relocate') {
+                    _showRelocateDialog(song);
+                  } else if (value == 'delete') {
+                    _deleteSong(song);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'relocate',
+                    child: Row(
+                      children: [
+                        Icon(Icons.drive_file_move),
+                        SizedBox(width: 8),
+                        Text('Move to...'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-        title: Text(
-          song.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+            ],
+          ),
+          onTap: () {
+            final musicProvider = Provider.of<music_provider.MusicProvider>(
+              context,
+              listen: false,
+            );
+            musicProvider.playSong(song);
+          },
         ),
-        subtitle: Text(
-          song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(song.formattedDuration),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'relocate') {
-                  _showRelocateDialog(song);
-                } else if (value == 'delete') {
-                  _deleteSong(song);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'relocate',
-                  child: Row(
-                    children: [
-                      Icon(Icons.drive_file_move),
-                      SizedBox(width: 8),
-                      Text('Move to...'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        onTap: () {
-          final musicProvider = Provider.of<music_provider.MusicProvider>(
-            context,
-            listen: false,
-          );
-          musicProvider.playSong(song);
-        },
-      ),
-    );
-
-
+      );
 
   Future<void> _scanLocalFiles() async {
     try {
       // Request necessary permissions first
-      final hasPermission = await PermissionHelper.requestFileManagementPermission();
+      final hasPermission =
+          await PermissionHelper.requestFileManagementPermission();
       if (!hasPermission) {
         debugPrint('File management permission not granted');
         return;
       }
-      
+
       // Scan ALL locations, not just current one
       final locations = ['internal', 'downloads', 'music'];
       final List<Song> allSongs = [];
-      
+
       for (final location in locations) {
         final dir = await _getMusicDirectory(location);
         if (!await dir.exists()) continue;
-        
-        final files = await dir.list().where((f) => f is File && 
-          (f.path.endsWith('.m4a') || f.path.endsWith('.webm') || f.path.endsWith('.mp3') || f.path.endsWith('.opus'))
-        ).toList();
-        
+
+        final files = await dir
+            .list()
+            .where((f) =>
+                f is File &&
+                (f.path.endsWith('.m4a') ||
+                    f.path.endsWith('.webm') ||
+                    f.path.endsWith('.mp3') ||
+                    f.path.endsWith('.opus')))
+            .toList();
+
         final songs = files.map((file) {
           final fileName = file.path.split('/').last;
-          final nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
+          final nameWithoutExt =
+              fileName.substring(0, fileName.lastIndexOf('.'));
           final parts = nameWithoutExt.split('_');
           final title = parts.first;
           return Song(
@@ -326,16 +336,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             duration: 0,
           );
         }).toList();
-        
+
         allSongs.addAll(songs);
       }
-      
+
       // Add scanned songs to MusicProvider playlist
-      final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProvider =
+          Provider.of<music_provider.MusicProvider>(context, listen: false);
       for (final song in allSongs) {
         musicProvider.addSongToPlaylist(song);
       }
-      
+
       if (mounted) {
         setState(() => _localFiles = allSongs);
       }
@@ -343,7 +354,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       debugPrint('Error scanning local files: $e');
     }
   }
-  
+
   Future<Directory> _getMusicDirectory(String downloadLocation) async {
     if (downloadLocation == 'downloads') {
       return Directory('/storage/emulated/0/Download/tsmusic');
@@ -354,24 +365,26 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       return Directory('${appDir.path}/tsmusic');
     }
   }
-  
+
   Future<void> _showRelocateDialog(Song song) async {
     final locations = [
       {'value': 'internal', 'label': 'Internal Storage'},
       {'value': 'downloads', 'label': 'Downloads folder'},
       {'value': 'music', 'label': 'Music folder'},
     ];
-    
+
     final selected = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Move to...'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: locations.map((loc) => ListTile(
-            title: Text(loc['label']!),
-            onTap: () => Navigator.of(context).pop(loc['value']),
-          )).toList(),
+          children: locations
+              .map((loc) => ListTile(
+                    title: Text(loc['label']!),
+                    onTap: () => Navigator.of(context).pop(loc['value']),
+                  ))
+              .toList(),
         ),
         actions: [
           TextButton(
@@ -381,12 +394,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ],
       ),
     );
-    
+
     if (selected != null) {
       await _relocateSong(song, selected);
     }
   }
-  
+
   Future<void> _relocateSong(Song song, String targetLocation) async {
     try {
       final sourceFile = File(song.url);
@@ -396,28 +409,33 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         );
         return;
       }
-      
+
       final targetDir = await _getMusicDirectory(targetLocation);
       if (!await targetDir.exists()) {
         await targetDir.create(recursive: true);
       }
-      
+
       final fileName = song.url.split('/').last;
       final targetFile = File('${targetDir.path}/$fileName');
-      
+
       // Copy then delete source
       await sourceFile.copy(targetFile.path);
       await sourceFile.delete();
-      
+
       // Update song in provider
-      final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProvider =
+          Provider.of<music_provider.MusicProvider>(context, listen: false);
       final updatedSong = song.copyWith(url: targetFile.path);
       musicProvider.addSongToPlaylist(updatedSong);
-      
+
       // Refresh UI
       await _scanLocalFiles();
-      
-      final locationLabels = {'internal': 'Internal Storage', 'downloads': 'Downloads folder', 'music': 'Music folder'};
+
+      final locationLabels = {
+        'internal': 'Internal Storage',
+        'downloads': 'Downloads folder',
+        'music': 'Music folder'
+      };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Moved to ${locationLabels[targetLocation]}')),
       );
@@ -428,7 +446,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
     }
   }
-  
+
   Future<void> _deleteSong(Song song) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -448,24 +466,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       try {
-        // Delete physical file
-        final file = File(song.url);
-        if (await file.exists()) {
-          await file.delete();
-        }
-        
-        // Remove from DB + in-memory via provider
+        // Delete from DB and file via provider
         if (mounted) {
-          await Provider.of<music_provider.MusicProvider>(context, listen: false)
+          await Provider.of<music_provider.MusicProvider>(context,
+                  listen: false)
               .deleteSong(song);
         }
-        
+
         // Refresh local file list
         await _scanLocalFiles();
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('"${song.title}" deleted')),
@@ -481,14 +494,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       }
     }
   }
-  
+
   void addDownload(String videoId, String title) {
     if (!_downloadProgress.containsKey(videoId)) {
       setState(() {
         _downloadProgress[videoId] = 0.0;
       });
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-      _youTubeService.downloadAudio(
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
+      _youTubeService
+          .downloadAudio(
         videoId: videoId,
         preferredFormat: settingsProvider.audioFormat,
         downloadLocation: settingsProvider.downloadLocation,
@@ -499,9 +514,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             });
           }
         },
-      ).then((result) async {
+      )
+          .then((result) async {
         if (result != null && mounted) {
-          await Provider.of<music_provider.MusicProvider>(context, listen: false)
+          await Provider.of<music_provider.MusicProvider>(context,
+                  listen: false)
               .loadFromDatabaseOnly();
           _scanLocalFiles();
           setState(() {

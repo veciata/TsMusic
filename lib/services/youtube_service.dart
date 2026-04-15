@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb, ChangeNotifier;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kIsWeb, ChangeNotifier;
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,7 @@ import 'package:path/path.dart' as path;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
+import 'package:tsmusic/utils/youtube_artist_parser.dart';
 
 /// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
 /// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
@@ -60,13 +62,16 @@ class YouTubeAudio {
       safeDuration = null;
     }
 
-    final authors = video.author.split(',').map((a) => a.trim()).toList();
+    final artistName = YouTubeArtistParser.parseArtistName(
+      video.title,
+      video.author,
+    );
 
     return YouTubeAudio(
       id: video.id.value,
       title: video.title,
-      author: video.author,
-      artists: authors.isNotEmpty ? authors : ['Unknown Artist'],
+      author: artistName,
+      artists: [artistName],
       duration: safeDuration,
       thumbnailUrl: video.thumbnails.mediumResUrl,
     );
@@ -107,7 +112,8 @@ class YouTubeService with ChangeNotifier {
   final Map<String, VideoSearchList> _searchPages = {};
 
   // Getters
-  List<DownloadProgress> get activeDownloads => _activeDownloads.values.toList();
+  List<DownloadProgress> get activeDownloads =>
+      _activeDownloads.values.toList();
   YouTubeAudio? get currentAudio => _currentAudio;
   bool get isPlaying => _player.state.playing;
 
@@ -135,11 +141,12 @@ class YouTubeService with ChangeNotifier {
 
       // Clear any previous errors
       await _player.stop();
-      
+
       final String? audioUrl = await _getAudioStream(audio.id);
 
       if (audioUrl == null) {
-        throw Exception('Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.');
+        throw Exception(
+            'Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.');
       }
 
       debugPrint('Playing audio from URL: $audioUrl');
@@ -153,7 +160,7 @@ class YouTubeService with ChangeNotifier {
         debugPrint('❌ Error setting audio source: $e');
         throw Exception('Ses çalınamadı: ${e.toString()}');
       }
-      
+
       // Update the current audio with the latest info
       _currentAudio = YouTubeAudio(
         id: audio.id,
@@ -164,7 +171,7 @@ class YouTubeService with ChangeNotifier {
         thumbnailUrl: audio.thumbnailUrl,
         audioUrl: audioUrl,
       );
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error playing YouTube audio: $e');
@@ -186,7 +193,8 @@ class YouTubeService with ChangeNotifier {
           ytClients: [YoutubeApiClient.androidVr],
         );
       } catch (e) {
-        debugPrint('Manifest androidVr ile alınamadı, varsayılan deneniyor: $e');
+        debugPrint(
+            'Manifest androidVr ile alınamadı, varsayılan deneniyor: $e');
         manifest = await _yt.videos.streamsClient.getManifest(videoId);
       }
 
@@ -200,10 +208,12 @@ class YouTubeService with ChangeNotifier {
           audioStreams.where((s) => s.container.name == 'mp4').toList();
       final StreamInfo streamInfo = m4aStreams.isNotEmpty
           ? m4aStreams.reduce(
-              (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+              (a, b) =>
+                  a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
             )
           : audioStreams.reduce(
-              (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+              (a, b) =>
+                  a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
             );
 
       final streamUrl = streamInfo.url.toString();
@@ -214,20 +224,19 @@ class YouTubeService with ChangeNotifier {
       return null;
     }
   }
-  
+
   // Pause audio
   Future<void> pause() async {
     await _player.pause();
     notifyListeners();
   }
-  
+
   // Stop audio
   Future<void> stop() async {
     await _player.stop();
     _currentAudio = null;
     notifyListeners();
   }
-  
 
   void _notifyProgressUpdate() {
     notifyListeners();
@@ -259,7 +268,8 @@ class YouTubeService with ChangeNotifier {
       }
       _activeDownloads.remove(videoId);
       _notifyProgressUpdate();
-      debugPrint('_completeDownload: Download for videoId: $videoId completed and removed from active list.');
+      debugPrint(
+          '_completeDownload: Download for videoId: $videoId completed and removed from active list.');
     }
   }
 
@@ -314,9 +324,6 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-
-
-
   Future<String?> getAudioStreamUrl(String videoId) async {
     try {
       final manifest = await _yt.videos.streamsClient.getManifest(videoId);
@@ -325,7 +332,8 @@ class YouTubeService with ChangeNotifier {
         return streams.withHighestBitrate().url.toString();
       }
       // Audio-only streams required - no video fallback
-      debugPrint('getAudioStreamUrl: No audio-only streams available for videoId: $videoId');
+      debugPrint(
+          'getAudioStreamUrl: No audio-only streams available for videoId: $videoId');
       return null;
     } catch (e) {
       debugPrint('Error getting audio stream URL: $e');
@@ -366,65 +374,93 @@ class YouTubeService with ChangeNotifier {
       }
 
       // Select stream based on preferred format
-      // Prefer m4a (mp4) format for best compatibility with audio players
       StreamInfo streamInfo;
       final audioStreams = manifest.audioOnly.toList();
-      
-      // Try to find m4a/mp4 stream first (best compatibility)
-      final m4aStreams = audioStreams.where((s) => s.container.name == 'mp4').toList();
-      
-      if (m4aStreams.isNotEmpty) {
-        // Use highest bitrate m4a stream
-        streamInfo = m4aStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
-        debugPrint('downloadAudio: Selected m4a format for best compatibility');
-      } else if (preferredFormat == AudioFormat.auto || preferredFormat == AudioFormat.all) {
-        // Auto: pick highest bitrate from available
-        streamInfo = audioStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
-        debugPrint('downloadAudio: No m4a available, using ${streamInfo.container.name}');
-      } else {
-        // Filter by container type as requested
-        final preferredContainer = preferredFormat.name;
-        final matchingStreams = audioStreams.where((s) => 
-          s.container.name.toLowerCase() == preferredContainer ||
-          (preferredFormat == AudioFormat.m4a && s.container.name == 'mp4') ||
-          (preferredFormat == AudioFormat.opus && s.container.name == 'webm')
-        ).toList();
-        
-        if (matchingStreams.isNotEmpty) {
-          streamInfo = matchingStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
-          debugPrint('downloadAudio: Selected ${streamInfo.container.name} format as requested');
-        } else {
-          // Fallback to best available
-          streamInfo = audioStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
-          debugPrint('downloadAudio: Preferred format $preferredContainer not available, using ${streamInfo.container.name}');
+
+      if (audioStreams.isEmpty) {
+        throw Exception('No audio streams available for video $videoId');
+      }
+
+      // Select format based on user preference
+      StreamInfo? selectedStream;
+
+      if (preferredFormat == AudioFormat.m4a) {
+        // User wants M4A - find best m4a stream
+        final m4aStreams =
+            audioStreams.where((s) => s.container.name == 'mp4').toList();
+        if (m4aStreams.isNotEmpty) {
+          selectedStream = m4aStreams.reduce((a, b) =>
+              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint('downloadAudio: Selected m4a format as requested');
+        }
+      } else if (preferredFormat == AudioFormat.opus) {
+        // User wants OPUS - find best webm/opus stream
+        final opusStreams =
+            audioStreams.where((s) => s.container.name == 'webm').toList();
+        if (opusStreams.isNotEmpty) {
+          selectedStream = opusStreams.reduce((a, b) =>
+              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint('downloadAudio: Selected opus format as requested');
+        }
+      } else if (preferredFormat == AudioFormat.mp3) {
+        // MP3 typically comes as m4a container or webm
+        final mp3Streams = audioStreams
+            .where(
+                (s) => s.container.name == 'mp4' || s.container.name == 'webm')
+            .toList();
+        if (mp3Streams.isNotEmpty) {
+          selectedStream = mp3Streams.reduce((a, b) =>
+              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint('downloadAudio: Selected stream for MP3 preference');
         }
       }
 
+      // Auto mode or fallback: prefer m4a for compatibility, then highest bitrate
+      if (selectedStream == null) {
+        final m4aStreams =
+            audioStreams.where((s) => s.container.name == 'mp4').toList();
+        if (m4aStreams.isNotEmpty) {
+          selectedStream = m4aStreams.reduce((a, b) =>
+              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint(
+              'downloadAudio: Auto mode - selected m4a for best compatibility');
+        } else {
+          // Fallback to highest bitrate available
+          selectedStream = audioStreams.reduce((a, b) =>
+              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          debugPrint(
+              'downloadAudio: Auto mode - using highest bitrate ${selectedStream.container.name}');
+        }
+      }
+
+      streamInfo = selectedStream;
+
       final musicDir = await _getMusicDirectory(downloadLocation);
       final safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      
+
       // Use proper audio extension based on container format
       String audioExtension;
       if (streamInfo.container.name == 'mp4') {
         audioExtension = 'm4a';
       } else if (streamInfo.container.name == 'webm') {
-        // WebM audio-only files typically use Opus codec, save as .opus
         audioExtension = 'opus';
       } else {
         audioExtension = streamInfo.container.name;
       }
-      
+
+      // Simple filename: Title_VideoID.extension (no bitrate to avoid duplicates)
       final finalFile = File(
         path.join(
           musicDir.path,
-          '${safeTitle}_${videoId}_${streamInfo.bitrate.bitsPerSecond}.$audioExtension',
+          '${safeTitle}_$videoId.$audioExtension',
         ),
       );
 
       if (await finalFile.exists()) {
         final fileSize = await finalFile.length();
         if (fileSize > 0) {
-          debugPrint('downloadAudio: File already exists and is valid: ${finalFile.path}. Skipping.');
+          debugPrint(
+              'downloadAudio: File already exists and is valid: ${finalFile.path}. Skipping.');
           _completeDownload(videoId);
           return DownloadResult(
             filePath: finalFile.path,
@@ -432,41 +468,44 @@ class YouTubeService with ChangeNotifier {
               videoId: videoId,
               filePath: finalFile.path,
               title: video.title,
-              author: video.author,
+              author: YouTubeArtistParser.parseArtistName(
+                  video.title, video.author),
               duration: video.duration?.inMilliseconds ?? 0,
             ),
           );
         } else {
-          debugPrint('downloadAudio: Empty file found: ${finalFile.path}. Deleting and re-downloading.');
+          debugPrint(
+              'downloadAudio: Empty file found: ${finalFile.path}. Deleting and re-downloading.');
           await finalFile.delete();
         }
       }
 
       final downloadProgress = _activeDownloads[videoId];
       debugPrint('downloadAudio: Getting stream for videoId: $videoId');
-      
+
       // Use YouTube Explode copyTo method - more reliable than manual streaming
       final contentLength = streamInfo.size.totalBytes;
-      debugPrint('downloadAudio: Expected content length: $contentLength bytes');
-      
+      debugPrint(
+          'downloadAudio: Expected content length: $contentLength bytes');
+
       var receivedBytes = 0;
       var lastProgressUpdate = DateTime.now();
-      
+
       try {
         // Create a custom sink to track progress
         final sink = finalFile.openWrite();
-        
+
         // Use listen instead of await for to have more control
         final stream = _yt.videos.streamsClient.get(streamInfo);
-        
+
         await for (final chunk in stream) {
           if (downloadProgress?.cancelRequested == true) {
             break;
           }
-          
+
           sink.add(chunk);
           receivedBytes += chunk.length;
-          
+
           // Update progress every 100ms to avoid flooding
           final now = DateTime.now();
           if (now.difference(lastProgressUpdate).inMilliseconds > 100) {
@@ -475,14 +514,14 @@ class YouTubeService with ChangeNotifier {
               final progress = receivedBytes / contentLength;
               _updateDownloadProgress(videoId, progress);
               onProgress?.call(progress);
-              debugPrint('downloadAudio: Progress ${(progress * 100).toStringAsFixed(1)}%');
+              debugPrint(
+                  'downloadAudio: Progress ${(progress * 100).toStringAsFixed(1)}%');
             }
           }
         }
-        
+
         await sink.flush();
         await sink.close();
-        
       } on Exception catch (e) {
         debugPrint('downloadAudio: Stream error: $e');
         // Clean up partial file
@@ -491,9 +530,10 @@ class YouTubeService with ChangeNotifier {
         }
         rethrow;
       }
-      
+
       final finalFileSize = await finalFile.length();
-      debugPrint('downloadAudio: Download completed. Final file size: $finalFileSize bytes');
+      debugPrint(
+          'downloadAudio: Download completed. Final file size: $finalFileSize bytes');
 
       if (downloadProgress?.cancelRequested == true) {
         if (await finalFile.exists()) {
@@ -507,7 +547,7 @@ class YouTubeService with ChangeNotifier {
         videoId: videoId,
         filePath: finalFile.path,
         title: video.title,
-        author: video.author,
+        author: YouTubeArtistParser.parseArtistName(video.title, video.author),
         duration: video.duration?.inMilliseconds ?? 0,
       );
 
@@ -521,7 +561,8 @@ class YouTubeService with ChangeNotifier {
       final download = _activeDownloads[videoId];
       if (download != null) {
         download.isDownloading = false;
-        download.error = download.cancelRequested ? 'Canceled' : 'Download failed';
+        download.error =
+            download.cancelRequested ? 'Canceled' : 'Download failed';
         _notifyProgressUpdate();
       }
       rethrow;
@@ -536,7 +577,7 @@ class YouTubeService with ChangeNotifier {
     }
 
     Directory? baseDir;
-    
+
     if (Platform.isAndroid) {
       if (downloadLocation == 'downloads') {
         // Use public Downloads folder
@@ -566,8 +607,6 @@ class YouTubeService with ChangeNotifier {
     return musicDir;
   }
 
-
-
   Future<ts.Song> _addDownloadedSongToLibrary({
     required String videoId,
     required String filePath,
@@ -589,10 +628,6 @@ class YouTubeService with ChangeNotifier {
       rethrow;
     }
   }
-
-
-
-
 
   @override
   void dispose() {

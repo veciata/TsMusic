@@ -6,6 +6,8 @@ import '../providers/music_provider.dart' as music_provider;
 import '../providers/settings_provider.dart';
 import '../services/youtube_service.dart';
 import '../models/song.dart';
+import '../localization/app_localizations.dart';
+import '../widgets/mini_player_widget.dart';
 import 'downloads_screen.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
@@ -22,7 +24,8 @@ class ArtistDetailScreen extends StatefulWidget {
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
 }
 
-class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTickerProviderStateMixin {
+class _ArtistDetailScreenState extends State<ArtistDetailScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late YouTubeService _youTubeService;
   List<YouTubeAudio> _youtubeSongs = [];
@@ -43,7 +46,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.8) {
       _loadMoreYouTubeSongs();
     }
   }
@@ -52,7 +56,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     if (widget.artistImageUrlNotifier.value != null) return;
     if (_artistImageCache.containsKey(widget.artistName)) {
       setState(() {
-        widget.artistImageUrlNotifier.value = _artistImageCache[widget.artistName];
+        widget.artistImageUrlNotifier.value =
+            _artistImageCache[widget.artistName];
       });
       return;
     }
@@ -98,7 +103,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
     setState(() => _isLoading = true);
     try {
-      final results = await _youTubeService.searchAudioNextPage(widget.artistName);
+      final results =
+          await _youTubeService.searchAudioNextPage(widget.artistName);
       setState(() {
         _youtubeSongs.addAll(results);
         _isLoading = false;
@@ -114,14 +120,21 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     }
   }
 
+  Future<void> _playAllLocalSongs(List<Song> songs) async {
+    if (songs.isEmpty) return;
+    final musicProvider =
+        Provider.of<music_provider.MusicProvider>(context, listen: false);
+    await musicProvider.setPlaylistAndPlay(songs, 0);
+  }
+
   Future<void> _playAudio(YouTubeAudio audio) async {
     if (!mounted) return;
-    
+
     setState(() => _loadingYouTubeId = audio.id);
-    
+
     try {
       await _youTubeService.playAudio(audio);
-      
+
       if (mounted) {
         setState(() {
           _loadingYouTubeId = null;
@@ -129,10 +142,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
       }
     } catch (e) {
       debugPrint('Error playing audio: $e');
-      
+
       if (mounted) {
         setState(() => _loadingYouTubeId = null);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Audio could not be played'),
@@ -148,7 +161,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
     if (!mounted) return;
-    
+
     final isDownloading =
         _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
     if (isDownloading) {
@@ -160,7 +173,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     }
 
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider =
+          Provider.of<SettingsProvider>(context, listen: false);
       final result = await _youTubeService.downloadAudio(
         videoId: audio.id,
         preferredFormat: settingsProvider.audioFormat,
@@ -186,7 +200,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
 
   void _navigateToDownloads() {
     if (!mounted) return;
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -205,51 +219,67 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     final musicProvider = Provider.of<music_provider.MusicProvider>(context);
+    final l10n = AppLocalizations.of(context);
     final localSongs = musicProvider.getSongsByArtist(widget.artistName);
 
     return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverAppBar(
-              expandedHeight: 200.0,
-              pinned: true,
-              flexibleSpace: ValueListenableBuilder<String?>(
-                valueListenable: widget.artistImageUrlNotifier,
-                builder: (context, artistImageUrl, child) => FlexibleSpaceBar(
-                    title: Text(
-                      widget.artistName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 2))],
+      body: Column(
+        children: [
+          Expanded(
+            child: NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                SliverAppBar(
+                  expandedHeight: 200.0,
+                  pinned: true,
+                  flexibleSpace: ValueListenableBuilder<String?>(
+                    valueListenable: widget.artistImageUrlNotifier,
+                    builder: (context, artistImageUrl, child) =>
+                        FlexibleSpaceBar(
+                      title: Text(
+                        widget.artistName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                                color: Colors.black54,
+                                blurRadius: 10,
+                                offset: Offset(0, 2))
+                          ],
+                        ),
                       ),
+                      background: artistImageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: artistImageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) =>
+                                  Container(color: Colors.grey[800]),
+                              errorWidget: (context, url, error) =>
+                                  _buildPlaceholderImage(),
+                            )
+                          : _buildPlaceholderImage(),
                     ),
-                    background: artistImageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: artistImageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(color: Colors.grey[800]),
-                            errorWidget: (context, url, error) => _buildPlaceholderImage(),
-                          )
-                        : _buildPlaceholderImage(),
                   ),
-              ),
-              bottom: TabBar(
+                  bottom: TabBar(
+                    controller: _tabController,
+                    tabs: [
+                      Tab(text: l10n.localSongs),
+                      Tab(text: l10n.online),
+                    ],
+                  ),
+                ),
+              ],
+              body: TabBarView(
                 controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Local Songs'),
-                  Tab(text: 'Online'),
+                children: [
+                  _buildLocalSongsTab(localSongs, musicProvider),
+                  _buildYouTubeTab(),
                 ],
               ),
             ),
-          ],
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildLocalSongsTab(localSongs, musicProvider),
-            _buildYouTubeTab(),
-          ],
-        ),
+          ),
+          const MiniPlayerWidget(),
+        ],
       ),
     );
   }
@@ -272,19 +302,21 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     }
   }
 
-  Widget _buildLocalSongsTab(List<Song> songs, music_provider.MusicProvider musicProvider) {
-    if (songs.isEmpty) return const Center(child: Text('No local songs found for this artist'));
+  Widget _buildLocalSongsTab(
+      List<Song> songs, music_provider.MusicProvider musicProvider) {
+    final l10n = AppLocalizations.of(context);
+    if (songs.isEmpty) return Center(child: Text(l10n.noLocalSongsForArtist));
 
     final Map<int, Song> uniqueSongs = {};
     final Set<String> seenPaths = {};
-    
+
     for (final song in songs) {
       try {
         if (song.url.isEmpty) continue;
-        
+
         final normalizedPath = _normalizePath(song.url);
         if (normalizedPath.isEmpty) continue;
-        
+
         if (!seenPaths.contains(normalizedPath)) {
           seenPaths.add(normalizedPath);
           uniqueSongs[song.id] = song;
@@ -295,17 +327,30 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         }
       }
     }
-    
+
     final uniqueSongsList = uniqueSongs.values.toList();
-    
+
     if (uniqueSongsList.isEmpty) {
-      return const Center(child: Text('No valid songs found for this artist'));
+      return Center(child: Text(l10n.noLocalSongsForArtist));
     }
 
     return ListView.builder(
-      itemCount: uniqueSongsList.length,
+      itemCount: uniqueSongsList.length + 1,
       itemBuilder: (context, index) {
-        final song = uniqueSongsList[index];
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton.icon(
+              onPressed: () => _playAllLocalSongs(uniqueSongsList),
+              icon: const Icon(Icons.play_arrow),
+              label: Text('${l10n.playAll} (${uniqueSongsList.length})'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          );
+        }
+        final song = uniqueSongsList[index - 1];
         final isCurrentSong = musicProvider.currentSong?.id == song.id;
         return ListTile(
           leading: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
@@ -316,15 +361,18 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const Icon(Icons.music_note, size: 50),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.music_note, size: 50),
                   ),
                 )
               : const Icon(Icons.music_note, size: 50),
           title: Text(
             song.title,
-            style: TextStyle(fontWeight: isCurrentSong ? FontWeight.bold : FontWeight.normal),
+            style: TextStyle(
+                fontWeight:
+                    isCurrentSong ? FontWeight.bold : FontWeight.normal),
           ),
-          subtitle: Text(song.album ?? 'Unknown Album'),
+          subtitle: Text(song.album ?? l10n.unknownAlbum),
           trailing: Text(song.formattedDuration),
           onTap: () => musicProvider.playSong(song),
         );
@@ -333,8 +381,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   }
 
   Widget _buildYouTubeTab() {
-    if (_isLoading && _youtubeSongs.isEmpty) return const Center(child: CircularProgressIndicator());
-    if (_youtubeSongs.isEmpty) return const Center(child: Text('No online songs found for this artist'));
+    final l10n = AppLocalizations.of(context);
+    if (_isLoading && _youtubeSongs.isEmpty)
+      return Center(child: CircularProgressIndicator());
+    if (_youtubeSongs.isEmpty)
+      return Center(child: Text(l10n.noOnlineSongsFound));
 
     return ListView.builder(
       controller: _scrollController,
@@ -352,12 +403,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
     final isCurrent = youTubeService.currentAudio?.id == audio.id;
     final isPlaying = youTubeService.isPlaying && isCurrent;
     final isLoading = _loadingYouTubeId == audio.id;
-    
+
     final downloadProgress = youTubeService.activeDownloads
         .where((d) => d.videoId == audio.id)
         .firstOrNull;
 
-    final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final musicProvider =
+        Provider.of<music_provider.MusicProvider>(context, listen: false);
     final isDownloaded = musicProvider.songs
         .any((s) => s.id == audio.id.hashCode && s.isDownloaded);
 
@@ -392,9 +444,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(audio.artists.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (isCurrent && isPlaying)
-              const LinearProgressIndicator(),
+            Text(audio.artists.join(', '),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (isCurrent && isPlaying) const LinearProgressIndicator(),
             if (downloadProgress != null)
               LinearProgressIndicator(value: downloadProgress.progress),
             if (isDownloaded) const Text('Downloaded'),
@@ -418,7 +470,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
               icon: Icon(
                 isDownloaded
                     ? Icons.check_circle
-                    : (downloadProgress != null ? Icons.downloading : Icons.download),
+                    : (downloadProgress != null
+                        ? Icons.downloading
+                        : Icons.download),
               ),
               onPressed: () async {
                 if (isDownloaded) {
@@ -438,14 +492,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> with SingleTick
   }
 
   Widget _buildLoadingIndicator() => const Padding(
-      padding: EdgeInsets.all(16.0),
-      child: Center(child: CircularProgressIndicator()),
-    );
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
 
   Widget _buildPlaceholderImage() => Container(
-      color: Colors.grey[800],
-      child: Center(
-        child: Icon(Icons.person, size: 120, color: Colors.grey[600]),
-      ),
-    );
+        color: Colors.grey[800],
+        child: Center(
+          child: Icon(Icons.person, size: 120, color: Colors.grey[600]),
+        ),
+      );
 }

@@ -6,7 +6,7 @@ import '../providers/music_provider.dart' as music_provider;
 import '../providers/settings_provider.dart';
 import '../models/song.dart' as model;
 import '../services/youtube_service.dart';
-import '../widgets/bottom_navigation_widget.dart';
+import '../widgets/mini_player_widget.dart';
 
 import 'downloads_screen.dart';
 
@@ -488,11 +488,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   ],
                 ),
               ),
+            // Always show mini player at bottom
+            const MiniPlayerWidget(),
           ],
-        ),
-        bottomNavigationBar: BottomNavigationWidget(
-          currentIndex: -1,
-          onTap: (index) {},
         ),
       ),
     );

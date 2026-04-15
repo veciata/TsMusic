@@ -8,8 +8,8 @@ class PackageInfoUtils {
     _packageInfo = await PackageInfo.fromPlatform();
   }
   
-  /// Get app version (e.g., 1.0.0)
-  static String get version => _packageInfo?.version ?? '1.0.0';
+  /// Get app version (e.g., 1.1.0)
+  static String get version => _packageInfo?.version ?? '1.1.0';
   
   /// Get app name
   static String get appName => _packageInfo?.appName ?? 'TS Music';

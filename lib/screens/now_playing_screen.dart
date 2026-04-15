@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:media_kit/media_kit.dart';
 import '../providers/music_provider.dart';
+import '../widgets/now_playing_queue_bottom_sheet.dart';
+import '../localization/app_localizations.dart';
 import 'artist_detail_screen.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -12,7 +14,7 @@ class NowPlayingScreen extends StatefulWidget {
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
 
-class _NowPlayingScreenState extends State<NowPlayingScreen> 
+class _NowPlayingScreenState extends State<NowPlayingScreen>
     with SingleTickerProviderStateMixin {
   AnimationController? _albumArtController;
   double _currentPosition = 0.0;
@@ -67,98 +69,107 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     return '$minutes:$remainingSeconds';
   }
 
-  Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title) => AnimatedBuilder(
-      animation: _albumArtController ?? AnimationController(vsync: this, duration: const Duration(seconds: 20)),
-      builder: (context, child) {
-        final controller = _albumArtController ?? AnimationController(vsync: this, duration: const Duration(seconds: 20));
-        return Transform.rotate(
-          angle: controller.value * 2 * 3.14159,
-          child: Container(
-            width: 280,
-            height: 280,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.3),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-              image: albumArtUrl != null
-                  ? DecorationImage(
-                      image: NetworkImage(albumArtUrl),
-                      fit: BoxFit.cover,
+  Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title) =>
+      AnimatedBuilder(
+        animation: _albumArtController ??
+            AnimationController(
+                vsync: this, duration: const Duration(seconds: 20)),
+        builder: (context, child) {
+          final controller = _albumArtController ??
+              AnimationController(
+                  vsync: this, duration: const Duration(seconds: 20));
+          return Transform.rotate(
+            angle: controller.value * 2 * 3.14159,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+                image: albumArtUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(albumArtUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                color: albumArtUrl == null
+                    ? theme.colorScheme.primaryContainer
+                    : null,
+              ),
+              child: albumArtUrl == null
+                  ? Center(
+                      child: Icon(
+                        Icons.music_note,
+                        size: 80,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     )
                   : null,
-              color: albumArtUrl == null ? theme.colorScheme.primaryContainer : null,
             ),
-            child: albumArtUrl == null
-                ? Center(
-                    child: Icon(
-                      Icons.music_note,
-                      size: 80,
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
-                  )
-                : null,
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
 
   Widget _buildControlButton({
     required IconData icon,
     required VoidCallback onPressed,
     double size = 24,
     Color? color,
-  }) => IconButton(
-      icon: Icon(icon, size: size),
-      color: color,
-      onPressed: onPressed,
-    );
+  }) =>
+      IconButton(
+        icon: Icon(icon, size: size),
+        color: color,
+        onPressed: onPressed,
+      );
 
   Widget _buildVolumeControl(ThemeData theme) => AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: _showVolumeSlider ? 200 : 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: _showVolumeSlider
-          ? Row(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _volume == 0 
-                      ? Icons.volume_off
-                      : _volume < 0.5 
-                        ? Icons.volume_down
-                        : Icons.volume_up,
-                    color: theme.colorScheme.onSurfaceVariant,
+        duration: const Duration(milliseconds: 300),
+        width: _showVolumeSlider ? 200 : 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: _showVolumeSlider
+            ? Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _volume == 0
+                          ? Icons.volume_off
+                          : _volume < 0.5
+                              ? Icons.volume_down
+                              : Icons.volume_up,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: () => setState(() => _showVolumeSlider = false),
                   ),
-                  onPressed: () => setState(() => _showVolumeSlider = false),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _volume,
-                    onChanged: (value) => setState(() => _volume = value),
-                    activeColor: theme.colorScheme.primary,
-                    inactiveColor: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  Expanded(
+                    child: Slider(
+                      value: _volume,
+                      onChanged: (value) => setState(() => _volume = value),
+                      activeColor: theme.colorScheme.primary,
+                      inactiveColor:
+                          theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                    ),
                   ),
+                ],
+              )
+            : IconButton(
+                icon: Icon(
+                  Icons.volume_up,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ],
-            )
-          : IconButton(
-              icon: Icon(
-                Icons.volume_up,
-                color: theme.colorScheme.onSurfaceVariant,
+                onPressed: () => setState(() => _showVolumeSlider = true),
               ),
-              onPressed: () => setState(() => _showVolumeSlider = true),
-            ),
-    );
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -257,43 +268,51 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   const SizedBox(height: 8),
                   Wrap(
                     alignment: WrapAlignment.center,
-                    children: currentSong.artists.map((artist) => GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ArtistDetailScreen(
-                                artistName: artist,
-                                artistImageUrl: ValueNotifier<String?>(currentSong.albumArtUrl),
+                    children: currentSong.artists
+                        .map((artist) => GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ArtistDetailScreen(
+                                      artistName: artist,
+                                      artistImageUrl: ValueNotifier<String?>(
+                                          currentSong.albumArtUrl),
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer
+                                      .withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: theme.colorScheme.primary
+                                        .withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  artist,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: theme.colorScheme.primary
+                                        .withOpacity(0.5),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: theme.colorScheme.primary.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            artist,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.underline,
-                              decorationColor: theme.colorScheme.primary.withOpacity(0.5),
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )).toList(),
+                            ))
+                        .toList(),
                   ),
                 ],
               ),
@@ -344,8 +363,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   _buildControlButton(
                     icon: Icons.shuffle,
                     onPressed: musicProvider.toggleShuffle,
-                    color: musicProvider.shuffleEnabled 
-                        ? theme.colorScheme.primary 
+                    color: musicProvider.shuffleEnabled
+                        ? theme.colorScheme.primary
                         : theme.colorScheme.onSurface.withOpacity(0.7),
                   ),
 
@@ -371,8 +390,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     ),
                     child: IconButton(
                       icon: Icon(
-                        musicProvider.isPlaying 
-                            ? Icons.pause 
+                        musicProvider.isPlaying
+                            ? Icons.pause
                             : Icons.play_arrow,
                         size: 32,
                       ),
@@ -402,7 +421,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         : Icons.repeat,
                     onPressed: musicProvider.cycleRepeatMode,
                     color: musicProvider.loopMode != PlaylistMode.none
-                        ? theme.colorScheme.primary 
+                        ? theme.colorScheme.primary
                         : theme.colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ],
@@ -417,10 +436,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 children: [
                   _buildVolumeControl(theme),
                   IconButton(
-                    icon: const Icon(Icons.playlist_play),
+                    icon: const Icon(Icons.queue_music),
                     onPressed: () {
-                      // Show queue
+                      showNowPlayingQueue(context);
                     },
+                    tooltip: AppLocalizations.of(context).queue,
                   ),
                 ],
               ),

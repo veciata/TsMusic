@@ -22,6 +22,7 @@ import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'utils/package_info_utils.dart';
 import 'widgets/bottom_navigation_widget.dart';
+import 'widgets/mini_player_widget.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
@@ -249,112 +250,22 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
         ],
       ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: _pages,
+      body: Column(
+        children: [
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _pages,
+            ),
+          ),
+          // Persistent mini player — always visible above bottom nav
+          const MiniPlayerWidget(),
+        ],
       ),
       bottomNavigationBar: BottomNavigationWidget(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-      ),
-      bottomSheet: Consumer<music_provider.MusicProvider>(
-        builder: (context, musicProv, _) {
-          final currentSong = musicProv.currentSong;
-          final textStyle = const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16,);
-          return GestureDetector(
-            onTap: () {
-              if (currentSong != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const NowPlayingScreen()),
-                );
-              }
-            },
-            child: Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(Icons.music_note, size: 30),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          currentSong?.title ?? AppLocalizations.of(context).notPlaying,
-                          style: textStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          currentSong?.artists.isNotEmpty == true 
-                              ? currentSong!.artists.join(' & ') 
-                              : AppLocalizations.of(context).selectSongToPlay,
-                          style: TextStyle(
-                            color:
-                                Theme.of(context).textTheme.bodySmall?.color,
-                            fontSize: 14,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        musicProv.isPlaying ? Icons.pause : Icons.play_arrow,
-                        size: 30,
-                      ),
-                      onPressed: () {
-                        if (musicProv.currentSong != null) {
-                          musicProv.togglePlayPause();
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
 }

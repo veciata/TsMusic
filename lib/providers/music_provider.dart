@@ -24,7 +24,16 @@ class MusicProvider extends ChangeNotifier {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   // ===== CONSTANTS =====
-  static const List<String> audioExtensions = ['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.opus', '.m4b'];
+  static const List<String> audioExtensions = [
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.flac',
+    '.aac',
+    '.ogg',
+    '.opus',
+    '.m4b'
+  ];
   static const String _songsKey = 'cached_songs';
   static const int nowPlayingPlaylistId = 1;
 
@@ -52,6 +61,7 @@ class MusicProvider extends ChangeNotifier {
   // Cache for songs to avoid repeated database queries
   static final Map<String, Song> _songsMap = {};
   static List<Song> get _cachedSongs => _songsMap.values.toList();
+  List<Song> get librarySongs => _songsMap.values.toList();
 
   // Track if database has been initialized
   bool _isDatabaseInitialized = false;
@@ -68,22 +78,41 @@ class MusicProvider extends ChangeNotifier {
   bool get isPlaying => _player.state.playing;
   Duration get position => _player.state.position;
   Duration get duration => _player.state.duration;
-  Song? get currentSong => _playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length
-      ? _playlist[_currentIndex]
-      : null;
-  int? get currentIndex => (_playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length)
-      ? _currentIndex
-      : null;
-  List<Song> get queue => List.unmodifiable(_playlist);
-  List<Song> get allSongs => _playlist;
-  List<Song> get youtubeSongs => _playlist.where((song) => song.hasTag('tsmusic')).toList();
+  Song? get currentSong {
+    List<Song> activePlaylist =
+        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    return activePlaylist.isNotEmpty &&
+            _currentIndex >= 0 &&
+            _currentIndex < activePlaylist.length
+        ? activePlaylist[_currentIndex]
+        : null;
+  }
+
+  int? get currentIndex {
+    List<Song> activePlaylist =
+        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    return (activePlaylist.isNotEmpty &&
+            _currentIndex >= 0 &&
+            _currentIndex < activePlaylist.length)
+        ? _currentIndex
+        : null;
+  }
+
+  List<Song> get queue => _isUsingTempPlaylist
+      ? List.unmodifiable(_tempPlaylist)
+      : List.unmodifiable(_playlist);
+  List<Song> get allSongs => _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+  List<Song> get youtubeSongs =>
+      _playlist.where((song) => song.hasTag('tsmusic')).toList();
 
   // Collection getters
   List<String> get albums {
     final albumSet = <String>{};
     if (songs.isNotEmpty) {
       for (final song in _playlist) {
-        if (song.album != null && song.album!.isNotEmpty && song.album!.toLowerCase() != 'unknown album') {
+        if (song.album != null &&
+            song.album!.isNotEmpty &&
+            song.album!.toLowerCase() != 'unknown album') {
           albumSet.add(song.album!);
         }
       }
@@ -95,7 +124,8 @@ class MusicProvider extends ChangeNotifier {
     final artistSet = <String>{};
     for (final song in _playlist) {
       for (final artist in song.artists) {
-        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist') artistSet.add(artist);
+        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist')
+          artistSet.add(artist);
       }
     }
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
@@ -131,7 +161,8 @@ class MusicProvider extends ChangeNotifier {
           await _setAudioSource(_playlist[_currentIndex]);
           await _player.play();
           notifyListeners();
-        } else if (_playlist.length > 1 && _currentIndex < _playlist.length - 1) {
+        } else if (_playlist.length > 1 &&
+            _currentIndex < _playlist.length - 1) {
           await next();
         }
       }
@@ -214,17 +245,19 @@ class MusicProvider extends ChangeNotifier {
   void _applySorting() {
     switch (_currentSortOption) {
       case SongSortOption.title:
-        _displayedSongs.sort((a, b) => _sortAscending 
-          ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-          : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        _displayedSongs.sort((a, b) => _sortAscending
+            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
         break;
       case SongSortOption.artist:
         _displayedSongs.sort((a, b) {
-          final artistA = a.artists.isNotEmpty ? a.artists.first.toLowerCase() : '';
-          final artistB = b.artists.isNotEmpty ? b.artists.first.toLowerCase() : '';
-          return _sortAscending 
-            ? artistA.compareTo(artistB)
-            : artistB.compareTo(artistA);
+          final artistA =
+              a.artists.isNotEmpty ? a.artists.first.toLowerCase() : '';
+          final artistB =
+              b.artists.isNotEmpty ? b.artists.first.toLowerCase() : '';
+          return _sortAscending
+              ? artistA.compareTo(artistB)
+              : artistB.compareTo(artistA);
         });
         break;
       case SongSortOption.dateAdded:
@@ -238,16 +271,16 @@ class MusicProvider extends ChangeNotifier {
         _displayedSongs.sort((a, b) {
           final albumA = a.album?.toLowerCase() ?? '';
           final albumB = b.album?.toLowerCase() ?? '';
-          return _sortAscending 
-            ? albumA.compareTo(albumB)
-            : albumB.compareTo(albumA);
+          return _sortAscending
+              ? albumA.compareTo(albumB)
+              : albumB.compareTo(albumA);
         });
         break;
       case SongSortOption.duration:
         // Sort by duration
-        _displayedSongs.sort((a, b) => _sortAscending 
-          ? a.duration.compareTo(b.duration)
-          : b.duration.compareTo(a.duration));
+        _displayedSongs.sort((a, b) => _sortAscending
+            ? a.duration.compareTo(b.duration)
+            : b.duration.compareTo(a.duration));
         break;
     }
   }
@@ -259,18 +292,44 @@ class MusicProvider extends ChangeNotifier {
       _songsMap.clear();
       _playlist.clear();
       _displayedSongs.clear();
+
+      // First load from database
       await _loadSongsFromDatabase();
+
+      // Then scan for new music to find files in subdirectories
+      await _scanLocalStorageForMusic();
+
+      // Reload from database after scanning to include new songs
+      _songsMap.clear();
+      await _loadSongsFromDatabase();
+
       _applySorting();
       notifyListeners();
-      debugPrint('MusicProvider: refreshSongs() completed - ${_playlist.length} songs loaded');
+      debugPrint(
+          'MusicProvider: refreshSongs() completed - ${_playlist.length} songs loaded');
     } catch (e) {
       debugPrint('Error refreshing songs: $e');
     }
   }
 
   /// Deletes a song from both the database and in-memory collections.
-  Future<void> deleteSong(Song song) async {
+  Future<void> deleteSong(Song song, {bool deleteFile = true}) async {
     try {
+      // Delete physical file if it's a local file
+      if (deleteFile && song.url.isNotEmpty) {
+        try {
+          final file = File(song.url);
+          if (await file.exists()) {
+            await file.delete();
+            debugPrint('🗑️ Deleted file: ${song.url}');
+          } else {
+            debugPrint('⚠️ File not found for deletion: ${song.url}');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error deleting file ${song.url}: $e');
+        }
+      }
+
       // Remove from database first
       await _databaseHelper.deleteSong(song.id);
 
@@ -280,7 +339,8 @@ class MusicProvider extends ChangeNotifier {
       _songsMap.remove(song.url);
 
       notifyListeners();
-      debugPrint('🗑️ MusicProvider: removed song "${song.title}" from memory and DB');
+      debugPrint(
+          '🗑️ MusicProvider: removed song "${song.title}" from memory and DB');
     } catch (e) {
       debugPrint('Error deleting song: $e');
       rethrow;
@@ -295,15 +355,17 @@ class MusicProvider extends ChangeNotifier {
       _playlist.add(song);
       _displayedSongs.add(song);
       notifyListeners();
-      debugPrint('✅ MusicProvider: added downloaded song "${song.title}" to library');
+      debugPrint(
+          '✅ MusicProvider: added downloaded song "${song.title}" to library');
     } else {
-      debugPrint('ℹ️ MusicProvider: song "${song.title}" already in library, skipping add');
+      debugPrint(
+          'ℹ️ MusicProvider: song "${song.title}" already in library, skipping add');
     }
   }
 
   // ===== AUTO-RETRY LOGIC =====
   String? _lastError;
-  
+
   /// Attempts to load music with automatic retry on failure
   Future<void> loadLocalMusicWithRetry({bool forceRescan = false}) async {
     try {
@@ -312,19 +374,22 @@ class MusicProvider extends ChangeNotifier {
       _retryCount = 0;
       _lastError = null;
     } catch (e) {
-      debugPrint('MusicProvider: Error loading music (attempt ${_retryCount + 1}/$_maxRetries): $e');
+      debugPrint(
+          'MusicProvider: Error loading music (attempt ${_retryCount + 1}/$_maxRetries): $e');
       _lastError = e.toString();
-      
+
       if (_retryCount < _maxRetries) {
         _retryCount++;
         final delaySeconds = _baseRetryDelay * _retryCount;
-        
-        _error = 'Error: $_lastError\n\nRetrying in ${delaySeconds}s... (attempt $_retryCount/$_maxRetries)';
+
+        _error =
+            'Error: $_lastError\n\nRetrying in ${delaySeconds}s... (attempt $_retryCount/$_maxRetries)';
         notifyListeners();
-        
-        debugPrint('MusicProvider: Auto-retrying in ${delaySeconds} seconds...');
+
+        debugPrint(
+            'MusicProvider: Auto-retrying in ${delaySeconds} seconds...');
         await Future.delayed(Duration(seconds: delaySeconds));
-        
+
         // Recursive retry
         await loadLocalMusicWithRetry(forceRescan: forceRescan);
       } else {
@@ -337,7 +402,7 @@ class MusicProvider extends ChangeNotifier {
       }
     }
   }
-  
+
   /// Manual retry - resets retry count and tries again
   Future<void> retryLoading() async {
     _retryCount = 0;
@@ -345,6 +410,7 @@ class MusicProvider extends ChangeNotifier {
     notifyListeners();
     await loadLocalMusicWithRetry(forceRescan: true);
   }
+
   Future<void> addSong(Song song) async {
     final existingIndex = _playlist.indexWhere((s) => s.id == song.id);
     if (existingIndex != -1) {
@@ -370,7 +436,7 @@ class MusicProvider extends ChangeNotifier {
     await db.transaction((txn) async {
       final songId = await txn.insert(
         DatabaseHelper.tableSongs,
-        song.toMap(),
+        song.toDbMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
@@ -501,11 +567,10 @@ class MusicProvider extends ChangeNotifier {
       } else {
         // If no songs in database, do a full scan
         await _scanLocalStorageForMusic();
-        
+
         // Ensure all scanned songs are saved to database
         await _ensureCachedSongsInDatabase();
       }
-
     } catch (e) {
       _error = 'Error loading music: $e';
       _isLoading = false;
@@ -526,13 +591,13 @@ class MusicProvider extends ChangeNotifier {
   // ===== PLAYLIST MANAGEMENT =====
   Future<void> playSong(Song song) async {
     var index = _playlist.indexWhere((s) => s.id == song.id);
-    
+
     // If song not in playlist, add it
     if (index == -1) {
       _addSongIfNotExists(song);
       index = _playlist.indexWhere((s) => s.id == song.id);
     }
-    
+
     if (index != -1) {
       _currentIndex = index;
       await _setAudioSource(song);
@@ -543,19 +608,45 @@ class MusicProvider extends ChangeNotifier {
     }
   }
 
+  List<Song> _tempPlaylist = [];
+  bool _isUsingTempPlaylist = false;
+
+  List<Song> get tempPlaylist => _tempPlaylist;
+  bool get isUsingTempPlaylist => _isUsingTempPlaylist;
+
+  Future<void> setPlaylistAndPlay(List<Song> songs, int startIndex) async {
+    if (songs.isEmpty || startIndex < 0 || startIndex >= songs.length) return;
+
+    _tempPlaylist = List.from(songs);
+    _isUsingTempPlaylist = true;
+    await _setAudioSource(songs[startIndex]);
+    await _player.play();
+    await _updateNotification();
+    await _updateNowPlayingPlaylist();
+    notifyListeners();
+  }
+
+  void clearTempPlaylist() {
+    _tempPlaylist = [];
+    _isUsingTempPlaylist = false;
+    notifyListeners();
+  }
+
   Future<void> next() async {
-    if (_playlist.isEmpty) return;
+    List<Song> currentPlaylist =
+        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    if (currentPlaylist.isEmpty) return;
     if (_shuffleEnabled) {
       int nextIndex = _currentIndex;
       final random = Random();
-      while (nextIndex == _currentIndex && _playlist.length > 1) {
-        nextIndex = random.nextInt(_playlist.length);
+      while (nextIndex == _currentIndex && currentPlaylist.length > 1) {
+        nextIndex = random.nextInt(currentPlaylist.length);
       }
       _currentIndex = nextIndex;
     } else {
-      _currentIndex = (_currentIndex + 1) % _playlist.length;
+      _currentIndex = (_currentIndex + 1) % currentPlaylist.length;
     }
-    await _setAudioSource(_playlist[_currentIndex]);
+    await _setAudioSource(currentPlaylist[_currentIndex]);
     await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
@@ -563,10 +654,12 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> previous() async {
-    if (_playlist.isEmpty) return;
-    _currentIndex = (_currentIndex - 1) % _playlist.length;
-    if (_currentIndex < 0) _currentIndex = _playlist.length - 1;
-    await _setAudioSource(_playlist[_currentIndex]);
+    List<Song> currentPlaylist =
+        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    if (currentPlaylist.isEmpty) return;
+    _currentIndex = (_currentIndex - 1) % currentPlaylist.length;
+    if (_currentIndex < 0) _currentIndex = currentPlaylist.length - 1;
+    await _setAudioSource(currentPlaylist[_currentIndex]);
     await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
@@ -596,24 +689,32 @@ class MusicProvider extends ChangeNotifier {
   String? getAlbumArtUrl(String albumName, {String? artistName}) {
     for (final song in _playlist) {
       if (song.album == albumName &&
-          (artistName == null || song.artists.any((artist) => artist == artistName))) {
+          (artistName == null ||
+              song.artists.any((artist) => artist == artistName))) {
         return song.albumArtUrl;
       }
     }
     return null;
-    }
+  }
 
-  List<Song> getSongsByArtist(String artistName) => _playlist.where((song) => song.artists.any((artist) => artist == artistName)).toList();
+  List<Song> getSongsByArtist(String artistName) => _playlist
+      .where((song) => song.artists.any((artist) => artist == artistName))
+      .toList();
 
-  List<Song> getSongsByAlbum(String albumName, {String? artistName}) => _playlist.where((song) =>
-      song.album == albumName &&
-      (artistName == null || song.artists.any((artist) => artist == artistName))
-    ).toList();
+  List<Song> getSongsByAlbum(String albumName, {String? artistName}) =>
+      _playlist
+          .where((song) =>
+              song.album == albumName &&
+              (artistName == null ||
+                  song.artists.any((artist) => artist == artistName)))
+          .toList();
 
   List<String> getAlbumsByArtist(String artistName) {
     final albumSet = <String>{};
     for (final song in _playlist) {
-      if (song.artists.any((artist) => artist == artistName) && song.album != null && song.album!.isNotEmpty) {
+      if (song.artists.any((artist) => artist == artistName) &&
+          song.album != null &&
+          song.album!.isNotEmpty) {
         albumSet.add(song.album!);
       }
     }
@@ -621,35 +722,37 @@ class MusicProvider extends ChangeNotifier {
   }
 
   // ===== SORTING AND FILTERING =====
-  Future<void> sortSongs({required SongSortOption sortBy, bool ascending = true}) async {
+  Future<void> sortSongs(
+      {required SongSortOption sortBy, bool ascending = true}) async {
     try {
       _currentSortOption = sortBy;
       _sortAscending = ascending;
 
       // Sort the songs
-      final sortedSongs = _songsMap.values.toList()..sort((a, b) {
-        int compare;
-        switch (sortBy) {
-          case SongSortOption.title:
-            compare = a.title.compareTo(b.title);
-            break;
-          case SongSortOption.artist:
-            final artistA = a.artists.isNotEmpty ? a.artists.first : '';
-            final artistB = b.artists.isNotEmpty ? b.artists.first : '';
-            compare = artistA.compareTo(artistB);
-            break;
-          case SongSortOption.album:
-            compare = (a.album ?? '').compareTo(b.album ?? '');
-            break;
-          case SongSortOption.duration:
-            compare = a.duration.compareTo(b.duration);
-            break;
-          case SongSortOption.dateAdded:
-            compare = a.dateAdded.compareTo(b.dateAdded);
-            break;
-        }
-        return ascending ? compare : -compare;
-      });
+      final sortedSongs = _songsMap.values.toList()
+        ..sort((a, b) {
+          int compare;
+          switch (sortBy) {
+            case SongSortOption.title:
+              compare = a.title.compareTo(b.title);
+              break;
+            case SongSortOption.artist:
+              final artistA = a.artists.isNotEmpty ? a.artists.first : '';
+              final artistB = b.artists.isNotEmpty ? b.artists.first : '';
+              compare = artistA.compareTo(artistB);
+              break;
+            case SongSortOption.album:
+              compare = (a.album ?? '').compareTo(b.album ?? '');
+              break;
+            case SongSortOption.duration:
+              compare = a.duration.compareTo(b.duration);
+              break;
+            case SongSortOption.dateAdded:
+              compare = a.dateAdded.compareTo(b.dateAdded);
+              break;
+          }
+          return ascending ? compare : -compare;
+        });
 
       // Update the playlist with sorted songs
       _playlist = sortedSongs;
@@ -704,35 +807,46 @@ class MusicProvider extends ChangeNotifier {
         for (final songData in results) {
           final songId = songData['id'] as int;
           final artistsData = await _databaseHelper.getArtistsForSong(songId);
-          final artists = artistsData.map((row) => row['name'] as String).toList();
-          
-          searchedSongs.add(Song(
-            id: songId,
-            youtubeId: songData['youtube_id'] as String?,
-            title: songData['title'] as String,
-            url: songData['file_path'] as String,
-            duration: songData['duration'] as int,
-            artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
-            dateAdded: songData['created_at'] != null
-                ? DateTime.parse(songData['created_at'] as String)
-                : DateTime.now(),
-          ),);
+          final artists =
+              artistsData.map((row) => row['name'] as String).toList();
+
+          searchedSongs.add(
+            Song(
+              id: songId,
+              youtubeId: songData['youtube_id'] as String?,
+              title: songData['title'] as String,
+              url: songData['file_path'] as String,
+              duration: songData['duration'] as int,
+              artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
+              dateAdded: songData['created_at'] != null
+                  ? DateTime.parse(songData['created_at'] as String)
+                  : DateTime.now(),
+            ),
+          );
         }
         _displayedSongs = searchedSongs;
       } else {
         // Fallback to in-memory search if no results from database
         final lowerQuery = query.toLowerCase();
-        _displayedSongs = _playlist.where((song) => song.title.toLowerCase().contains(lowerQuery) ||
-                 song.artists.any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-                 (song.album?.toLowerCase().contains(lowerQuery) ?? false)).toList();
+        _displayedSongs = _playlist
+            .where((song) =>
+                song.title.toLowerCase().contains(lowerQuery) ||
+                song.artists.any(
+                    (artist) => artist.toLowerCase().contains(lowerQuery)) ||
+                (song.album?.toLowerCase().contains(lowerQuery) ?? false))
+            .toList();
       }
     } catch (e) {
       debugPrint('Error searching songs: $e');
       // Fallback to in-memory search on error
       final lowerQuery = query.toLowerCase();
-      _displayedSongs = _playlist.where((song) => song.title.toLowerCase().contains(lowerQuery) ||
-               song.artists.any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-               (song.album?.toLowerCase().contains(lowerQuery) ?? false)).toList();
+      _displayedSongs = _playlist
+          .where((song) =>
+              song.title.toLowerCase().contains(lowerQuery) ||
+              song.artists
+                  .any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
+              (song.album?.toLowerCase().contains(lowerQuery) ?? false))
+          .toList();
     }
 
     notifyListeners();
@@ -741,8 +855,9 @@ class MusicProvider extends ChangeNotifier {
   // ===== PRIVATE HELPER METHODS =====
   /// Load songs from database with optimized queries
   Future<void> _loadSongsFromDatabase() async {
-    debugPrint('🔍 _loadSongsFromDatabase called, _songsMap.isNotEmpty=${_songsMap.isNotEmpty}, _songsMap.length=${_songsMap.length}');
-    
+    debugPrint(
+        '🔍 _loadSongsFromDatabase called, _songsMap.isNotEmpty=${_songsMap.isNotEmpty}, _songsMap.length=${_songsMap.length}');
+
     if (_songsMap.isNotEmpty) {
       _playlist = _cachedSongs;
       debugPrint('⚡ Using cached songs: ${_playlist.length} songs');
@@ -754,7 +869,8 @@ class MusicProvider extends ChangeNotifier {
       final db = await _databaseHelper.database;
 
       // First, just count total songs in database
-      final countResult = await db.rawQuery('SELECT COUNT(*) as count FROM ${DatabaseHelper.tableSongs}');
+      final countResult = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM ${DatabaseHelper.tableSongs}');
       final totalCount = Sqflite.firstIntValue(countResult) ?? 0;
       debugPrint('📊 Total songs in database table: $totalCount');
 
@@ -783,7 +899,8 @@ class MusicProvider extends ChangeNotifier {
         try {
           // Parse artists
           final artistNamesString = songData['artist_names'] as String?;
-          final artistNames = artistNamesString != null && artistNamesString.isNotEmpty
+          final artistNames = artistNamesString != null &&
+                  artistNamesString.isNotEmpty
               ? artistNamesString
                   .split(',')
                   .where((name) => name.isNotEmpty && name != 'Unknown Artist')
@@ -791,7 +908,8 @@ class MusicProvider extends ChangeNotifier {
                   .toList()
               : <String>[];
 
-          final artists = artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
+          final artists =
+              artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
 
           // Parse genres/tags
           final tagsString = songData['genre_names'] as String?;
@@ -840,15 +958,17 @@ class MusicProvider extends ChangeNotifier {
   /// Load Now Playing playlist from database
   Future<void> _loadNowPlayingPlaylist() async {
     try {
-      final songMaps = await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
+      final songMaps =
+          await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
       // Clear current playlist and add songs from database
       _playlist.clear();
       _songsMap.clear(); // Clear the map when reloading the playlist
-      
+
       for (final songData in songMaps) {
         final songId = songData['id'] as int;
         final artistsData = await _databaseHelper.getArtistsForSong(songId);
-        final artists = artistsData.map((row) => row['name'] as String).toList();
+        final artists =
+            artistsData.map((row) => row['name'] as String).toList();
 
         final song = Song(
           id: songId,
@@ -875,7 +995,8 @@ class MusicProvider extends ChangeNotifier {
   /// Update Now Playing playlist in database
   Future<void> _updateNowPlayingPlaylist() async {
     try {
-      final songIds = _playlist.map((song) => song.id).where((id) => id > 0).toList();
+      final songIds =
+          _playlist.map((song) => song.id).where((id) => id > 0).toList();
       await _databaseHelper.updateNowPlayingPlaylist(songIds);
     } catch (e) {
       if (kDebugMode) {
@@ -900,7 +1021,8 @@ class MusicProvider extends ChangeNotifier {
 
   /// Set audio source for playback
   Future<void> _setAudioSource(Song song) async {
-    final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
+    final mediaPath =
+        song.url.startsWith('/') ? 'file://${song.url}' : song.url;
     final media = Media(mediaPath);
     await _player.open(media);
     await _updateNotification();
@@ -922,7 +1044,8 @@ class MusicProvider extends ChangeNotifier {
   /// Save songs to storage cache
   Future<void> _saveSongsToStorage() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_songsKey, jsonEncode(_playlist.map((s) => s.toJson()).toList()));
+    await prefs.setString(
+        _songsKey, jsonEncode(_playlist.map((s) => s.toJson()).toList()));
   }
 
   /// Clear cache when forcing rescan
@@ -962,16 +1085,17 @@ class MusicProvider extends ChangeNotifier {
       }
 
       if (missingSongs.isNotEmpty) {
-        debugPrint('📊 ENSURING ${missingSongs.length} CACHED SONGS ARE IN DATABASE');
+        debugPrint(
+            '📊 ENSURING ${missingSongs.length} CACHED SONGS ARE IN DATABASE');
 
         // Save missing songs to database
         await db.transaction((txn) async {
           for (final song in missingSongs) {
             try {
-              // Insert song
+              // Insert song using database-compatible map
               final songId = await txn.insert(
                 DatabaseHelper.tableSongs,
-                song.toMap(),
+                song.toDbMap(),
                 conflictAlgorithm: ConflictAlgorithm.replace,
               );
 
@@ -1007,12 +1131,14 @@ class MusicProvider extends ChangeNotifier {
                 }
               }
             } catch (e) {
-              debugPrint('Error saving cached song ${song.title} to database: $e');
+              debugPrint(
+                  'Error saving cached song ${song.title} to database: $e');
             }
           }
         });
 
-        debugPrint('✅ ENSURED ${missingSongs.length} CACHED SONGS ARE IN DATABASE');
+        debugPrint(
+            '✅ ENSURED ${missingSongs.length} CACHED SONGS ARE IN DATABASE');
       }
     } catch (e) {
       debugPrint('Error ensuring cached songs in database: $e');
@@ -1061,6 +1187,9 @@ class MusicProvider extends ChangeNotifier {
       // First, check for deleted files and clean database
       await _cleanupDeletedSongs();
 
+      // Clean up old duplicate files (with bitrate in filename)
+      await _cleanupOldDuplicateFiles();
+
       final bool hasPermission = await _checkStoragePermission();
 
       if (!hasPermission) {
@@ -1076,7 +1205,8 @@ class MusicProvider extends ChangeNotifier {
       // Get comprehensive list of music directories to scan
       final musicDirectories = await _getAllMusicDirectories();
 
-      debugPrint('🔍 SCANNING ${musicDirectories.length} DIRECTORIES FOR MUSIC FILES');
+      debugPrint(
+          '🔍 SCANNING ${musicDirectories.length} DIRECTORIES FOR MUSIC FILES');
       debugPrint('Directories to scan:');
       for (final dir in musicDirectories) {
         debugPrint('  📁 $dir');
@@ -1099,7 +1229,8 @@ class MusicProvider extends ChangeNotifier {
         final alternativeFiles = await _scanAlternativeLocations();
         if (alternativeFiles.isNotEmpty) {
           musicFiles.addAll(alternativeFiles);
-          debugPrint('✅ FOUND ${alternativeFiles.length} FILES IN ALTERNATIVE LOCATIONS');
+          debugPrint(
+              '✅ FOUND ${alternativeFiles.length} FILES IN ALTERNATIVE LOCATIONS');
         }
       }
 
@@ -1125,7 +1256,8 @@ class MusicProvider extends ChangeNotifier {
           _error = 'No valid music files found.';
         } else {
           _error = null;
-          debugPrint('✅ SUCCESSFULLY ADDED ${_playlist.length} SONGS TO DATABASE');
+          debugPrint(
+              '✅ SUCCESSFULLY ADDED ${_playlist.length} SONGS TO DATABASE');
         }
       }
 
@@ -1160,7 +1292,8 @@ class MusicProvider extends ChangeNotifier {
       }
 
       if (songsToRemove.isNotEmpty) {
-        debugPrint('Removing ${songsToRemove.length} deleted songs from database');
+        debugPrint(
+            'Removing ${songsToRemove.length} deleted songs from database');
         await db.delete(
           'songs',
           where: 'id IN (${List.filled(songsToRemove.length, '?').join(',')})',
@@ -1169,12 +1302,91 @@ class MusicProvider extends ChangeNotifier {
 
         await db.delete(
           'playlist_songs',
-          where: 'song_id IN (${List.filled(songsToRemove.length, '?').join(',')})',
+          where:
+              'song_id IN (${List.filled(songsToRemove.length, '?').join(',')})',
           whereArgs: songsToRemove,
         );
       }
     } catch (e) {
       debugPrint('Error cleaning up deleted songs: $e');
+    }
+  }
+
+  /// Clean up old duplicate files that have bitrate in filename
+  /// These are from old downloads that used bitrate in filename
+  Future<void> _cleanupOldDuplicateFiles() async {
+    try {
+      final musicDirectories = await _getAllMusicDirectories();
+
+      for (final dirPath in musicDirectories) {
+        try {
+          final dir = Directory(dirPath);
+          if (!await dir.exists()) continue;
+
+          // Map of video ID -> list of files
+          final Map<String, List<File>> videoIdFiles = {};
+
+          await for (final entity
+              in dir.list(recursive: true, followLinks: false)) {
+            if (entity is File) {
+              final ext = path.extension(entity.path).toLowerCase();
+              if (audioExtensions.contains(ext)) {
+                // Extract video ID from filename
+                // Pattern: Title_VideoID.ext or Title_VideoID_bitrate.ext
+                final fileName = path.basenameWithoutExtension(entity.path);
+                final parts = fileName.split('_');
+
+                if (parts.isNotEmpty) {
+                  final lastPart = parts.last;
+                  // Check if last part looks like a YouTube video ID (11 chars alphanumeric)
+                  if (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(lastPart)) {
+                    videoIdFiles.putIfAbsent(lastPart, () => []).add(entity);
+                  }
+                }
+              }
+            }
+          }
+
+          // For each video ID, keep only the file without bitrate in name
+          for (final entry in videoIdFiles.entries) {
+            if (entry.value.length > 1) {
+              File? bestFile;
+              List<File> toDelete = [];
+
+              for (final file in entry.value) {
+                final fileName = path.basenameWithoutExtension(file.path);
+                // File without bitrate: Title_VideoID
+                // File with bitrate: Title_VideoID_128000
+                if (RegExp(r'_[0-9]+$').hasMatch(fileName)) {
+                  toDelete.add(file);
+                } else {
+                  bestFile = file;
+                }
+              }
+
+              // Keep the one without bitrate, delete others
+              if (bestFile == null && entry.value.isNotEmpty) {
+                // If no clean file, keep the first one
+                bestFile = entry.value.first;
+                toDelete = entry.value.skip(1).toList();
+              }
+
+              for (final file in toDelete) {
+                try {
+                  await file.delete();
+                  debugPrint('🗑️ Deleted old duplicate: ${file.path}');
+                } catch (e) {
+                  debugPrint('⚠️ Could not delete ${file.path}: $e');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error cleaning duplicates in $dirPath: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in cleanupOldDuplicateFiles: $e');
     }
   }
 
@@ -1218,23 +1430,39 @@ class MusicProvider extends ChangeNotifier {
           '${externalDir.path}/Music/tsmusic',
         ];
         musicDirectories.addAll(basePaths);
+
+        // Add parent storage paths for recursive scanning
+        // This ensures subdirectories are scanned
+        final parentPath = externalDir.path.contains('/Android')
+            ? externalDir.path
+                .substring(0, externalDir.path.indexOf('/Android'))
+            : externalDir.path;
+        musicDirectories.add(parentPath);
+        musicDirectories.add('$parentPath/Music');
+        musicDirectories.add('$parentPath/Download');
+        musicDirectories.add('$parentPath/Music/tsmusic');
       }
     } catch (e) {
       debugPrint('Error getting external storage directory: $e');
     }
 
-    // Add standard Android paths - comprehensive list
+    // Add standard Android paths - comprehensive list with parent directories
     final standardPaths = [
-      // Primary storage
+      // Primary storage - parent directories for recursive scanning
+      '/storage/emulated/0',
       '/storage/emulated/0/Music',
       '/storage/emulated/0/Download',
+      '/storage/emulated/0/Music/tsmusic',
+      '/sdcard',
       '/sdcard/Music',
       '/sdcard/Download',
       // Alternative mount points
+      '/mnt/sdcard',
       '/mnt/sdcard/Music',
       '/mnt/sdcard/Download',
 
       // System media paths
+      '/data/media/0',
       '/data/media/0/Music',
       '/data/media/0/Download',
 
@@ -1245,13 +1473,17 @@ class MusicProvider extends ChangeNotifier {
     musicDirectories.addAll(standardPaths);
 
     // Remove duplicates and filter out null/empty paths
-    final uniquePaths = musicDirectories.where((path) => path.isNotEmpty).toList();
+    final uniquePaths =
+        musicDirectories.where((path) => path.isNotEmpty).toSet().toList();
+
+    debugPrint('🔍 Final music directories to scan: $uniquePaths');
 
     return uniquePaths;
   }
 
   /// Scan all directories in parallel for maximum speed
-  Future<Map<String, dynamic>> _scanAllDirectoriesParallel(List<String> directories) async {
+  Future<Map<String, dynamic>> _scanAllDirectoriesParallel(
+      List<String> directories) async {
     final List<File> allMusicFiles = [];
     final Set<String> processedPaths = {};
     int totalFilesFound = 0;
@@ -1260,11 +1492,15 @@ class MusicProvider extends ChangeNotifier {
     const batchSize = 5;
 
     for (int i = 0; i < directories.length; i += batchSize) {
-      final endIndex = (i + batchSize < directories.length) ? i + batchSize : directories.length;
+      final endIndex = (i + batchSize < directories.length)
+          ? i + batchSize
+          : directories.length;
       final batch = directories.sublist(i, endIndex);
 
       // Process each directory in this batch
-      final futures = batch.map((dirPath) => _scanSingleDirectory(dirPath, processedPaths)).toList();
+      final futures = batch
+          .map((dirPath) => _scanSingleDirectory(dirPath, processedPaths))
+          .toList();
 
       try {
         final results = await Future.wait(futures);
@@ -1287,7 +1523,8 @@ class MusicProvider extends ChangeNotifier {
   }
 
   /// Scan a single directory for music files
-  Future<Map<String, dynamic>?> _scanSingleDirectory(String dirPath, Set<String> processedPaths) async {
+  Future<Map<String, dynamic>?> _scanSingleDirectory(
+      String dirPath, Set<String> processedPaths) async {
     try {
       final dir = Directory(dirPath);
       if (!await dir.exists()) return null;
@@ -1295,14 +1532,16 @@ class MusicProvider extends ChangeNotifier {
       final List<File> musicFiles = [];
       int fileCount = 0;
 
-      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity
+          in dir.list(recursive: true, followLinks: false)) {
         if (entity is File && !processedPaths.contains(entity.path)) {
           final ext = path.extension(entity.path).toLowerCase();
           if (audioExtensions.contains(ext)) {
             try {
               final stat = await entity.stat();
               // Lower minimum file size to catch more files
-              if (stat.size > 512) { // Even smaller threshold
+              if (stat.size > 512) {
+                // Even smaller threshold
                 musicFiles.add(entity);
                 processedPaths.add(entity.path);
                 fileCount++;
@@ -1344,7 +1583,8 @@ class MusicProvider extends ChangeNotifier {
       try {
         final dir = Directory(basePath);
         if (await dir.exists()) {
-          await for (final entity in dir.list(recursive: true, followLinks: false)) {
+          await for (final entity
+              in dir.list(recursive: true, followLinks: false)) {
             if (entity is File) {
               final ext = path.extension(entity.path).toLowerCase();
               if (audioExtensions.contains(ext)) {
@@ -1370,7 +1610,8 @@ class MusicProvider extends ChangeNotifier {
   }
 
   /// Process all music files and add them to database in a single transaction
-  Future<void> _processAndAddAllSongs(List<File> musicFiles, bool background) async {
+  Future<void> _processAndAddAllSongs(
+      List<File> musicFiles, bool background) async {
     debugPrint('🔄 PROCESSING ${musicFiles.length} MUSIC FILES...');
 
     // Clear existing data
@@ -1411,10 +1652,10 @@ class MusicProvider extends ChangeNotifier {
     await db.transaction((txn) async {
       for (final song in validSongs) {
         try {
-          // Insert song
+          // Insert song using database-compatible map
           final songId = await txn.insert(
             DatabaseHelper.tableSongs,
-            song.toMap(),
+            song.toDbMap(),
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
 
@@ -1464,13 +1705,14 @@ class MusicProvider extends ChangeNotifier {
     await _updateNowPlayingPlaylist();
 
     debugPrint('🎉 SUCCESSFULLY ADDED ${validSongs.length} SONGS TO DATABASE');
-    
+
     // Ensure all songs are saved to database for consistency
     await _ensureCachedSongsInDatabase();
   }
 
   /// Helper method to get or create artist
-  Future<int> _getOrCreateArtist(DatabaseExecutor txn, String artistName) async {
+  Future<int> _getOrCreateArtist(
+      DatabaseExecutor txn, String artistName) async {
     final existingArtist = await txn.query(
       DatabaseHelper.tableArtists,
       where: '${DatabaseHelper.columnName} = ?',
@@ -1512,11 +1754,19 @@ class MusicProvider extends ChangeNotifier {
 
       // Clean up filename
       String cleanFileName(String fileName) => fileName
-            .replaceAll(RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false), '')
-            .replaceAll(RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps', caseSensitive: false), '')
-            .replaceAll(RegExp(r'\b(official|music|video|lyrics|hd|clear|audio)\b', caseSensitive: false), '')
-            .replaceAll(RegExp(r'\s{2,}'), ' ')
-            .trim();
+          .replaceAll(
+              RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false),
+              '')
+          .replaceAll(
+              RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
+                  caseSensitive: false),
+              '')
+          .replaceAll(
+              RegExp(r'\b(official|music|video|lyrics|hd|clear|audio)\b',
+                  caseSensitive: false),
+              '')
+          .replaceAll(RegExp(r'\s{2,}'), ' ')
+          .trim();
 
       final cleanedName = cleanFileName(fileName);
       String title = cleanedName;
@@ -1534,7 +1784,9 @@ class MusicProvider extends ChangeNotifier {
 
         // Handle featured artists
         String? featuredArtists;
-        final featPattern = RegExp(r'^(.*?)\s*(?:ft\.?|feat\.?|featuring)\s+(.+)$', caseSensitive: false);
+        final featPattern = RegExp(
+            r'^(.*?)\s*(?:ft\.?|feat\.?|featuring)\s+(.+)$',
+            caseSensitive: false);
         final featMatch = featPattern.firstMatch(rawTitle);
 
         if (featMatch != null) {
@@ -1553,9 +1805,17 @@ class MusicProvider extends ChangeNotifier {
         artistsList.addAll(featuredList);
 
         title = rawTitle
-            .replaceAll(RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false), '')
-            .replaceAll(RegExp(r'(?:ft\.?|feat\.?|featuring)\s+.+$', caseSensitive: false), '')
-            .replaceAll(RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps', caseSensitive: false), '')
+            .replaceAll(
+                RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false),
+                '')
+            .replaceAll(
+                RegExp(r'(?:ft\.?|feat\.?|featuring)\s+.+$',
+                    caseSensitive: false),
+                '')
+            .replaceAll(
+                RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
+                    caseSensitive: false),
+                '')
             .replaceAll(RegExp(r'\s{2,}'), ' ')
             .trim();
       }
@@ -1571,11 +1831,12 @@ class MusicProvider extends ChangeNotifier {
 
       // Create new song
       final isTSMusic = file.path.toLowerCase().contains('music/tsmusic') ||
-                       file.path.toLowerCase().contains('tsmusic');
+          file.path.toLowerCase().contains('tsmusic');
 
       final song = Song(
         id: file.path.hashCode,
-        title: title.isNotEmpty ? title : path.basenameWithoutExtension(file.path),
+        title:
+            title.isNotEmpty ? title : path.basenameWithoutExtension(file.path),
         artists: artistsList,
         album: 'Unknown Album',
         url: file.path,
@@ -1593,7 +1854,6 @@ class MusicProvider extends ChangeNotifier {
   /// Get audio duration for a file
   Future<Duration> _getAudioDuration(String filePath) async {
     try {
-      // First, check if file exists and is readable
       final file = File(filePath);
       if (!await file.exists()) {
         debugPrint('File does not exist: $filePath');
@@ -1601,68 +1861,46 @@ class MusicProvider extends ChangeNotifier {
       }
 
       final fileSize = await file.length();
-      if (fileSize < 1024) { // File too small to be valid audio
-        debugPrint('File too small to be valid audio: $filePath ($fileSize bytes)');
+      if (fileSize < 1024) {
+        debugPrint(
+            'File too small to be valid audio: $filePath ($fileSize bytes)');
         return Duration.zero;
       }
 
-      final audioPlayer = Player();
-      try {
-        // Set file path and wait for it to load
-        await audioPlayer.open(Media(filePath));
+      final extension = path.extension(filePath).toLowerCase();
 
-        // Wait for metadata to load with timeout
-        Duration? duration;
-        int attempts = 0;
-        const maxAttempts = 10;
-
-        while (duration == null && attempts < maxAttempts) {
-          duration = audioPlayer.state.duration;
-          if (duration == null || duration == Duration.zero) {
-            await Future.delayed(const Duration(milliseconds: 100));
-            attempts++;
-          }
-        }
-
-        if (duration == null) {
-          debugPrint('Could not get duration for $filePath after $maxAttempts attempts');
-          return Duration.zero;
-        }
-
-        return duration;
-      } catch (e) {
-        debugPrint('Error getting duration for $filePath: $e');
-
-        // Handle specific error types
-        if (e.toString().contains('Source error') || e.toString().contains('source')) {
-          debugPrint('Source error for file: $filePath - file may be corrupted or in unsupported format');
-          return Duration.zero;
-        }
-
-        if (e.toString().contains('Codec') || e.toString().contains('codec')) {
-          debugPrint('Codec error for file: $filePath - unsupported codec');
-          return Duration.zero;
-        }
-
-        // For other errors, try a shorter timeout
-        try {
-          await audioPlayer.open(Media(filePath));
-          await Future.delayed(const Duration(milliseconds: 200));
-          final duration = audioPlayer.state.duration;
-          return duration ?? Duration.zero;
-        } catch (retryError) {
-          debugPrint('Retry failed for $filePath: $retryError');
-          return Duration.zero;
-        }
-      } finally {
-        try {
-          await audioPlayer.dispose();
-        } catch (_) {
-          // Ignore dispose errors
-        }
+      // Estimate duration based on file size and average bitrate
+      // Common bitrates: MP3/M4A ~128-320kbps, OPUS ~96-160kbps
+      int estimatedBitrate;
+      if (extension == '.mp3') {
+        estimatedBitrate = 128000; // 128 kbps
+      } else if (extension == '.m4a' || extension == '.aac') {
+        estimatedBitrate = 128000; // 128 kbps
+      } else if (extension == '.opus') {
+        estimatedBitrate = 96000; // 96 kbps
+      } else if (extension == '.ogg' || extension == '.flac') {
+        estimatedBitrate = 256000; // 256 kbps for FLAC/Ogg
+      } else if (extension == '.wav') {
+        estimatedBitrate = 1411200; // 1411 kbps (CD quality)
+      } else {
+        estimatedBitrate = 128000; // default
       }
+
+      // Duration = (file size in bits) / bitrate
+      final estimatedMs = (fileSize * 8 * 1000) / estimatedBitrate;
+
+      // Reasonable duration check: between 10 seconds and 30 minutes
+      if (estimatedMs < 10000 || estimatedMs > 1800000) {
+        debugPrint(
+            'Suspicious duration estimate for $filePath: ${Duration(milliseconds: estimatedMs.round())}, using default 3 minutes');
+        return const Duration(minutes: 3);
+      }
+
+      debugPrint(
+          'Estimated duration for $filePath: ${Duration(milliseconds: estimatedMs.round())} (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+      return Duration(milliseconds: estimatedMs.round());
     } catch (e) {
-      debugPrint('Error accessing file $filePath: $e');
+      debugPrint('Error getting duration for $filePath: $e');
       return Duration.zero;
     }
   }
@@ -1709,7 +1947,10 @@ class MusicProvider extends ChangeNotifier {
   }
 
   void moveInQueue(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _playlist.length || newIndex < 0 || newIndex >= _playlist.length) {
+    if (oldIndex < 0 ||
+        oldIndex >= _playlist.length ||
+        newIndex < 0 ||
+        newIndex >= _playlist.length) {
       return;
     }
     final song = _playlist.removeAt(oldIndex);
@@ -1750,5 +1991,49 @@ class MusicProvider extends ChangeNotifier {
     _displayedSongs.clear();
     await _updateNowPlayingPlaylist();
     notifyListeners();
+  }
+
+  Future<void> loadPlaylistAsQueue(int playlistId) async {
+    try {
+      final songMaps = await _databaseHelper.getSongsInPlaylist(playlistId);
+      _playlist.clear();
+      _songsMap.clear();
+
+      for (final songData in songMaps) {
+        final songId = songData['id'] as int;
+        final artistsData = await _databaseHelper.getArtistsForSong(songId);
+        final artists =
+            artistsData.map((row) => row['name'] as String).toList();
+
+        final song = Song(
+          id: songId,
+          youtubeId: songData['youtube_id'] as String?,
+          title: songData['title'] as String? ?? 'Unknown Title',
+          url: songData['file_path'] as String,
+          duration: songData['duration'] as int? ?? 0,
+          artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
+          dateAdded: songData['created_at'] != null
+              ? DateTime.parse(songData['created_at'] as String)
+              : DateTime.now(),
+        );
+        _addSongIfNotExists(song);
+      }
+
+      _displayedSongs = List.from(_playlist);
+
+      if (_playlist.isNotEmpty) {
+        _currentIndex = 0;
+        await _setAudioSource(_playlist[0]);
+        await _player.play();
+        await _updateNotification();
+      }
+
+      await _updateNowPlayingPlaylist();
+      notifyListeners();
+      debugPrint('Loaded playlist $playlistId with ${_playlist.length} songs');
+    } catch (e) {
+      debugPrint('Error loading playlist as queue: $e');
+      rethrow;
+    }
   }
 }
