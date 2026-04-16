@@ -107,7 +107,7 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## TODO
-
+- [ ] Perminant notification
 - [ ] Playlist download and auto playlist generation
 - [x] ~~Improved UI and color scheme support~~
 - [x] ~~New player screen styles~~
