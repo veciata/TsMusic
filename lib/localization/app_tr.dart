@@ -262,4 +262,58 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get downloadingMusic => 'Müzik indiriliyor...';
+
+  @override
+  String get introWelcomeTitle => 'TS Music\'e Hoş Geldiniz';
+
+  @override
+  String get introWelcomeDesc =>
+      'Müzik kütüphanenizi yönetmek ve keyifli bir şekilde dinlemek için güçlü özelliklere sahip kişisel müzik oynatıcınız.';
+
+  @override
+  String get introSearchTitle => 'Ara ve Keşfet';
+
+  @override
+  String get introSearchDesc =>
+      'En sevdiğiniz şarkıları çevrimiçi arayın ve doğrudan dinleyin veya çevrimdışı dinleme için indirin.';
+
+  @override
+  String get introDownloadTitle => 'Müzik İndir';
+
+  @override
+  String get introDownloadDesc =>
+      'En sevdiğiniz parçaları yüksek kalitede indirin ve çevrimdışı müzik kütüphanenizi oluşturun.';
+
+  @override
+  String get introQueueTitle => 'Kuyruk Yönetimi';
+
+  @override
+  String get introQueueDesc =>
+      'Kesintisiz müzik dinleme keyfinin tadını çıkarmak için oynatma kuyruğunuzu oluşturun ve yönetin.';
+
+  @override
+  String get getStarted => 'Başla';
+
+  @override
+  String get next => 'İleri';
+
+  @override
+  String get introStorageTitle => 'Depolama Erişimi';
+
+  @override
+  String get introStorageDesc =>
+      'Müzik dosyalarınızı bulmak ve oynatmak için lütfen depolama erişim izni verin.';
+
+  @override
+  String get permissionRequired => 'Devam etmek için depolama izni gereklidir';
+
+  @override
+  String get grantPermission => 'İzin Ver';
+
+  @override
+  String get permissionGranted => 'İzin Verildi';
+
+  @override
+  String get permissionGrantedDesc =>
+      'Artık müzik dosyalarınıza erişebilirsiniz. Devam etmek için İleri\'ye dokunun.';
 }

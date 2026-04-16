@@ -15,13 +15,36 @@ import '../models/song.dart';
 import '../models/song_sort_option.dart';
 import '../services/audio_notification_service.dart';
 import '../database/database_helper.dart';
+import '../services/youtube_service.dart';
 
 /// Main music provider class for managing music playback and library
 class MusicProvider extends ChangeNotifier {
   // ===== CORE DEPENDENCIES =====
   final Player _player = Player();
 
+  YouTubeService? _youTubeService;
+  bool _youTubeServiceLinked = false;
+
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+
+  void setYouTubeService(YouTubeService service) {
+    _youTubeService = service;
+    _youTubeServiceLinked = true;
+    service.setStopOtherPlayerCallback(() => stop());
+  }
+
+  YouTubeService _getYouTubeService() {
+    if (!_youTubeServiceLinked && _youTubeService == null) {
+      try {
+        final yt = YouTubeService.instance;
+        if (yt != null && !_youTubeServiceLinked) {
+          _youTubeService = yt;
+          yt.setStopOtherPlayerCallback(() => stop());
+        }
+      } catch (_) {}
+    }
+    return _youTubeService!;
+  }
 
   // ===== CONSTANTS =====
   static const List<String> audioExtensions = [
@@ -504,6 +527,8 @@ class MusicProvider extends ChangeNotifier {
         debugPrint('No songs in database, scanning for music...');
         await _scanLocalStorageForMusic();
       } else {
+        // Check for deleted files and scan for new files in background
+        await _scanLocalStorageForMusic(background: true);
         _error = null;
       }
 
@@ -512,7 +537,15 @@ class MusicProvider extends ChangeNotifier {
       _error = 'Error loading music from database: $e';
       _isLoading = false;
       _loadingNotifier.value = false;
-      notifyListeners();
+
+      // Only set error if playlist is still empty
+      if (_playlist.isEmpty) {
+        notifyListeners();
+      } else {
+        // If we have songs, clear error and notify anyway
+        _error = null;
+        notifyListeners();
+      }
       rethrow;
     }
   }
@@ -575,7 +608,6 @@ class MusicProvider extends ChangeNotifier {
       _error = 'Error loading music: $e';
       _isLoading = false;
       _loadingNotifier.value = false;
-      notifyListeners();
 
       // Try to recover by forcing a rescan
       if (_playlist.isEmpty) {
@@ -584,12 +616,19 @@ class MusicProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       _loadingNotifier.value = false;
+      // Clear error if we have songs
+      if (_playlist.isNotEmpty) {
+        _error = null;
+      }
       notifyListeners();
     }
   }
 
   // ===== PLAYLIST MANAGEMENT =====
   Future<void> playSong(Song song) async {
+    // Stop online player first to avoid double sound
+    await _youTubeService?.stop();
+
     var index = _playlist.indexWhere((s) => s.id == song.id);
 
     // If song not in playlist, add it
@@ -616,6 +655,9 @@ class MusicProvider extends ChangeNotifier {
 
   Future<void> setPlaylistAndPlay(List<Song> songs, int startIndex) async {
     if (songs.isEmpty || startIndex < 0 || startIndex >= songs.length) return;
+
+    // Stop online player first to avoid double sound
+    await _youTubeService?.stop();
 
     _tempPlaylist = List.from(songs);
     _isUsingTempPlaylist = true;
@@ -1235,7 +1277,15 @@ class MusicProvider extends ChangeNotifier {
       }
 
       if (musicFiles.isEmpty) {
-        _error = 'No music files found on device.';
+        // Only set error if there are no songs in database either
+        final db = await _databaseHelper.database;
+        final countResult =
+            await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+        final count = countResult.first['count'] as int? ?? 0;
+
+        if (count == 0) {
+          _error = 'No music files found on device.';
+        }
         if (!background) {
           _isLoading = false;
           _loadingNotifier.value = false;
@@ -1252,8 +1302,15 @@ class MusicProvider extends ChangeNotifier {
       if (!background) {
         _isLoading = false;
         _loadingNotifier.value = false;
-        if (_playlist.isEmpty) {
-          _error = 'No valid music files found.';
+        // Only show error if both scanning found nothing AND database is empty
+        final db = await _databaseHelper.database;
+        final countResult =
+            await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+        final count = countResult.first['count'] as int? ?? 0;
+
+        if (_playlist.isEmpty && count == 0) {
+          _error =
+              'No music found. Add music to your device or download from YouTube.';
         } else {
           _error = null;
           debugPrint(
@@ -1265,7 +1322,16 @@ class MusicProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ ERROR DURING MUSIC SCAN: $e');
       if (!background) {
-        _error = 'Error scanning for music: $e';
+        // Only show error if database is also empty
+        final db = await _databaseHelper.database;
+        final countResult =
+            await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+        final count = countResult.first['count'] as int? ?? 0;
+
+        if (count == 0) {
+          _error =
+              'Could not scan for music. Please check storage permissions.';
+        }
         _isLoading = false;
         _loadingNotifier.value = false;
         notifyListeners();
@@ -1420,54 +1486,13 @@ class MusicProvider extends ChangeNotifier {
     final musicDirectories = <String>{};
 
     // Try to get external storage directory dynamically
-    try {
-      final externalDir = await getExternalStorageDirectory();
-      if (externalDir != null) {
-        final basePaths = [
-          externalDir.path,
-          '${externalDir.path}/Music',
-          '${externalDir.path}/Download',
-          '${externalDir.path}/Music/tsmusic',
-        ];
-        musicDirectories.addAll(basePaths);
-
-        // Add parent storage paths for recursive scanning
-        // This ensures subdirectories are scanned
-        final parentPath = externalDir.path.contains('/Android')
-            ? externalDir.path
-                .substring(0, externalDir.path.indexOf('/Android'))
-            : externalDir.path;
-        musicDirectories.add(parentPath);
-        musicDirectories.add('$parentPath/Music');
-        musicDirectories.add('$parentPath/Download');
-        musicDirectories.add('$parentPath/Music/tsmusic');
-      }
-    } catch (e) {
-      debugPrint('Error getting external storage directory: $e');
-    }
-
-    // Add standard Android paths - comprehensive list with parent directories
+    // Only canonical paths - avoid duplicates from symlinks (/sdcard, /mnt/sdcard, /data/media/0 all point to same location)
     final standardPaths = [
-      // Primary storage - parent directories for recursive scanning
-      '/storage/emulated/0',
       '/storage/emulated/0/Music',
       '/storage/emulated/0/Download',
       '/storage/emulated/0/Music/tsmusic',
-      '/sdcard',
-      '/sdcard/Music',
-      '/sdcard/Download',
-      // Alternative mount points
-      '/mnt/sdcard',
-      '/mnt/sdcard/Music',
-      '/mnt/sdcard/Download',
-
-      // System media paths
-      '/data/media/0',
-      '/data/media/0/Music',
-      '/data/media/0/Download',
-
-      // TSMusic specific
-      '/data/data/com.veciata.tsmusic/files',
+      '/storage/emulated/0/Android/data/com.veciata.tsmusic/files/Music',
+      '/storage/emulated/0/Android/data/com.veciata.tsmusic/files/Download',
     ];
 
     musicDirectories.addAll(standardPaths);
@@ -1710,13 +1735,18 @@ class MusicProvider extends ChangeNotifier {
     await _ensureCachedSongsInDatabase();
   }
 
-  /// Helper method to get or create artist
+  /// Helper method to get or create artist (case-insensitive)
   Future<int> _getOrCreateArtist(
       DatabaseExecutor txn, String artistName) async {
+    final trimmedName = artistName.trim();
+    if (trimmedName.isEmpty) {
+      return 0;
+    }
+
     final existingArtist = await txn.query(
       DatabaseHelper.tableArtists,
-      where: '${DatabaseHelper.columnName} = ?',
-      whereArgs: [artistName],
+      where: 'LOWER(${DatabaseHelper.columnName}) = LOWER(?)',
+      whereArgs: [trimmedName],
     );
 
     if (existingArtist.isNotEmpty) {
@@ -1725,7 +1755,7 @@ class MusicProvider extends ChangeNotifier {
 
     return await txn.insert(
       DatabaseHelper.tableArtists,
-      {'name': artistName, 'created_at': DateTime.now().toIso8601String()},
+      {'name': trimmedName, 'created_at': DateTime.now().toIso8601String()},
     );
   }
 

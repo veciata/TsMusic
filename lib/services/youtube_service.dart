@@ -9,6 +9,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as path;
+import 'package:id3_codec/id3_codec.dart' show ID3Encoder, MetadataV2p4Body;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
@@ -62,7 +63,7 @@ class YouTubeAudio {
       safeDuration = null;
     }
 
-    final artistName = YouTubeArtistParser.parseArtistName(
+    final artistList = YouTubeArtistParser.parseArtistName(
       video.title,
       video.author,
     );
@@ -70,8 +71,8 @@ class YouTubeAudio {
     return YouTubeAudio(
       id: video.id.value,
       title: video.title,
-      author: artistName,
-      artists: [artistName],
+      author: artistList.isNotEmpty ? artistList.first : video.author,
+      artists: artistList,
       duration: safeDuration,
       thumbnailUrl: video.thumbnails.mediumResUrl,
     );
@@ -101,6 +102,8 @@ class DownloadProgress {
 }
 
 class YouTubeService with ChangeNotifier {
+  static YouTubeService? _instance;
+
   final YoutubeExplode _yt;
   final http.Client _httpClient;
   final Player _player;
@@ -111,17 +114,27 @@ class YouTubeService with ChangeNotifier {
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
 
+  Function()? _stopOtherPlayer;
+
   // Getters
   List<DownloadProgress> get activeDownloads =>
       _activeDownloads.values.toList();
   YouTubeAudio? get currentAudio => _currentAudio;
   bool get isPlaying => _player.state.playing;
+  Player get player => _player;
+
+  static YouTubeService? get instance => _instance;
+
+  void setStopOtherPlayerCallback(Function() callback) {
+    _stopOtherPlayer = callback;
+  }
 
   // Public constructor
   YouTubeService({YoutubeExplode? yt, http.Client? httpClient, Player? player})
       : _yt = yt ?? YoutubeExplode(),
         _httpClient = httpClient ?? http.Client(),
         _player = player ?? Player() {
+    _instance = this;
     _init();
   }
 
@@ -138,6 +151,9 @@ class YouTubeService with ChangeNotifier {
       _currentAudio = audio;
       isLoading.value = true;
       notifyListeners();
+
+      // Stop local player first to avoid double sound
+      _stopOtherPlayer?.call();
 
       // Clear any previous errors
       await _player.stop();
@@ -229,6 +245,14 @@ class YouTubeService with ChangeNotifier {
   Future<void> pause() async {
     await _player.pause();
     notifyListeners();
+  }
+
+  // Resume audio
+  Future<void> play() async {
+    if (_currentAudio != null) {
+      await _player.play();
+      notifyListeners();
+    }
   }
 
   // Stop audio
@@ -448,11 +472,40 @@ class YouTubeService with ChangeNotifier {
         audioExtension = streamInfo.container.name;
       }
 
-      // Simple filename: Title_VideoID.extension (no bitrate to avoid duplicates)
+      // Check if this video is already downloaded (check by youtube_id in database)
+      final db = await DatabaseHelper().database;
+      final existingByVideoId = await db.query(
+        'songs',
+        where: 'youtube_id = ?',
+        whereArgs: [videoId],
+      );
+
+      if (existingByVideoId.isNotEmpty) {
+        final existingPath = existingByVideoId.first['file_path'] as String;
+        final existingFile = File(existingPath);
+        if (await existingFile.exists()) {
+          debugPrint(
+              'downloadAudio: Video $videoId already downloaded at $existingPath');
+          _completeDownload(videoId);
+          return DownloadResult(
+            filePath: existingPath,
+            song: await _addDownloadedSongToLibrary(
+              videoId: videoId,
+              filePath: existingPath,
+              title: video.title,
+              artists: YouTubeArtistParser.parseArtistName(
+                  video.title, video.author),
+              duration: video.duration?.inMilliseconds ?? 0,
+            ),
+          );
+        }
+      }
+
+      // Simple filename: Title.extension (video ID stored in metadata, not filename)
       final finalFile = File(
         path.join(
           musicDir.path,
-          '${safeTitle}_$videoId.$audioExtension',
+          '$safeTitle.$audioExtension',
         ),
       );
 
@@ -468,7 +521,7 @@ class YouTubeService with ChangeNotifier {
               videoId: videoId,
               filePath: finalFile.path,
               title: video.title,
-              author: YouTubeArtistParser.parseArtistName(
+              artists: YouTubeArtistParser.parseArtistName(
                   video.title, video.author),
               duration: video.duration?.inMilliseconds ?? 0,
             ),
@@ -535,6 +588,27 @@ class YouTubeService with ChangeNotifier {
       debugPrint(
           'downloadAudio: Download completed. Final file size: $finalFileSize bytes');
 
+      // Write ID3 tags to the downloaded file
+      try {
+        final fileBytes = await finalFile.readAsBytes();
+        final encoder = ID3Encoder(fileBytes);
+
+        final artistNames =
+            YouTubeArtistParser.parseArtistName(video.title, video.author)
+                .join(', ');
+
+        final encodedBytes = encoder.encodeSync(MetadataV2p4Body(
+          title: video.title,
+          artist: artistNames,
+          userDefines: {'youtube_id': videoId},
+        ));
+
+        await finalFile.writeAsBytes(encodedBytes);
+        debugPrint('downloadAudio: Written ID3 tags to file');
+      } catch (e) {
+        debugPrint('downloadAudio: Failed to write ID3 tags: $e');
+      }
+
       if (downloadProgress?.cancelRequested == true) {
         if (await finalFile.exists()) {
           await finalFile.delete();
@@ -547,7 +621,7 @@ class YouTubeService with ChangeNotifier {
         videoId: videoId,
         filePath: finalFile.path,
         title: video.title,
-        author: YouTubeArtistParser.parseArtistName(video.title, video.author),
+        artists: YouTubeArtistParser.parseArtistName(video.title, video.author),
         duration: video.duration?.inMilliseconds ?? 0,
       );
 
@@ -611,7 +685,7 @@ class YouTubeService with ChangeNotifier {
     required String videoId,
     required String filePath,
     required String title,
-    required String author,
+    required List<String> artists,
     required int duration,
   }) async {
     try {
@@ -620,7 +694,7 @@ class YouTubeService with ChangeNotifier {
         videoId: videoId,
         filePath: filePath,
         title: title,
-        author: author,
+        artists: artists,
         duration: duration,
       );
     } catch (e) {

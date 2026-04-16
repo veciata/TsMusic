@@ -6,17 +6,16 @@ import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/sql_screen.dart';
-import 'screens/now_playing_screen.dart';
-import 'screens/welcome_screen.dart';
+import 'screens/introduction_screen.dart';
 import 'screens/search_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/music_provider.dart' as music_provider;
-import 'services/permission_service.dart';
 import 'services/youtube_service.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
@@ -28,19 +27,22 @@ final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize MediaKit for audio playback
   MediaKit.ensureInitialized();
   await PackageInfoUtils.init();
 
   final youTubeService = YouTubeService();
-  final permissionService = PermissionService();
-  final hasPermission = await permissionService.hasStoragePermission();
 
-  runApp(MusicPlayerApp(
-    youTubeService: youTubeService,
-    hasPermission: hasPermission,
-  ),);
+  final prefs = await SharedPreferences.getInstance();
+  final introCompleted = prefs.getBool('intro_completed') ?? false;
+
+  runApp(
+    MusicPlayerApp(
+      youTubeService: youTubeService,
+      introCompleted: introCompleted,
+    ),
+  );
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
@@ -53,7 +55,7 @@ Future<void> main() async {
       titleBarStyle: TitleBarStyle.normal,
     );
 
-    windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
     });
@@ -62,12 +64,12 @@ Future<void> main() async {
 
 class MusicPlayerApp extends StatefulWidget {
   final YouTubeService youTubeService;
-  final bool hasPermission;
+  final bool introCompleted;
 
   const MusicPlayerApp({
     super.key,
     required this.youTubeService,
-    required this.hasPermission,
+    required this.introCompleted,
   });
 
   @override
@@ -75,69 +77,70 @@ class MusicPlayerApp extends StatefulWidget {
 }
 
 class _MusicPlayerAppState extends State<MusicPlayerApp> {
-  late bool _hasPermission;
+  late bool _introCompleted;
 
   @override
   void initState() {
     super.initState();
-    _hasPermission = widget.hasPermission;
+    _introCompleted = widget.introCompleted;
   }
 
-  void _onPermissionGranted() {
+  void _onIntroComplete() {
     setState(() {
-      _hasPermission = true;
+      _introCompleted = true;
     });
   }
 
   @override
   Widget build(BuildContext context) => MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
-        ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
-        ChangeNotifierProvider(create: (_) => widget.youTubeService),
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
-      ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          final lightTheme = themeProvider.getLightTheme();
-          final darkTheme = themeProvider.getDarkTheme();
-          final isDark = themeProvider.isDarkMode;
-          final baseTextTheme =
-              isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
-          final textTheme = baseTextTheme.copyWith(
-            headlineLarge: baseTextTheme.headlineLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-            headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          );
+    providers: [
+      ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
+      ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
+      ChangeNotifierProvider(create: (_) => widget.youTubeService),
+      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+    ],
+    child: Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final lightTheme = themeProvider.getLightTheme();
+        final darkTheme = themeProvider.getDarkTheme();
+        final isDark = themeProvider.isDarkMode;
+        final baseTextTheme = isDark
+            ? ThemeData.dark().textTheme
+            : ThemeData.light().textTheme;
+        final textTheme = baseTextTheme.copyWith(
+          headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+          headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        );
 
-          return Consumer<SettingsProvider>(
-            builder: (context, settingsProvider, _) {
-              return MaterialApp(
-                title: 'TS Music',
-                debugShowCheckedModeBanner: false,
-                theme: lightTheme.copyWith(textTheme: textTheme),
-                darkTheme: darkTheme.copyWith(textTheme: textTheme),
-                themeMode: themeProvider.themeMode,
-                locale: settingsProvider.locale,
-                localizationsDelegates: const [
-                  AppLocalizations.delegate,
-                  GlobalMaterialLocalizations.delegate,
-                  GlobalWidgetsLocalizations.delegate,
-                  GlobalCupertinoLocalizations.delegate,
-                ],
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: _hasPermission
-                    ? const MainNavigationScreen()
-                    : WelcomeScreen(onPermissionGranted: _onPermissionGranted),
-              );
-            },
-          );
-        },
-      ),
-    );
+        return Consumer<SettingsProvider>(
+          builder: (context, settingsProvider, _) {
+            return MaterialApp(
+              title: 'TS Music',
+              debugShowCheckedModeBanner: false,
+              theme: lightTheme.copyWith(textTheme: textTheme),
+              darkTheme: darkTheme.copyWith(textTheme: textTheme),
+              themeMode: themeProvider.themeMode,
+              locale: settingsProvider.locale,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: _introCompleted
+                  ? const MainNavigationScreen()
+                  : IntroductionScreen(onComplete: _onIntroComplete),
+            );
+          },
+        );
+      },
+    ),
+  );
 }
 
 class MainNavigationScreen extends StatefulWidget {
@@ -163,8 +166,10 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     _requestNotificationPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final musicProv =
-          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProv = Provider.of<music_provider.MusicProvider>(
+        context,
+        listen: false,
+      );
       // Load from database first, then scan for new music in background
       _initializeMusic(musicProv);
     });
@@ -231,41 +236,39 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(
-        title: Text(_getTitle()),
-        centerTitle: true,
-        actions: [
-          if (_selectedIndex == 0)
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SearchScreen(),
-                  ),
-                );
-              },
-              tooltip: AppLocalizations.of(context).search,
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: _pages,
-            ),
+    appBar: AppBar(
+      title: Text(_getTitle()),
+      centerTitle: true,
+      actions: [
+        if (_selectedIndex == 0)
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
+              );
+            },
+            tooltip: AppLocalizations.of(context).search,
           ),
-          // Persistent mini player — always visible above bottom nav
-          const MiniPlayerWidget(),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationWidget(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-      ),
-    );
+      ],
+    ),
+    body: Column(
+      children: [
+        Expanded(
+          child: PageView(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: _pages,
+          ),
+        ),
+        // Persistent mini player — always visible above bottom nav
+        const MiniPlayerWidget(),
+      ],
+    ),
+    bottomNavigationBar: BottomNavigationWidget(
+      currentIndex: _selectedIndex,
+      onTap: _onItemTapped,
+    ),
+  );
 }

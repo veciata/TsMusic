@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_provider.dart' as music_provider;
+import '../providers/theme_provider.dart';
+import '../services/youtube_service.dart';
 import '../localization/app_localizations.dart';
 import '../screens/now_playing_screen.dart';
+import '../models/player_styles.dart';
 
-/// Builds a route that slides up from the bottom and slides down on dismiss.
 Route _slideUpRoute() => PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) =>
           const NowPlayingScreen(),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(0.0, 1.0); // start from bottom
+        const begin = Offset(0.0, 1.0);
         const end = Offset.zero;
         const curve = Curves.easeInOut;
 
@@ -25,22 +27,73 @@ Route _slideUpRoute() => PageRouteBuilder(
       reverseTransitionDuration: const Duration(milliseconds: 300),
     );
 
-/// A compact "now playing" bar that should be visible at all times.
-/// Place it between the main content and the bottom navigation bar.
+void _showMinimalPlayer(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => SizedBox(
+      width: double.infinity,
+      height: MediaQuery.of(sheetContext).size.height * 0.5,
+      child: GestureDetector(
+        onTap: () {},
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(sheetContext).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: const NowPlayingScreen(),
+        ),
+      ),
+    ),
+  );
+}
+
 class MiniPlayerWidget extends StatelessWidget {
   const MiniPlayerWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final youTubeService = Provider.of<YouTubeService>(context, listen: false);
+
     return Consumer<music_provider.MusicProvider>(
       builder: (context, musicProv, _) {
         final currentSong = musicProv.currentSong;
+        final isOnlinePlaying = youTubeService.isPlaying;
+        final currentOnlineAudio = youTubeService.currentAudio;
         final l10n = AppLocalizations.of(context);
+
+        final String title;
+        final String artist;
+        final bool isPlaying;
+
+        if (isOnlinePlaying && currentOnlineAudio != null) {
+          title = currentOnlineAudio.title;
+          artist = currentOnlineAudio.author ??
+              currentOnlineAudio.artists.join(', ');
+          isPlaying = true;
+        } else if (currentSong != null) {
+          title = currentSong.title;
+          artist = currentSong.artists.isNotEmpty
+              ? currentSong.artists.join(' & ')
+              : l10n.selectSongToPlay;
+          isPlaying = musicProv.isPlaying;
+        } else {
+          title = l10n.notPlaying;
+          artist = l10n.selectSongToPlay;
+          isPlaying = false;
+        }
 
         return GestureDetector(
           onTap: () {
-            if (currentSong != null) {
-              Navigator.push(context, _slideUpRoute());
+            if (currentSong != null || isOnlinePlaying) {
+              final themeProvider =
+                  Provider.of<ThemeProvider>(context, listen: false);
+              if (themeProvider.playerStyle == PlayerStyle.minimal) {
+                _showMinimalPlayer(context);
+              } else {
+                Navigator.push(context, _slideUpRoute());
+              }
             }
           },
           child: Container(
@@ -51,83 +104,89 @@ class MiniPlayerWidget extends StatelessWidget {
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 4,
-                  offset: const Offset(0, -1),
+                  color: Colors.black12,
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
                 ),
               ],
             ),
             child: Row(
               children: [
-                // Album art / icon
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Theme.of(context).colorScheme.primaryContainer,
                   ),
-                  child: const Icon(Icons.music_note, size: 26),
+                  child: currentSong?.albumArtUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            currentSong!.albumArtUrl!,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Icon(
+                          Icons.music_note,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                 ),
                 const SizedBox(width: 12),
-                // Title + artist
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        currentSong?.title ?? l10n.notPlaying,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+                        title,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        currentSong?.artists.isNotEmpty == true
-                            ? currentSong!.artists.join(' & ')
-                            : l10n.selectSongToPlay,
-                        style: TextStyle(
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                          fontSize: 12,
-                        ),
+                        artist,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Play/Pause button
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(21),
-                  ),
-                  child: IconButton(
+                if (isOnlinePlaying)
+                  IconButton(
                     icon: Icon(
-                      musicProv.isPlaying ? Icons.pause : Icons.play_arrow,
-                      size: 24,
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    padding: EdgeInsets.zero,
                     onPressed: () {
-                      if (musicProv.currentSong != null) {
-                        musicProv.togglePlayPause();
+                      if (isPlaying) {
+                        youTubeService.pause();
+                      } else {
+                        youTubeService.play();
+                      }
+                    },
+                  )
+                else
+                  IconButton(
+                    icon: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    onPressed: () {
+                      if (isPlaying) {
+                        musicProv.pause();
+                      } else {
+                        musicProv.play();
                       }
                     },
                   ),
-                ),
               ],
             ),
           ),
@@ -136,4 +195,3 @@ class MiniPlayerWidget extends StatelessWidget {
     );
   }
 }
-

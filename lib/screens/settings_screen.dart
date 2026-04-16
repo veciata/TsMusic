@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/theme_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/audio_format.dart';
+import '../models/player_styles.dart';
 import '../utils/package_info_utils.dart';
 import '../localization/app_localizations.dart';
 
@@ -339,50 +340,28 @@ class SettingsScreen extends StatelessWidget {
                   _showLanguageDialog(context, settingsProvider);
                 },
               ),
+              const Divider(height: 1),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Text(l10n.accentColor),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: themeProvider.availableColors
+                      .map((color) => ColorSelector(
+                            color: color,
+                            isSelected:
+                                themeProvider.primaryColor.value == color.value,
+                            onTap: () => themeProvider.setPrimaryColor(color),
+                          ))
+                      .toList(),
+                ),
+              ),
             ],
           ),
-          if (kDebugMode) ...[
-            const Divider(height: 1),
-            SettingsSection(
-              title: l10n.debug,
-              icon: Icons.bug_report,
-              children: [
-                ListTile(
-                  title: Text(l10n.playerStyle),
-                  leading: const Icon(Icons.style),
-                  trailing: Text(
-                    themeProvider.getPlayerStyleName(themeProvider.playerStyle),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  onTap: () {
-                    _showPlayerStyleDialog(context, themeProvider);
-                  },
-                ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 8.0, horizontal: 16.0),
-                  child: Text(l10n.accentColor),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: themeProvider.availableColors
-                        .map((color) => ColorSelector(
-                              color: color,
-                              isSelected: themeProvider.primaryColor.value ==
-                                  color.value,
-                              onTap: () => themeProvider.setPrimaryColor(color),
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
-          ],
           // Downloads Section
           SettingsSection(
             title: l10n.downloads,
@@ -490,6 +469,28 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+          if (kDebugMode) ...[
+            const Divider(height: 1),
+            SettingsSection(
+              title: l10n.debug,
+              icon: Icons.bug_report,
+              children: [
+                ListTile(
+                  title: Text(l10n.playerStyle),
+                  leading: const Icon(Icons.style),
+                  trailing: Text(
+                    themeProvider.getPlayerStyleName(themeProvider.playerStyle),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  onTap: () {
+                    _showPlayerStyleDialog(context, themeProvider);
+                  },
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

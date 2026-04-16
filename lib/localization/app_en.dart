@@ -262,4 +262,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadingMusic => 'Downloading music...';
+
+  @override
+  String get introWelcomeTitle => 'Welcome to TS Music';
+
+  @override
+  String get introWelcomeDesc =>
+      'Your personal music player with powerful features to manage and enjoy your music library.';
+
+  @override
+  String get introSearchTitle => 'Search & Discover';
+
+  @override
+  String get introSearchDesc =>
+      'Search for your favorite songs online and stream them directly or download for offline listening.';
+
+  @override
+  String get introDownloadTitle => 'Download Music';
+
+  @override
+  String get introDownloadDesc =>
+      'Download your favorite tracks in high quality and build your offline music library.';
+
+  @override
+  String get introQueueTitle => 'Queue Management';
+
+  @override
+  String get introQueueDesc =>
+      'Create and manage your playback queue to enjoy uninterrupted music playback.';
+
+  @override
+  String get getStarted => 'Get Started';
+
+  @override
+  String get next => 'Next';
+
+  @override
+  String get introStorageTitle => 'Storage Access';
+
+  @override
+  String get introStorageDesc =>
+      'To find and play your music files, please grant storage access permission.';
+
+  @override
+  String get permissionRequired => 'Storage permission is required to continue';
+
+  @override
+  String get grantPermission => 'Grant Permission';
+
+  @override
+  String get permissionGranted => 'Permission Granted';
+
+  @override
+  String get permissionGrantedDesc =>
+      'You can now access your music files. Tap Next to continue.';
 }

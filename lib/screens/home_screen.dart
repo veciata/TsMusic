@@ -581,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen>
       return const SkeletonHomeScreen();
     }
 
-    if (musicProvider.error != null) {
+    if (musicProvider.error != null && musicProvider.songs.isEmpty) {
       return Scaffold(
         body: Center(
           child: Padding(
@@ -589,45 +589,24 @@ class _HomeScreenState extends State<HomeScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const Icon(Icons.music_off, size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
                 Text(
-                  l10n.errorLoadingMusic,
+                  l10n.noMusicFound,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade900,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      musicProvider.error!,
-                      textAlign: TextAlign.left,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontFamily: 'monospace',
-                            color: Colors.red.shade300,
-                          ),
-                    ),
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Download music from YouTube',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey,
+                      ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: musicProvider.loadFromDatabaseOnly,
+                  onPressed: () => musicProvider.refreshSongs(),
                   icon: const Icon(Icons.refresh),
                   label: Text(l10n.tryAgain),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {
-                    musicProvider.refreshSongs();
-                  },
-                  child: Text(l10n.skip),
                 ),
               ],
             ),
@@ -706,7 +685,12 @@ class _HomeScreenState extends State<HomeScreen>
       try {
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
-        await file.rename(newPath);
+        try {
+          await file.rename(newPath);
+        } on FileSystemException {
+          await file.copy(newPath);
+          await file.delete();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${l10n.move}: $selected')),

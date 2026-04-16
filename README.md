@@ -109,8 +109,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## TODO
 
 - [ ] Playlist download and auto playlist generation
-- [ ] Improved UI and color scheme support
-- [ ] New player screen styles
+- [x] ~~Improved UI and color scheme support~~
+- [x] ~~New player screen styles~~
 - [ ] Auto detect language support
 - [ ] More language support
 

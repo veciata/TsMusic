@@ -4,6 +4,23 @@ import 'package:path/path.dart' as path;
 import 'package:media_kit/media_kit.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import '../utils/artist_parser.dart';
+
+String normalizeStoragePath(String filePath) {
+  if (filePath.startsWith('/sdcard/')) {
+    return '/storage/emulated/0/${filePath.substring(8)}';
+  }
+  if (filePath.startsWith('/mnt/sdcard/')) {
+    return '/storage/emulated/0/${filePath.substring(12)}';
+  }
+  if (filePath.startsWith('/data/media/0/')) {
+    return '/storage/emulated/0/${filePath.substring(14)}';
+  }
+  if (filePath.startsWith('/data/data/')) {
+    return filePath;
+  }
+  return filePath;
+}
 
 class MusicScannerService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -26,7 +43,8 @@ class MusicScannerService {
       if (primaryStorage == null) return;
 
       final musicDir = Directory(path.join(primaryStorage.path, 'Music'));
-      final downloadsDir = Directory(path.join(primaryStorage.path, 'Download'));
+      final downloadsDir =
+          Directory(path.join(primaryStorage.path, 'Download'));
 
       if (await musicDir.exists()) {
         await _scanDirectory(musicDir);
@@ -63,55 +81,54 @@ class MusicScannerService {
       final extension = path.extension(file.path).toLowerCase();
       if (!_supportedExtensions.contains(extension)) return;
 
-      // Check if file already exists in database
+      // Normalize path to avoid duplicates from symlinks
+      final normalizedPath = normalizeStoragePath(file.path);
+
+      // Check if file already exists in database (using normalized path)
       final db = await _dbHelper.database;
       final existingSongs = await db.query(
         DatabaseHelper.tableSongs,
         where: 'file_path = ?',
-        whereArgs: [file.path],
+        whereArgs: [normalizedPath],
       );
 
       if (existingSongs.isNotEmpty) return; // Skip if already in database
 
       // Extract metadata
-      final metadata = await _extractMetadata(file);
-      
+      final metadata = await _extractMetadata(file, normalizedPath);
+
       // Insert into database
-      await _insertSongToDatabase(file, metadata);
-      
+      await _insertSongToDatabase(file, metadata, normalizedPath);
     } catch (e) {
       print('Error processing file ${file.path}: $e');
     }
   }
 
-  // Extract metadata from audio file
-  Future<Map<String, dynamic>> _extractMetadata(File file) async {
+// Extract metadata from audio file
+  Future<Map<String, dynamic>> _extractMetadata(
+      File file, String normalizedPath) async {
     try {
       // Load the audio file to get metadata
-      await _audioPlayer.open(Media(file.path);
-      final source = _audioPlayer.audioSource;
-      final audioMetadata = source?.sequence.firstOrNull?.tag;
-      
-      return {
-        'title': audioMetadata?.title ?? path.basenameWithoutExtension(file.path),
-        'artist': audioMetadata?.artist ?? 'Unknown Artist',
-        'album': audioMetadata?.album ?? 'Unknown Album',
-        'genre': audioMetadata?.genre?.isNotEmpty == true 
-            ? audioMetadata!.genre 
-            : 'Unknown Genre',
-        'file_path': file.path,
-        'duration': _audioPlayer.state.duration?.inMilliseconds ?? 0,
-        'track_number': audioMetadata?.trackNumber ?? 0,
-        'year': audioMetadata?.publishDate?.year,
-      };
-    } catch (e) {
-      // Fallback if metadata extraction fails
+      await _audioPlayer.open(Media(file.path));
+      await Future.delayed(const Duration(milliseconds: 100));
+      final duration = _audioPlayer.state.duration?.inMilliseconds ?? 0;
+
       return {
         'title': path.basenameWithoutExtension(file.path),
-        'artist': 'Unknown Artist',
+        'artists': ArtistParser.parseArtists('Unknown Artist'),
         'album': 'Unknown Album',
         'genre': 'Unknown Genre',
-        'file_path': file.path,
+        'file_path': normalizedPath,
+        'duration': duration,
+        'track_number': 0,
+      };
+    } catch (e) {
+      return {
+        'title': path.basenameWithoutExtension(file.path),
+        'artists': ArtistParser.parseArtists('Unknown Artist'),
+        'album': 'Unknown Album',
+        'genre': 'Unknown Genre',
+        'file_path': normalizedPath,
         'duration': 0,
         'track_number': 0,
       };
@@ -121,25 +138,32 @@ class MusicScannerService {
   }
 
   // Insert song and related data into database
-  Future<void> _insertSongToDatabase(File file, Map<String, dynamic> songData) async {
+  Future<void> _insertSongToDatabase(
+      File file, Map<String, dynamic> songData, String normalizedPath) async {
     final db = await _dbHelper.database;
-    
+    final List<String> artists =
+        songData['artists'] as List<String>? ?? ['Unknown Artist'];
+
     // Start a transaction
     await db.transaction((txn) async {
-      // Insert or get artist
-      final int artistId = await _getOrCreateArtist(txn, songData['artist']);
-      
+      // Insert or get all artists
+      final List<int> artistIds = [];
+      for (final artistName in artists) {
+        final artistId = await _getOrCreateArtist(txn, artistName);
+        artistIds.add(artistId);
+      }
+
       // Insert or get genre
       final int genreId = await _getOrCreateGenre(txn, songData['genre']);
-      
-      // Insert or get album
+
+      // Insert or get album (use first artist)
       final int albumId = await _getOrCreateAlbum(
-        txn, 
-        songData['album'], 
-        artistId,
+        txn,
+        songData['album'],
+        artistIds.isNotEmpty ? artistIds.first : 0,
         songData['year'],
       );
-      
+
       // Insert song
       final songId = await txn.insert(
         DatabaseHelper.tableSongs,
@@ -154,12 +178,14 @@ class MusicScannerService {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
-      // Add artist to song
-      await txn.insert(
-        DatabaseHelper.tableSongArtist,
-        {'song_id': songId, 'artist_id': artistId},
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+      // Add all artists to song
+      for (final artistId in artistIds) {
+        await txn.insert(
+          DatabaseHelper.tableSongArtist,
+          {'song_id': songId, 'artist_id': artistId},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
 
       // Add tag if in tsmusic folder
       if (file.path.contains('/Music/tsmusic/')) {
@@ -173,12 +199,18 @@ class MusicScannerService {
     });
   }
 
-  // Helper method to get or create an artist
+  // Helper method to get or create an artist (case-insensitive match)
   Future<int> _getOrCreateArtist(Transaction txn, String artistName) async {
+    final trimmedName = artistName.trim();
+    if (trimmedName.isEmpty) {
+      return 0;
+    }
+
+    // Try to find existing artist (case-insensitive)
     final artists = await txn.query(
       DatabaseHelper.tableArtists,
-      where: 'name = ?',
-      whereArgs: [artistName],
+      where: 'LOWER(name) = LOWER(?)',
+      whereArgs: [trimmedName],
     );
 
     if (artists.isNotEmpty) {
@@ -187,7 +219,7 @@ class MusicScannerService {
 
     return await txn.insert(
       DatabaseHelper.tableArtists,
-      {'name': artistName},
+      {'name': trimmedName},
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
@@ -213,9 +245,9 @@ class MusicScannerService {
 
   // Helper method to get or create an album
   Future<int> _getOrCreateAlbum(
-    Transaction txn, 
-    String albumName, 
-    int artistId, 
+    Transaction txn,
+    String albumName,
+    int artistId,
     int? year,
   ) async {
     final albums = await txn.query(

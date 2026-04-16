@@ -1,25 +1,27 @@
 class YouTubeArtistParser {
-  static String parseArtistName(String title, String channelName) {
+  static List<String> parseArtistName(String title, String channelName) {
     final fromTitle = _extractFromTitle(title);
-    if (fromTitle != null && fromTitle.length > 2) {
+    if (fromTitle != null && fromTitle.isNotEmpty) {
       return fromTitle;
     }
 
     final cleaned = _cleanChannelName(channelName);
     if (cleaned.isNotEmpty) {
-      return cleaned;
+      return [cleaned];
     }
 
-    return channelName;
+    return [channelName];
   }
 
-  static String? _extractFromTitle(String title) {
+  static List<String>? _extractFromTitle(String title) {
     final patterns = [
       RegExp(r'^(.+?)\s*[-:]\s*.+'),
       RegExp(r'^(.+?)\s+ft\.\s+.+', caseSensitive: false),
       RegExp(r'^(.+?)\s+feat\.\s+.+', caseSensitive: false),
       RegExp(r'^(.+?)\s+with\s+.+', caseSensitive: false),
     ];
+
+    String? mainArtistFromPattern;
 
     for (final pattern in patterns) {
       final match = pattern.firstMatch(title);
@@ -28,8 +30,44 @@ class YouTubeArtistParser {
         artist = artist
             .split(RegExp(r'\s*(ft\.|feat\.|with)\s*', caseSensitive: false))[0]
             .trim();
+
         if (artist.isNotEmpty && artist.length > 1) {
-          return _cleanChannelName(artist);
+          mainArtistFromPattern = _cleanChannelName(artist);
+        }
+
+        // Check if title contains featured artists
+        final featMatch = RegExp(
+          r'(?:ft\.?|feat\.?|featuring)\s+(.+)$',
+          caseSensitive: false,
+        ).firstMatch(title);
+
+        List<String> artists = [];
+
+        // Always add main artist first
+        if (mainArtistFromPattern != null && mainArtistFromPattern.isNotEmpty) {
+          artists.add(mainArtistFromPattern);
+        }
+
+        if (featMatch != null) {
+          final featured = featMatch.group(1)?.trim() ?? '';
+          if (featured.isNotEmpty) {
+            final featuredList = featured
+                .split(RegExp(r'\s*(?:,|&|and|\+)\s*', caseSensitive: false))
+                .map((a) => _cleanChannelName(a.trim()))
+                .where((a) => a.isNotEmpty)
+                .toList();
+
+            // Only add featured artists if they're different from main
+            for (final feat in featuredList) {
+              if (!artists.any((a) => a.toLowerCase() == feat.toLowerCase())) {
+                artists.add(feat);
+              }
+            }
+          }
+        }
+
+        if (artists.isNotEmpty) {
+          return artists;
         }
       }
     }

@@ -3,10 +3,7 @@ import 'app_en.dart';
 import 'app_tr.dart';
 
 class AppLocalizations {
-  static const supportedLocales = [
-    Locale('en', 'US'),
-    Locale('tr', 'TR'),
-  ];
+  static const supportedLocales = [Locale('en', 'US'), Locale('tr', 'TR')];
 
   static const Locale fallbackLocale = Locale('en', 'US');
 
@@ -138,6 +135,24 @@ class AppLocalizations {
   String get downloadComplete => throw UnimplementedError();
   String get noDownloads => throw UnimplementedError();
   String get downloadingMusic => throw UnimplementedError();
+
+  // Introduction
+  String get introWelcomeTitle => throw UnimplementedError();
+  String get introWelcomeDesc => throw UnimplementedError();
+  String get introStorageTitle => throw UnimplementedError();
+  String get introStorageDesc => throw UnimplementedError();
+  String get introSearchTitle => throw UnimplementedError();
+  String get introSearchDesc => throw UnimplementedError();
+  String get introDownloadTitle => throw UnimplementedError();
+  String get introDownloadDesc => throw UnimplementedError();
+  String get introQueueTitle => throw UnimplementedError();
+  String get introQueueDesc => throw UnimplementedError();
+  String get getStarted => throw UnimplementedError();
+  String get next => throw UnimplementedError();
+  String get permissionRequired => throw UnimplementedError();
+  String get grantPermission => throw UnimplementedError();
+  String get permissionGranted => throw UnimplementedError();
+  String get permissionGrantedDesc => throw UnimplementedError();
 }
 
 class _AppLocalizationsDelegate
@@ -146,8 +161,9 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) {
-    return AppLocalizations.supportedLocales.any((supportedLocale) =>
-        supportedLocale.languageCode == locale.languageCode);
+    return AppLocalizations.supportedLocales.any(
+      (supportedLocale) => supportedLocale.languageCode == locale.languageCode,
+    );
   }
 
   @override
