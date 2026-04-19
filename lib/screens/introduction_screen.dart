@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../localization/app_localizations.dart';
-import '../services/permission_service.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
+import 'package:tsmusic/services/permission_service.dart';
 
 class IntroductionScreen extends StatefulWidget {
   final VoidCallback onComplete;

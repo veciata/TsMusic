@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../providers/theme_provider.dart';
-import '../providers/settings_provider.dart';
-import '../models/audio_format.dart';
-import '../models/player_styles.dart';
-import '../utils/package_info_utils.dart';
-import '../localization/app_localizations.dart';
+import 'package:tsmusic/providers/theme_provider.dart';
+import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/models/audio_format.dart';
+import 'package:tsmusic/models/player_styles.dart';
+import 'package:tsmusic/utils/package_info_utils.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 
 class SettingsSection extends StatelessWidget {
   final String title;

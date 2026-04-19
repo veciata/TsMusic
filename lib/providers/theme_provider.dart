@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/player_styles.dart';
-import '../models/app_theme.dart' as app_theme;
+import 'package:tsmusic/models/player_styles.dart';
+import 'package:tsmusic/core/theme/app_theme.dart' as app_theme;
 
 class ThemeProvider with ChangeNotifier {
   static const String _themeModeKey = 'theme_mode';

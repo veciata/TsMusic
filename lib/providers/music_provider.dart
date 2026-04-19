@@ -11,11 +11,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
-import '../models/song.dart';
-import '../models/song_sort_option.dart';
-import '../services/audio_notification_service.dart';
-import '../database/database_helper.dart';
-import '../services/youtube_service.dart';
+import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/models/song_sort_option.dart';
+import 'package:tsmusic/services/audio_notification_service.dart';
+import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/services/youtube_service.dart';
 
 /// Main music provider class for managing music playback and library
 class MusicProvider extends ChangeNotifier {
@@ -1490,7 +1490,6 @@ class MusicProvider extends ChangeNotifier {
     final standardPaths = [
       '/storage/emulated/0/Music',
       '/storage/emulated/0/Download',
-      '/storage/emulated/0/Music/tsmusic',
       '/storage/emulated/0/Android/data/com.veciata.tsmusic/files/Music',
       '/storage/emulated/0/Android/data/com.veciata.tsmusic/files/Download',
     ];

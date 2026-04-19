@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'app_en.dart';
-import 'app_tr.dart';
+import 'package:tsmusic/localization/app_en.dart';
+import 'package:tsmusic/localization/app_tr.dart';
 
 class AppLocalizations {
   static const supportedLocales = [Locale('en', 'US'), Locale('tr', 'TR')];

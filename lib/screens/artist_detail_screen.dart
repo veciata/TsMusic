@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/music_provider.dart' as music_provider;
-import '../providers/settings_provider.dart';
-import '../services/youtube_service.dart';
-import '../models/song.dart';
-import '../localization/app_localizations.dart';
-import '../widgets/mini_player_widget.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/providers/youtube_player_provider.dart';
+import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
+import 'package:tsmusic/widgets/mini_player_widget.dart';
+import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'downloads_screen.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
@@ -28,17 +30,19 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late YouTubeService _youTubeService;
+  late YouTubePlayerProvider _youtubePlayer;
   List<YouTubeAudio> _youtubeSongs = [];
   bool _isLoading = false;
   bool _hasMore = true;
   final ScrollController _scrollController = ScrollController();
   final Map<String, String> _artistImageCache = {};
-  String? _loadingYouTubeId;
 
   @override
   void initState() {
     super.initState();
     _youTubeService = context.read<YouTubeService>();
+    _youtubePlayer = context.read<YouTubePlayerProvider>();
+    _youtubePlayer.registerScreen('artist_screen');
     _tabController = TabController(length: 2, vsync: this);
     _loadYouTubeSongs();
     _scrollController.addListener(_onScroll);
@@ -128,27 +132,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Future<void> _playAudio(YouTubeAudio audio) async {
-    if (!mounted) return;
-
-    setState(() => _loadingYouTubeId = audio.id);
-
     try {
-      await _youTubeService.playAudio(audio);
-
-      if (mounted) {
-        setState(() {
-          _loadingYouTubeId = null;
-        });
-      }
+      await _youtubePlayer.playAudio(audio);
     } catch (e) {
-      debugPrint('Error playing audio: $e');
-
       if (mounted) {
-        setState(() => _loadingYouTubeId = null);
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Audio could not be played'),
+            content: Text('Audio could not be played: $e'),
             action: SnackBarAction(
               label: 'Retry',
               onPressed: () => _playAudio(audio),
@@ -211,6 +201,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
   @override
   void dispose() {
+    // Unregister screen and stop YouTube audio when leaving artist screen
+    _youtubePlayer.unregisterScreen('artist_screen');
     _tabController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -222,12 +214,18 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     final l10n = AppLocalizations.of(context);
     final localSongs = musicProvider.getSongsByArtist(widget.artistName);
 
-    return Scaffold(
-      body: Column(
-        children: [
-          Expanded(
-            child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+    return WillPopScope(
+      onWillPop: () async {
+        // Stop YouTube player when leaving artist screen
+        await _youtubePlayer.stop();
+        return true;
+      },
+      child: Scaffold(
+        body: Column(
+          children: [
+            Expanded(
+              child: NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 SliverAppBar(
                   expandedHeight: 200.0,
                   pinned: true,
@@ -278,8 +276,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
               ),
             ),
           ),
+          // Always show mini player at bottom
           const MiniPlayerWidget(),
         ],
+      ),
       ),
     );
   }
@@ -399,95 +399,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Widget _buildOnlineResultItem(YouTubeAudio audio) {
-    final youTubeService = Provider.of<YouTubeService>(context);
-    final isCurrent = youTubeService.currentAudio?.id == audio.id;
-    final isPlaying = youTubeService.isPlaying && isCurrent;
-    final isLoading = _loadingYouTubeId == audio.id;
-
-    final downloadProgress = youTubeService.activeDownloads
-        .where((d) => d.videoId == audio.id)
-        .firstOrNull;
-
-    final musicProvider =
-        Provider.of<music_provider.MusicProvider>(context, listen: false);
-    final isDownloaded = musicProvider.songs
-        .any((s) => s.id == audio.id.hashCode && s.isDownloaded);
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        leading: audio.thumbnailUrl?.isNotEmpty == true
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: CachedNetworkImage(
-                  imageUrl: audio.thumbnailUrl!,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) =>
-                      Container(width: 60, height: 60, color: Colors.grey[300]),
-                  errorWidget: (context, url, error) =>
-                      Container(width: 60, height: 60, color: Colors.grey[300]),
-                ),
-              )
-            : Container(
-                width: 60,
-                height: 60,
-                color: Colors.grey[300],
-                child: const Icon(Icons.music_video),
-              ),
-        title: Text(
-          audio.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(audio.artists.join(', '),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (isCurrent && isPlaying) const LinearProgressIndicator(),
-            if (downloadProgress != null)
-              LinearProgressIndicator(value: downloadProgress.progress),
-            if (isDownloaded) const Text('Downloaded'),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isLoading)
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              IconButton(
-                icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                onPressed: () => _playAudio(audio),
-              ),
-            IconButton(
-              icon: Icon(
-                isDownloaded
-                    ? Icons.check_circle
-                    : (downloadProgress != null
-                        ? Icons.downloading
-                        : Icons.download),
-              ),
-              onPressed: () async {
-                if (isDownloaded) {
-                  return;
-                }
-                if (downloadProgress != null) {
-                  _navigateToDownloads();
-                  return;
-                }
-                await _handleDownload(audio);
-              },
-            ),
-          ],
-        ),
-      ),
+    return YouTubePlaybackWidget(
+      audio: audio,
+      onPlay: _playAudio,
+      onDownload: _handleDownload,
     );
   }
 

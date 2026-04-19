@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/music_provider.dart' as music_provider;
-import '../screens/now_playing_screen.dart';
-import '../screens/queue_screen.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/screens/now_playing_screen.dart';
+import 'package:tsmusic/screens/queue_screen.dart';
 
 class NowPlayingBottomSheet extends StatelessWidget {
   const NowPlayingBottomSheet({super.key});

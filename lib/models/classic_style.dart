@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'song.dart';
-import '../providers/music_provider.dart';
+import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/providers/music_provider.dart';
 
 Widget buildClassicStyle({
   required ThemeData theme,

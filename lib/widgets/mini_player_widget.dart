@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/music_provider.dart' as music_provider;
-import '../providers/theme_provider.dart';
-import '../services/youtube_service.dart';
-import '../localization/app_localizations.dart';
-import '../screens/now_playing_screen.dart';
-import '../models/player_styles.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/theme_provider.dart';
+import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
+import 'package:tsmusic/screens/now_playing_screen.dart';
+import 'package:tsmusic/models/player_styles.dart';
 
 Route _slideUpRoute() => PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) =>

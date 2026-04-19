@@ -3,8 +3,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:media_kit/media_kit.dart';
 import 'package:sqflite/sqflite.dart';
-import '../database/database_helper.dart';
-import '../utils/artist_parser.dart';
+import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/utils/artist_parser.dart';
 
 String normalizeStoragePath(String filePath) {
   if (filePath.startsWith('/sdcard/')) {

@@ -55,7 +55,6 @@ dependencies:
 
   # Desktop
   window_manager: ^0.5.1
-  id3_codec: ^1.0.3
 
   # UI components
 

@@ -9,7 +9,6 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as path;
-import 'package:id3_codec/id3_codec.dart' show ID3Encoder, MetadataV2p4Body;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
@@ -439,7 +438,7 @@ class YouTubeService with ChangeNotifier {
         }
       }
 
-      // Auto mode or fallback: prefer m4a for compatibility, then highest bitrate
+      // Auto mode or fallback: prefer m4a for Android compatibility, then highest bitrate
       if (selectedStream == null) {
         final m4aStreams =
             audioStreams.where((s) => s.container.name == 'mp4').toList();
@@ -447,7 +446,7 @@ class YouTubeService with ChangeNotifier {
           selectedStream = m4aStreams.reduce((a, b) =>
               a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
           debugPrint(
-              'downloadAudio: Auto mode - selected m4a for best compatibility');
+              'downloadAudio: Auto mode - selected m4a for Android compatibility');
         } else {
           // Fallback to highest bitrate available
           selectedStream = audioStreams.reduce((a, b) =>
@@ -587,27 +586,6 @@ class YouTubeService with ChangeNotifier {
       final finalFileSize = await finalFile.length();
       debugPrint(
           'downloadAudio: Download completed. Final file size: $finalFileSize bytes');
-
-      // Write ID3 tags to the downloaded file
-      try {
-        final fileBytes = await finalFile.readAsBytes();
-        final encoder = ID3Encoder(fileBytes);
-
-        final artistNames =
-            YouTubeArtistParser.parseArtistName(video.title, video.author)
-                .join(', ');
-
-        final encodedBytes = encoder.encodeSync(MetadataV2p4Body(
-          title: video.title,
-          artist: artistNames,
-          userDefines: {'youtube_id': videoId},
-        ));
-
-        await finalFile.writeAsBytes(encodedBytes);
-        debugPrint('downloadAudio: Written ID3 tags to file');
-      } catch (e) {
-        debugPrint('downloadAudio: Failed to write ID3 tags: $e');
-      }
 
       if (downloadProgress?.cancelRequested == true) {
         if (await finalFile.exists()) {

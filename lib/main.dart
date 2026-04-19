@@ -8,20 +8,21 @@ import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
-import 'screens/home_screen.dart';
-import 'screens/settings_screen.dart';
-import 'screens/downloads_screen.dart';
-import 'screens/sql_screen.dart';
-import 'screens/introduction_screen.dart';
-import 'screens/search_screen.dart';
-import 'providers/theme_provider.dart';
-import 'providers/music_provider.dart' as music_provider;
-import 'services/youtube_service.dart';
+import 'package:tsmusic/screens/home_screen.dart';
+import 'package:tsmusic/screens/settings_screen.dart';
+import 'package:tsmusic/screens/downloads_screen.dart';
+import 'package:tsmusic/screens/sql_screen.dart';
+import 'package:tsmusic/screens/introduction_screen.dart';
+import 'package:tsmusic/screens/search_screen.dart';
+import 'package:tsmusic/providers/theme_provider.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/youtube_player_provider.dart';
+import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
-import 'utils/package_info_utils.dart';
-import 'widgets/bottom_navigation_widget.dart';
-import 'widgets/mini_player_widget.dart';
+import 'package:tsmusic/utils/package_info_utils.dart';
+import 'package:tsmusic/widgets/bottom_navigation_widget.dart';
+import 'package:tsmusic/widgets/mini_player_widget.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
@@ -97,6 +98,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
       ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
       ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
       ChangeNotifierProvider(create: (_) => widget.youTubeService),
+      ChangeNotifierProvider(create: (_) => YouTubePlayerProvider(widget.youTubeService)),
       ChangeNotifierProvider(create: (_) => SettingsProvider()),
     ],
     child: Consumer<ThemeProvider>(

@@ -33,7 +33,11 @@ class AudioService {
   }
 
   Future<void> _updateNotification(Song? song) async {
-    // Media notification will be handled separately
+    // Update notification with current song info
+    if (song != null) {
+      // This would typically update the system notification
+      // For now, basic notification handling
+    }
   }
 
   Future<void> play() async => await _player.play();

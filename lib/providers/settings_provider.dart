@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/audio_format.dart';
+import 'package:tsmusic/models/audio_format.dart';
 
 class SettingsProvider with ChangeNotifier {
   static const String _audioFormatKey = 'audioFormat';
@@ -68,7 +68,7 @@ class SettingsProvider with ChangeNotifier {
     } else if (format == AudioFormat.auto) {
       return 'Auto (App decides)';
     }
-    return 'Unknown Format';
+    return 'Best available audio';
   }
 
   Future<void> setDownloadLocation(String location) async {
@@ -88,7 +88,7 @@ class SettingsProvider with ChangeNotifier {
     } else if (location == 'music') {
       return 'Music folder';
     }
-    return 'Unknown Location';
+    return 'Internal Storage (App folder)';
   }
 
   String getLanguageName(Locale locale) {

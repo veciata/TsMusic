@@ -470,6 +470,55 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  void _showCreatePlaylistDialog() {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.createPlaylist),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: l10n.playlistName,
+            border: const OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(context);
+                try {
+                  await DatabaseHelper().createPlaylist(name);
+                  await _loadPlaylists();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.playlistCreated)),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${l10n.error}: $e')),
+                    );
+                  }
+                }
+              }
+            },
+            child: Text(l10n.create),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPlaylistsTab(music_provider.MusicProvider musicProvider) {
     final l10n = AppLocalizations.of(context);
 
@@ -638,6 +687,22 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabController.animation!,
+        builder: (context, child) {
+          final value = _tabController.animation!.value;
+          if (value < 1.0) return const SizedBox.shrink();
+          
+          return Transform.scale(
+            scale: (value - 1.0).clamp(0.0, 1.0),
+            child: FloatingActionButton(
+              onPressed: _showCreatePlaylistDialog,
+              tooltip: l10n.createPlaylist,
+              child: const Icon(Icons.add),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -660,9 +725,9 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _showMoveDialog(Song song) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
-      {'label': l10n.internalStorage, 'path': '/storage/emulated/0/Music'},
+      {'label': l10n.internalStorage, 'path': '/storage/emulated/0/Music/tsmusic'},
       {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
-      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music'},
+      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music/tsmusic'},
     ];
 
     final selected = await showDialog<String>(
@@ -683,6 +748,12 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (selected != null) {
       try {
+        // Ensure the target directory exists
+        final targetDir = Directory(selected);
+        if (!await targetDir.exists()) {
+          await targetDir.create(recursive: true);
+        }
+        
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
         try {

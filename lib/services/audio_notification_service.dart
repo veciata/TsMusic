@@ -1,7 +1,8 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:audio_session/audio_session.dart';
-import '../models/song.dart';
+import 'package:flutter/foundation.dart';
+import 'package:tsmusic/models/song.dart';
 
 class AudioPlayerTask extends BaseAudioHandler {
   final Player _player;
@@ -83,13 +84,25 @@ class AudioPlayerTask extends BaseAudioHandler {
   Future<void> setMedia(Media media, {Song? song}) async {
     await _player.open(media);
     if (song != null) {
-      mediaItem.add(MediaItem(
-        id: song.id.toString(),
-        title: song.title,
-        artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
-        artUri: song.albumArtUrl != null ? Uri.parse(song.albumArtUrl!) : null,
-      ),);
-      onCurrentSongChanged(song);
+      try {
+        final title = song.title.isNotEmpty ? song.title : 'Unknown Title';
+        final artist = song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist';
+        
+        final artUri = song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty 
+            ? Uri.parse(song.albumArtUrl!) 
+            : null;
+            
+        mediaItem.add(MediaItem(
+          id: song.id.toString(),
+          title: title,
+          artist: artist,
+          artUri: artUri,
+          duration: song.duration > 0 ? Duration(milliseconds: song.duration) : null,
+        ));
+        onCurrentSongChanged(song);
+      } catch (e) {
+        debugPrint('Error setting media item: $e');
+      }
     }
   }
 

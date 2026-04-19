@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/music_provider.dart';
-import '../models/song.dart';
+import 'package:tsmusic/providers/music_provider.dart';
+import 'package:tsmusic/models/song.dart';
 
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});

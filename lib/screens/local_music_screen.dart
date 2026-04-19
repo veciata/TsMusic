@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 
-import '../providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 
 
 class LocalMusicScreen extends StatelessWidget {

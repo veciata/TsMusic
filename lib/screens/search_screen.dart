@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/music_provider.dart' as music_provider;
-import '../providers/settings_provider.dart';
-import '../models/song.dart' as model;
-import '../services/youtube_service.dart';
-import '../widgets/mini_player_widget.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/providers/youtube_player_provider.dart';
+import 'package:tsmusic/models/song.dart' as model;
+import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/widgets/mini_player_widget.dart';
+import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 
 import 'downloads_screen.dart';
 
@@ -21,12 +23,12 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late final YouTubeService _youTubeService;
+  late final YouTubePlayerProvider _youtubePlayer;
   List<YouTubeAudio> _youtubeResults = [];
   bool _isSearchingYouTube = false;
 
   bool _hasMoreYouTubeResults = true;
   Timer? _debounceTimer;
-  String? _loadingYouTubeId;
   final ScrollController _scrollController = ScrollController();
   final ScrollController _searchScrollController = ScrollController();
 
@@ -34,15 +36,20 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _youTubeService = context.read<YouTubeService>();
+    _youtubePlayer = context.read<YouTubePlayerProvider>();
+    _youtubePlayer.registerScreen('search_screen');
     _searchFocusNode.requestFocus();
+    _scrollController.addListener(_onScroll);
   }
 
 
 
   @override
   void dispose() {
+    _youtubePlayer.unregisterScreen('search_screen');
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchScrollController.dispose();
     _debounceTimer?.cancel();
@@ -50,28 +57,10 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _playAudio(YouTubeAudio audio) async {
-    if (!mounted) return;
-    
-    setState(() => _loadingYouTubeId = audio.id);
-    
     try {
-      // YouTube servisi üzerinden sadece sesi çal - timeout ekle
-      await _youTubeService.playAudio(audio).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw TimeoutException('Bağlantı zaman aşımına uğradı');
-        },
-      );
-      
-      if (mounted) {
-        setState(() => _loadingYouTubeId = null);
-      }
+      await _youtubePlayer.playAudio(audio);
     } catch (e) {
-      debugPrint('Error playing audio: $e');
-      
       if (mounted) {
-        setState(() => _loadingYouTubeId = null);
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Ses çalınamadı: $e'),
@@ -123,6 +112,14 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_searchController.text.isNotEmpty && !_isSearchingYouTube && _hasMoreYouTubeResults) {
+        _searchYouTube(_searchController.text, loadMore: true);
+      }
+    }
+  }
+
   Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
     if (query.isEmpty) {
       if (mounted) {
@@ -140,7 +137,9 @@ class _SearchScreenState extends State<SearchScreen> {
     if (mounted) setState(() => _isSearchingYouTube = true);
 
     try {
-      final List<YouTubeAudio> response = await _youTubeService.searchAudio(query);
+      final List<YouTubeAudio> response = loadMore 
+          ? await _youTubeService.searchAudioNextPage(query)
+          : await _youTubeService.searchAudio(query);
 
       if (mounted) {
         setState(() {
@@ -227,14 +226,17 @@ class _SearchScreenState extends State<SearchScreen> {
                 },
               ),
               onTap: () {
-                debugPrint('🔍 SearchScreen onTap: ${song.title}');
+                debugPrint('🔍 SearchScreen onTap: ${song.title} (URL: ${song.url})');
                 if (isCurrent) {
                   if (isSongPlaying) {
+                    debugPrint('🔍 SearchScreen: Pausing current song');
                     provider.pause();
                   } else {
+                    debugPrint('🔍 SearchScreen: Resuming current song');
                     provider.play();
                   }
                 } else {
+                  debugPrint('🔍 SearchScreen: Playing new song');
                   provider.playSong(song);
                 }
               },
@@ -258,6 +260,13 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           ..._youtubeResults.map(_buildYouTubeResultItem),
+          if (_hasMoreYouTubeResults && !_isSearchingYouTube)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ] else if (_searchController.text.isNotEmpty && filteredLocalSongs.isEmpty) ...[
           const Center(
             child: Padding(
@@ -271,100 +280,10 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildYouTubeResultItem(YouTubeAudio audio) {
-    final isLoading = _loadingYouTubeId == audio.id;
-    
-    // Listen to YouTubeService for download changes
-    final youTubeService = Provider.of<YouTubeService>(context);
-    final isCurrent = youTubeService.currentAudio?.id == audio.id;
-    final isPlaying = youTubeService.isPlaying && isCurrent;
-    
-    // Check if this audio is in the download queue
-    final downloadProgress = youTubeService.activeDownloads
-        .where((d) => d.videoId == audio.id)
-        .firstOrNull;
-
-    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
-    // isDownloaded is true when the 'tsmusic' tag is present (set during download
-    // and persisted in the DB, so it survives app restarts).
-    final isDownloaded = musicProvider.songs
-        .any((s) => s.youtubeId == audio.id && s.tags.contains('tsmusic'));
-    
-    debugPrint('🔍 Icon check for ${audio.id}: isDownloaded=$isDownloaded, songs=${musicProvider.songs.length}, downloadProgress=$downloadProgress');
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        leading: audio.thumbnailUrl?.isNotEmpty == true
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: CachedNetworkImage(
-                  imageUrl: audio.thumbnailUrl!,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) =>
-                      Container(width: 60, height: 60, color: Colors.grey[300]),
-                  errorWidget: (context, url, error) =>
-                      Container(width: 60, height: 60, color: Colors.grey[300]),
-                ),
-              )
-            : Container(
-                width: 60,
-                height: 60,
-                color: Colors.grey[300],
-                child: const Icon(Icons.music_video),
-              ),
-        title: Text(
-          audio.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(audio.artists.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (isCurrent && isPlaying)
-              const LinearProgressIndicator(),
-            if (downloadProgress != null)
-              LinearProgressIndicator(value: downloadProgress.progress),
-            if (isDownloaded) const Text('Downloaded'),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isLoading)
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              IconButton(
-                icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                onPressed: () => _playAudio(audio),
-              ),
-            IconButton(
-              icon: Icon(
-                isDownloaded
-                    ? Icons.check_circle
-                    : (downloadProgress != null ? Icons.downloading : Icons.download),
-              ),
-              onPressed: () async {
-                if (isDownloaded) {
-                  return;
-                }
-                if (downloadProgress != null) {
-                  // Already downloading, do nothing
-                  return;
-                }
-                // Start download and stay on search screen
-                await _handleDownload(audio);
-              },
-            ),
-          ],
-        ),
-      ),
+    return YouTubePlaybackWidget(
+      audio: audio,
+      onPlay: _playAudio,
+      onDownload: _handleDownload,
     );
   }
 
@@ -377,9 +296,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        if (currentSong != null && currentSong.url.startsWith('http')) {
-          await musicProvider.stop();
-        }
+        // Stop YouTube player when leaving search screen
+        await _youtubePlayer.stop();
         return true;
       },
       child: Scaffold(
@@ -410,9 +328,8 @@ class _SearchScreenState extends State<SearchScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              if (currentSong != null && currentSong.url.startsWith('http')) {
-                musicProvider.stop();
-              }
+              // Stop YouTube player when going back
+              _youtubePlayer.stop();
               Navigator.of(context).pop();
             },
           ),
@@ -422,72 +339,6 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: _buildSearchResults(localSongs, musicProvider, currentSong, isPlaying),
             ),
-            if (currentSong != null && currentSong.url.startsWith('http'))
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.music_note),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            currentSong.title,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          Text(
-                            currentSong.artists.isNotEmpty ? currentSong.artists.join(' & ') : 'Unknown Artist',
-                            style: Theme.of(context).textTheme.bodySmall,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _youTubeService.isLoading,
-                      builder: (context, isLoading, child) => IconButton(
-                          icon: isLoading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                          onPressed: () async {
-                            if (isLoading) return;
-                            if (isPlaying) {
-                              await musicProvider.pause();
-                            } else {
-                              // Find the YouTubeAudio from search results
-                              final youtubeAudio = _youtubeResults.firstWhere(
-                              (audio) => audio.id.hashCode == currentSong.id,
-                                orElse: () => YouTubeAudio(
-                                  id: currentSong.id.toString(),
-                                  title: currentSong.title,
-                                  author: currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist',
-                                  artists: currentSong.artists.isNotEmpty ? currentSong.artists : ['Unknown Artist'],
-                                  duration: Duration(milliseconds: currentSong.duration),
-                                  thumbnailUrl: currentSong.albumArtUrl,
-                                  audioUrl: currentSong.url,
-                                ),
-                              );
-                              await _playAudio(youtubeAudio);
-                            }
-                          },
-                        ),
-                    ),
-                  ],
-                ),
-              ),
             // Always show mini player at bottom
             const MiniPlayerWidget(),
           ],

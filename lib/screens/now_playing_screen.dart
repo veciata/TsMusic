@@ -2,16 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:media_kit/media_kit.dart';
-import '../providers/music_provider.dart';
-import '../providers/theme_provider.dart';
-import '../models/player_styles.dart';
-import '../models/classic_style.dart';
-import '../models/modern_style.dart';
-import '../models/compact_style.dart';
-import '../models/minimal_style.dart';
-import '../widgets/now_playing_queue_bottom_sheet.dart';
-import '../localization/app_localizations.dart';
-import '../models/song.dart';
+import 'package:tsmusic/providers/music_provider.dart';
+import 'package:tsmusic/providers/theme_provider.dart';
+import 'package:tsmusic/models/player_styles.dart';
+import 'package:tsmusic/models/classic_style.dart';
+import 'package:tsmusic/models/modern_style.dart';
+import 'package:tsmusic/models/compact_style.dart';
+import 'package:tsmusic/models/minimal_style.dart';
+import 'package:tsmusic/widgets/now_playing_queue_bottom_sheet.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 import 'artist_detail_screen.dart';
 
 class NowPlayingScreen extends StatefulWidget {

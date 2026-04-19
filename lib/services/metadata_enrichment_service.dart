@@ -1,4 +1,4 @@
-import '../models/song.dart';
+import 'package:tsmusic/models/song.dart';
 
 /// A placeholder metadata enrichment service.
 ///

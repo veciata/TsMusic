@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/music_provider.dart' as music_provider;
-import '../providers/settings_provider.dart';
-import '../models/song.dart';
-import '../services/youtube_service.dart';
-import '../utils/permission_helper.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/utils/permission_helper.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});

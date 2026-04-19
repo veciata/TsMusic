@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../database/database_helper.dart';
-import '../providers/music_provider.dart' as music_provider;
-import '../localization/app_localizations.dart';
+import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/localization/app_localizations.dart';
 
 class PlaylistSelectorBottomSheet extends StatefulWidget {
   const PlaylistSelectorBottomSheet({super.key});
