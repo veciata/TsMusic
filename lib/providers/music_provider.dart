@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
@@ -23,29 +22,15 @@ class MusicProvider extends ChangeNotifier {
   final Player _player = Player();
 
   YouTubeService? _youTubeService;
-  bool _youTubeServiceLinked = false;
 
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   void setYouTubeService(YouTubeService service) {
     _youTubeService = service;
-    _youTubeServiceLinked = true;
     service.setStopOtherPlayerCallback(() => stop());
   }
 
-  YouTubeService _getYouTubeService() {
-    if (!_youTubeServiceLinked && _youTubeService == null) {
-      try {
-        final yt = YouTubeService.instance;
-        if (yt != null && !_youTubeServiceLinked) {
-          _youTubeService = yt;
-          yt.setStopOtherPlayerCallback(() => stop());
-        }
-      } catch (_) {}
-    }
-    return _youTubeService!;
-  }
-
+  
   // ===== CONSTANTS =====
   static const List<String> audioExtensions = [
     '.mp3',

@@ -5,13 +5,8 @@ import 'package:media_kit/media_kit.dart';
 import 'package:tsmusic/providers/music_provider.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/models/player_styles.dart';
-import 'package:tsmusic/models/classic_style.dart';
-import 'package:tsmusic/models/modern_style.dart';
-import 'package:tsmusic/models/compact_style.dart';
-import 'package:tsmusic/models/minimal_style.dart';
 import 'package:tsmusic/widgets/now_playing_queue_bottom_sheet.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
-import 'artist_detail_screen.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});

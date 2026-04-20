@@ -69,8 +69,7 @@ class MiniPlayerWidget extends StatelessWidget {
 
         if (isOnlinePlaying && currentOnlineAudio != null) {
           title = currentOnlineAudio.title;
-          artist = currentOnlineAudio.author ??
-              currentOnlineAudio.artists.join(', ');
+          artist = currentOnlineAudio.author;
           isPlaying = true;
         } else if (currentSong != null) {
           title = currentSong.title;

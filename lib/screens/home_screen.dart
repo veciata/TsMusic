@@ -708,7 +708,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _handleSongAction(
       String action, Song song, music_provider.MusicProvider provider) async {
-    final l10n = AppLocalizations.of(context);
     switch (action) {
       case 'move':
         await _showMoveDialog(song);

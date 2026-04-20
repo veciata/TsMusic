@@ -111,7 +111,7 @@ class MusicScannerService {
       // Load the audio file to get metadata
       await _audioPlayer.open(Media(file.path));
       await Future.delayed(const Duration(milliseconds: 100));
-      final duration = _audioPlayer.state.duration?.inMilliseconds ?? 0;
+      final duration = _audioPlayer.state.duration.inMilliseconds;
 
       return {
         'title': path.basenameWithoutExtension(file.path),

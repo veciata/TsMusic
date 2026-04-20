@@ -13,8 +13,8 @@ ThemeData buildLightTheme(Color primaryColor) {
   final baseTheme = ThemeData.light();
   final colorScheme = ColorScheme.light(
     primary: primaryColor,
-    primaryContainer: primaryColor.withOpacity(0.8),
-    secondary: primaryColor.withOpacity(0.6),
+    primaryContainer: primaryColor.withValues(alpha: 0.8),
+    secondary: primaryColor.withValues(alpha: 0.6),
     onSurface: Colors.black87,
   );
 
@@ -28,9 +28,9 @@ ThemeData buildLightTheme(Color primaryColor) {
     textTheme: TextTheme(
       titleLarge:
           TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.8)),
-      bodyLarge: TextStyle(color: colorScheme.onSurface.withOpacity(0.8)),
-      bodyMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.8)),
+      titleMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.8)),
+      bodyLarge: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.8)),
+      bodyMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.8)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -46,7 +46,7 @@ ThemeData buildLightTheme(Color primaryColor) {
       ),
     ),
     iconTheme: IconThemeData(
-      color: colorScheme.onSurface.withOpacity(0.8),
+      color: colorScheme.onSurface.withValues(alpha: 0.8),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: colorScheme.surface,
@@ -60,8 +60,8 @@ ThemeData buildDarkTheme(Color primaryColor) {
   final baseTheme = ThemeData.dark();
   final colorScheme = ColorScheme.dark(
     primary: primaryColor,
-    primaryContainer: primaryColor.withOpacity(0.8),
-    secondary: primaryColor.withOpacity(0.6),
+    primaryContainer: primaryColor.withValues(alpha: 0.8),
+    secondary: primaryColor.withValues(alpha: 0.6),
     surface: Colors.grey[850]!,
     onPrimary: Colors.white,
   );
@@ -76,9 +76,9 @@ ThemeData buildDarkTheme(Color primaryColor) {
     textTheme: TextTheme(
       titleLarge:
           TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.9)),
-      bodyLarge: TextStyle(color: colorScheme.onSurface.withOpacity(0.9)),
-      bodyMedium: TextStyle(color: colorScheme.onSurface.withOpacity(0.9)),
+      titleMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.9)),
+      bodyLarge: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.9)),
+      bodyMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.9)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -102,7 +102,7 @@ ThemeData buildDarkTheme(Color primaryColor) {
       ),
     ),
     iconTheme: IconThemeData(
-      color: colorScheme.onSurface.withOpacity(0.9),
+      color: colorScheme.onSurface.withValues(alpha: 0.9),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: colorScheme.surface,
@@ -116,7 +116,7 @@ ThemeData buildDarkTheme(Color primaryColor) {
       ),
       color: colorScheme.surface,
       surfaceTintColor: colorScheme.surfaceTint,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
     ),
   );
 }

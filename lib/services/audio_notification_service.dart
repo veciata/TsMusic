@@ -67,11 +67,9 @@ class AudioPlayerTask extends BaseAudioHandler {
       androidCompactActionIndices: const [0, 1, 3],
       processingState: _getProcessingState(),
       playing: _player.state.playing,
-      updatePosition: _player.state.position ?? Duration.zero,
-      bufferedPosition: (_player.state.buffer?.inMilliseconds ?? 0) > 0 
-          ? _player.state.buffer! 
-          : Duration.zero,
-      speed: _player.state.rate ?? 1.0,
+      updatePosition: _player.state.position,
+      bufferedPosition: _player.state.buffer,
+      speed: _player.state.rate,
       queueIndex: 0,
     ),);
   }

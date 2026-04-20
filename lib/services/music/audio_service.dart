@@ -1,6 +1,5 @@
 import 'package:media_kit/media_kit.dart';
 import 'package:tsmusic/models/song.dart';
-import 'package:tsmusic/services/audio_notification_service.dart';
 
 class AudioService {
   final Player _player = Player();

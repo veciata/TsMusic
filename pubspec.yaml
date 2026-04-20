@@ -18,9 +18,7 @@ dependencies:
   # Audio
   media_kit: ^1.1.10+1
   media_kit_libs_audio: ^1.0.4
-  # just_audio: ^0.9.40
   audio_session: ^0.2.3
-  # just_audio_background: ^0.0.1-beta.14
   audio_service: ^0.18.18
 
   # File Access
@@ -32,7 +30,7 @@ dependencies:
   cached_network_image: ^3.4.1
 
   # State Management
-  provider: ^6.1.2
+  provider: ^8.0.0
   shared_preferences: ^2.3.3
   package_info_plus: ^9.0.1
   sqflite: ^2.3.0
