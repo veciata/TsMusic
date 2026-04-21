@@ -320,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      onTap: () => musicProvider.playSong(song),
+      onTap: () => musicProvider.playSongFromLibrary(song),
     );
   }
 

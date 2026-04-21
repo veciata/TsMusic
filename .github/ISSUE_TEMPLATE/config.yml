@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: TsMusic Discussions
+    url: https://github.com/veciata/TsMusic/discussions
+    about: Please ask and answer questions here
+  - name: Security Vulnerability
+    url: https://github.com/veciata/TsMusic/blob/main/SECURITY.md
+    about: Please follow our security policy
+  - name: Documentation
+    url: https://github.com/veciata/TsMusic/wiki
+    about: Check the wiki for documentation

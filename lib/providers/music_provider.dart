@@ -130,7 +130,7 @@ class MusicProvider extends ChangeNotifier {
 
   List<String> get artists {
     final artistSet = <String>{};
-    for (final song in _playlist) {
+    for (final song in _songsMap.values) {
       for (final artist in song.artists) {
         if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist')
           artistSet.add(artist);
@@ -632,6 +632,34 @@ class MusicProvider extends ChangeNotifier {
     }
   }
 
+  /// Play a song from library with entire library as queue (Now Playing)
+  Future<void> playSongFromLibrary(Song song) async {
+    // Stop online player first
+    await _youTubeService?.stop();
+
+    // Load entire library as queue
+    _playlist.clear();
+    _playlist.addAll(_songsMap.values);
+
+    // Find the clicked song
+    var index = _playlist.indexWhere((s) => s.id == song.id);
+    if (index == -1) {
+      // Song not in library yet, add it
+      _addSongIfNotExists(song);
+      index = _playlist.indexWhere((s) => s.id == song.id);
+    }
+
+    if (index != -1) {
+      _currentIndex = index;
+      await _setAudioSource(song);
+      await _player.play();
+      await _updateNotification();
+      await _updateNowPlayingPlaylist();
+      notifyListeners();
+      debugPrint('Playing from library: ${song.title}, queue size: ${_playlist.length}');
+    }
+  }
+
   List<Song> _tempPlaylist = [];
   bool _isUsingTempPlaylist = false;
 
@@ -714,7 +742,7 @@ class MusicProvider extends ChangeNotifier {
   }
 
   String? getAlbumArtUrl(String albumName, {String? artistName}) {
-    for (final song in _playlist) {
+    for (final song in _songsMap.values) {
       if (song.album == albumName &&
           (artistName == null ||
               song.artists.any((artist) => artist == artistName))) {
@@ -724,12 +752,12 @@ class MusicProvider extends ChangeNotifier {
     return null;
   }
 
-  List<Song> getSongsByArtist(String artistName) => _playlist
+  List<Song> getSongsByArtist(String artistName) => _songsMap.values
       .where((song) => song.artists.any((artist) => artist == artistName))
       .toList();
 
   List<Song> getSongsByAlbum(String albumName, {String? artistName}) =>
-      _playlist
+      _songsMap.values
           .where((song) =>
               song.album == albumName &&
               (artistName == null ||
@@ -738,7 +766,7 @@ class MusicProvider extends ChangeNotifier {
 
   List<String> getAlbumsByArtist(String artistName) {
     final albumSet = <String>{};
-    for (final song in _playlist) {
+    for (final song in _songsMap.values) {
       if (song.artists.any((artist) => artist == artistName) &&
           song.album != null &&
           song.album!.isNotEmpty) {
