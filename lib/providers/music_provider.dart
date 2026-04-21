@@ -1034,9 +1034,11 @@ class MusicProvider extends ChangeNotifier {
 
   /// Helper method to add a song only if it doesn't exist
   void _addSongIfNotExists(Song song) {
+    // Always add to _playlist (queue) for playback
+    _playlist.add(song);
+    // Only add to _songsMap if not exists (library cache)
     if (!_songsMap.containsKey(song.url)) {
       _songsMap[song.url] = song;
-      _playlist.add(song);
     }
   }
 
@@ -2011,7 +2013,6 @@ class MusicProvider extends ChangeNotifier {
     try {
       final songMaps = await _databaseHelper.getSongsInPlaylist(playlistId);
       _playlist.clear();
-      _songsMap.clear();
 
       for (final songData in songMaps) {
         final songId = songData['id'] as int;
@@ -2030,10 +2031,14 @@ class MusicProvider extends ChangeNotifier {
               ? DateTime.parse(songData['created_at'] as String)
               : DateTime.now(),
         );
-        _addSongIfNotExists(song);
+        // Always add to _playlist for queue, even if already in _songsMap
+        _playlist.add(song);
+        // Also update _songsMap if not exists
+        if (!_songsMap.containsKey(song.url)) {
+          _songsMap[song.url] = song;
+        }
       }
 
-      _displayedSongs = List.from(_playlist);
 
       if (_playlist.isNotEmpty) {
         _currentIndex = 0;

@@ -177,7 +177,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistDeleted => 'Playlist deleted';
 
   @override
-  String get noPlaylists => 'No playlists found';
+  String get noPlaylists => 'No playlists';
+
+  @override
+  String get addSongs => 'Add Songs';
+
+  @override
+  String get add => 'Add';
+
+  @override
+  String get removeFromPlaylist => 'Remove from Playlist';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String get play => 'Play';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get edit => 'Edit';
 
   @override
   String get noArtists => 'No artists found';

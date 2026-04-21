@@ -38,7 +38,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get artists => 'Sanatçılar';
 
   @override
-  String get playlists => 'Playlistler';
+  String get playlists => 'Oynatma Listeleri';
 
   @override
   String get localSongs => 'Yerel Şarkılar';
@@ -138,7 +138,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get delete => 'Sil';
 
   @override
-  String get addToPlaylist => 'Playlist\'e Ekle';
+  String get addToPlaylist => 'Oynatma Listesine Ekle';
 
   @override
   String get deleteSong => 'Şarkıyı Sil';
@@ -162,22 +162,43 @@ class AppLocalizationsTr extends AppLocalizations {
   String get musicFolder => 'Müzik Klasörü';
 
   @override
-  String get createPlaylist => 'Playlist Oluştur';
+  String get createPlaylist => 'Oynatma Listesi Oluştur';
 
   @override
-  String get deletePlaylist => 'Playlist\'i Sil';
+  String get deletePlaylist => 'Oynatma Listesini Sil';
 
   @override
-  String get playlistName => 'Playlist Adı';
+  String get playlistName => 'Oynatma Listesi Adı';
 
   @override
-  String get playlistCreated => 'Playlist oluşturuldu';
+  String get playlistCreated => 'Oynatma listesi oluşturuldu';
 
   @override
-  String get playlistDeleted => 'Playlist silindi';
+  String get playlistDeleted => 'Oynatma listesi silindi';
 
   @override
-  String get noPlaylists => 'Playlist bulunamadı';
+  String get noPlaylists => 'Oynatma listesi bulunamadı';
+
+  @override
+  String get addSongs => 'Listeye Şarkı Ekle';
+
+  @override
+  String get add => 'Ekle';
+
+  @override
+  String get removeFromPlaylist => 'Listeden Kaldır';
+
+  @override
+  String get remove => 'Kaldır';
+
+  @override
+  String get play => 'Oynat';
+
+  @override
+  String get done => 'Tamam';
+
+  @override
+  String get edit => 'Düzenle';
 
   @override
   String get noArtists => 'Sanatçı bulunamadı';

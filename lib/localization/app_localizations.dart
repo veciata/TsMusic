@@ -97,6 +97,13 @@ class AppLocalizations {
   String get playlistCreated => throw UnimplementedError();
   String get playlistDeleted => throw UnimplementedError();
   String get noPlaylists => throw UnimplementedError();
+  String get addSongs => throw UnimplementedError();
+  String get add => throw UnimplementedError();
+  String get removeFromPlaylist => throw UnimplementedError();
+  String get remove => throw UnimplementedError();
+  String get play => throw UnimplementedError();
+  String get done => throw UnimplementedError();
+  String get edit => throw UnimplementedError();
   String get noArtists => throw UnimplementedError();
 
   // Common
