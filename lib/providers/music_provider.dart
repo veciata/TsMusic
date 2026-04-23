@@ -180,6 +180,22 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
+    // Initialize audio notification service
+    try {
+      await AudioNotificationService.init(
+        player: _player,
+        onCurrentSongChanged: (song) {
+          debugPrint('Notification song changed: ${song?.title}');
+        },
+        onPlaybackStateChanged: (isPlaying) {
+          debugPrint('Notification playback state: $isPlaying');
+        },
+      );
+      debugPrint('Audio notification service initialized');
+    } catch (e) {
+      debugPrint('Error initializing audio notification service: $e');
+    }
+
     // Load Now Playing playlist first to show something immediately
     await _loadNowPlayingPlaylist();
 
