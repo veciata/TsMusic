@@ -187,7 +187,7 @@ class AudioNotificationService {
         androidNotificationChannelDescription: 'TsMusic playback notification',
         androidNotificationIcon: 'mipmap/ic_launcher',
         androidShowNotificationBadge: true,
-        notificationColor: Colors.blue[600],
+        notificationColor: Colors.blue,
       ),
     );
     

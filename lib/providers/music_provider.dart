@@ -182,7 +182,8 @@ class MusicProvider extends ChangeNotifier {
   Future<void> _initialize() async {
     // Initialize audio notification service
     try {
-      await AudioNotificationService.init(
+      debugPrint('Initializing audio notification service...');
+      final handler = await AudioNotificationService.init(
         player: _player,
         onCurrentSongChanged: (song) {
           debugPrint('Notification song changed: ${song?.title}');
@@ -191,9 +192,10 @@ class MusicProvider extends ChangeNotifier {
           debugPrint('Notification playback state: $isPlaying');
         },
       );
-      debugPrint('Audio notification service initialized');
-    } catch (e) {
+      debugPrint('Audio notification service initialized: handler=${handler != null}');
+    } catch (e, stackTrace) {
       debugPrint('Error initializing audio notification service: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
 
     // Load Now Playing playlist first to show something immediately
@@ -1092,20 +1094,28 @@ class MusicProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Set audio source for playback
+  /// Set audio source for playback via audio service (handles notification)
   Future<void> _setAudioSource(Song song) async {
-    final mediaPath =
-        song.url.startsWith('/') ? 'file://${song.url}' : song.url;
-    final media = Media(mediaPath);
-    await _player.open(media);
-    await _updateNotification();
+    final audioHandler = AudioNotificationService.audioHandler;
+    debugPrint('_setAudioSource: audioHandler=${audioHandler != null}');
+    if (audioHandler != null) {
+      final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
+      debugPrint('_setAudioSource: Setting media for ${song.title}');
+      await audioHandler.setMedia(Media(mediaPath), song: song);
+      debugPrint('_setAudioSource: Media set successfully');
+    } else {
+      // Fallback: open directly in player if service not available
+      debugPrint('_setAudioSource: Using fallback (no audioHandler)');
+      final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
+      await _player.open(Media(mediaPath));
+    }
   }
 
-  /// Update notification with current song
+  /// Update notification state only (player already has media)
   Future<void> _updateNotification() async {
     final audioHandler = AudioNotificationService.audioHandler;
     if (audioHandler != null && currentSong != null) {
-      await audioHandler.setMedia(Media(currentSong!.url), song: currentSong);
+      // Only update playback state, don't reopen media
       if (_player.state.playing) {
         await audioHandler.play();
       } else {
