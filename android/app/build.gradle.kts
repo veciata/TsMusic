@@ -23,13 +23,16 @@ android {
         applicationId = "com.veciata.tsmusic"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = flutter.minSdkVersion  // Minimum SDK 21 (Android 5.0) for audio_service compatibility
+        targetSdk = 34  // Target SDK 34 (Android 14) to avoid obsolete warnings
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.

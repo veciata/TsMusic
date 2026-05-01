@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
@@ -10,6 +13,7 @@ import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
+import 'package:tsmusic/utils/lru_cache.dart';
 import 'downloads_screen.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
@@ -34,12 +38,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   List<YouTubeAudio> _youtubeSongs = [];
   bool _isLoading = false;
   bool _hasMore = true;
+  bool _isOffline = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   final ScrollController _scrollController = ScrollController();
-  final Map<String, String> _artistImageCache = {};
+  late final LRUCache<String, String> _artistImageCache; // LRU cache for artist images
 
   @override
   void initState() {
     super.initState();
+    _artistImageCache = LRUCache<String, String>(maxCapacity: 100); // Max 100 artist images in cache
     _youTubeService = context.read<YouTubeService>();
     _youtubePlayer = context.read<YouTubePlayerProvider>();
     _youtubePlayer.registerScreen('artist_screen');
@@ -47,6 +54,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _loadYouTubeSongs();
     _scrollController.addListener(_onScroll);
     _fetchArtistImageIfNeeded();
+    
+    // Check initial connectivity status
+    _checkConnectivity();
+    
+    // Subscribe to connectivity changes
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+      _checkConnectivity();
+    });
   }
 
   void _onScroll() {
@@ -58,11 +73,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
   Future<void> _fetchArtistImageIfNeeded() async {
     if (widget.artistImageUrlNotifier.value != null) return;
-    if (_artistImageCache.containsKey(widget.artistName)) {
+    
+    // Check LRU cache first
+    final cachedUrl = _artistImageCache.get(widget.artistName);
+    if (cachedUrl != null) {
       setState(() {
-        widget.artistImageUrlNotifier.value =
-            _artistImageCache[widget.artistName];
+        widget.artistImageUrlNotifier.value = cachedUrl;
       });
+      debugPrint('✅ Using cached artist image for: ${widget.artistName}');
       return;
     }
 
@@ -70,10 +88,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       final results = await _youTubeService.searchAudio(widget.artistName);
       for (final song in results) {
         if (song.thumbnailUrl != null && song.thumbnailUrl!.isNotEmpty) {
-          _artistImageCache[widget.artistName] = song.thumbnailUrl!;
+          _artistImageCache.put(widget.artistName, song.thumbnailUrl!);
           setState(() {
             widget.artistImageUrlNotifier.value = song.thumbnailUrl;
           });
+          debugPrint('💾 Cached artist image for: ${widget.artistName}');
           break;
         }
       }
@@ -83,6 +102,17 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Future<void> _loadYouTubeSongs() async {
+    // Don't load YouTube songs if offline
+    if (_isOffline) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _youtubeSongs = []; // Clear results when offline
+        });
+      }
+      return;
+    }
+
     if (_isLoading) return;
 
     setState(() => _isLoading = true);
@@ -103,6 +133,17 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Future<void> _loadMoreYouTubeSongs() async {
+    // Don't load more YouTube songs if offline
+    if (_isOffline) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasMore = false; // No more results when offline
+        });
+      }
+      return;
+    }
+
     if (_isLoading || !_hasMore) return;
 
     setState(() => _isLoading = true);
@@ -205,7 +246,27 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _youtubePlayer.unregisterScreen('artist_screen');
     _tabController.dispose();
     _scrollController.dispose();
+    _connectivitySubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      if (mounted) {
+        setState(() {
+          _isOffline = result == ConnectivityResult.none;
+        });
+      }
+    } catch (e) {
+      // Handle connectivity check errors (common on web)
+      if (mounted) {
+        setState(() {
+          // Assume online if we can't determine connectivity
+          _isOffline = false;
+        });
+      }
+    }
   }
 
   @override
@@ -216,7 +277,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
     return WillPopScope(
       onWillPop: () async {
-        // Stop YouTube player when leaving artist screen
         await _youtubePlayer.stop();
         return true;
       },
@@ -225,61 +285,79 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           children: [
             Expanded(
               child: NestedScrollView(
-                headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                SliverAppBar(
-                  expandedHeight: 200.0,
-                  pinned: true,
-                  flexibleSpace: ValueListenableBuilder<String?>(
-                    valueListenable: widget.artistImageUrlNotifier,
-                    builder: (context, artistImageUrl, child) =>
-                        FlexibleSpaceBar(
-                      title: Text(
-                        widget.artistName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                                color: Colors.black54,
-                                blurRadius: 10,
-                                offset: Offset(0, 2))
-                          ],
-                        ),
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [
+                    SliverAppBar(
+                      expandedHeight: 200.0,
+                      pinned: true,
+                      flexibleSpace: ValueListenableBuilder<String?>(
+                        valueListenable: widget.artistImageUrlNotifier,
+                        builder: (context, artistImageUrl, child) {
+                          return FlexibleSpaceBar(
+                            title: Text(
+                              widget.artistName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black54,
+                                    blurRadius: 10,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            background: artistImageUrl != null
+                                ? CachedNetworkImage(
+                                    imageUrl: artistImageUrl,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) =>
+                                        Container(color: Colors.grey[800]),
+                                    errorWidget: (context, url, error) =>
+                                        _buildPlaceholderImage(),
+                                  )
+                                : _buildPlaceholderImage(),
+                          );
+                        },
                       ),
-                      background: artistImageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: artistImageUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) =>
-                                  Container(color: Colors.grey[800]),
-                              errorWidget: (context, url, error) =>
-                                  _buildPlaceholderImage(),
-                            )
-                          : _buildPlaceholderImage(),
+                      bottom: TabBar(
+                        controller: _tabController,
+                        tabs: [
+                          Tab(text: l10n.localSongs),
+                          Tab(text: l10n.online),
+                        ],
+                      ),
                     ),
-                  ),
-                  bottom: TabBar(
-                    controller: _tabController,
-                    tabs: [
-                      Tab(text: l10n.localSongs),
-                      Tab(text: l10n.online),
-                    ],
-                  ),
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildLocalSongsTab(localSongs, musicProvider),
+                    _buildYouTubeTab(),
+                  ],
                 ),
-              ],
-              body: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildLocalSongsTab(localSongs, musicProvider),
-                  _buildYouTubeTab(),
-                ],
               ),
             ),
-          ),
-          // Always show mini player at bottom
-          const MiniPlayerWidget(),
-        ],
-      ),
+            const MiniPlayerWidget(),
+            if (_isOffline)
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                color: Colors.grey[900],
+                child: Center(
+                  child: Text(
+                    'Offline Mode - Showing local results only',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

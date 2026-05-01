@@ -1,6 +1,11 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 
+import 'package:provider/provider.dart';
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/services/audio_notification_service.dart';
 
 class SqlScreen extends StatefulWidget {
   const SqlScreen({super.key});
@@ -97,6 +102,46 @@ class _SqlScreenState extends State<SqlScreen> {
     }
   }
 
+  Future<void> _testNotification(BuildContext context) async {
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        // Check if audio handler is available
+        final audioHandler = AudioNotificationService.audioHandler;
+        if (audioHandler == null) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Audio service not initialized. Check logs for details.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+        
+        // Try to trigger a test notification via audio service
+        final musicProvider =
+            Provider.of<music_provider.MusicProvider>(context, listen: false);
+        await musicProvider.showTestNotification();
+        
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Test notification sent!')),
+        );
+      } else {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Notifications only available on mobile devices')),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   Future<void> _cleanDuplicates(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -159,6 +204,12 @@ class _SqlScreenState extends State<SqlScreen> {
         appBar: AppBar(
           title: const Text('SQL Explorer'),
           actions: [
+            if (kDebugMode && (Platform.isAndroid || Platform.isIOS))
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                tooltip: 'Test Notification',
+                onPressed: () => _testNotification(context),
+              ),
             IconButton(
               icon: const Icon(Icons.cleaning_services),
               tooltip: 'Clean Duplicates',

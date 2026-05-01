@@ -12,6 +12,7 @@ import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
 import 'package:tsmusic/utils/youtube_artist_parser.dart';
+import 'package:tsmusic/utils/lru_cache.dart';
 
 /// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
 /// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
@@ -111,6 +112,10 @@ class YouTubeService with ChangeNotifier {
 
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
+  
+  // Caches for performance optimization
+  late final LRUCache<String, List<YouTubeAudio>> _searchResultsCache; // Cache search results
+  late final LRUCache<String, String> _audioUrlCache; // Cache audio stream URLs
 
   Function()? _stopOtherPlayer;
 
@@ -133,6 +138,9 @@ class YouTubeService with ChangeNotifier {
         _httpClient = httpClient ?? http.Client(),
         _player = player ?? Player() {
     _instance = this;
+    // Initialize caches with max capacity
+    _searchResultsCache = LRUCache<String, List<YouTubeAudio>>(maxCapacity: 100);
+    _audioUrlCache = LRUCache<String, String>(maxCapacity: 200);
     _init();
   }
 
@@ -198,6 +206,13 @@ class YouTubeService with ChangeNotifier {
   /// İndirme ile aynı mantık: önce androidVr, sonra varsayılan; mümkünse m4a (mp4).
   Future<String?> _getAudioStream(String videoId) async {
     try {
+      // Check cache first
+      final cached = _audioUrlCache.get(videoId);
+      if (cached != null) {
+        debugPrint('✅ Using cached stream URL for videoId: $videoId');
+        return cached;
+      }
+
       debugPrint('🔧 Getting YouTube stream URL: $videoId');
 
       StreamManifest manifest;
@@ -232,6 +247,10 @@ class YouTubeService with ChangeNotifier {
 
       final streamUrl = streamInfo.url.toString();
       debugPrint('✅ Got YouTube stream URL (${streamInfo.container.name})');
+      
+      // Cache the stream URL
+      _audioUrlCache.put(videoId, streamUrl);
+      
       return streamUrl;
     } catch (e) {
       debugPrint('❌ Stream extraction failed: $e');
@@ -321,10 +340,23 @@ class YouTubeService with ChangeNotifier {
 
   Future<List<YouTubeAudio>> searchAudio(String query) async {
     try {
+      // Check cache first
+      final cached = _searchResultsCache.get(query);
+      if (cached != null) {
+        debugPrint('✅ Using cached search results for: "$query"');
+        return cached;
+      }
+
+      debugPrint('🔍 Fetching fresh search results for: "$query"');
       final searchResults = await _yt.search.search(query);
       _searchPages[query] = searchResults;
       final videos = searchResults.whereType<Video>().toList();
-      return videos.map(YouTubeAudio.fromVideo).toList();
+      final audioList = videos.map(YouTubeAudio.fromVideo).toList();
+      
+      // Cache the results
+      _searchResultsCache.put(query, audioList);
+      
+      return audioList;
     } catch (e) {
       debugPrint('Error searching YouTube: $e');
       rethrow;

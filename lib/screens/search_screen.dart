@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
@@ -24,6 +25,8 @@ class _SearchScreenState extends State<SearchScreen> {
   late final YouTubePlayerProvider _youtubePlayer;
   List<YouTubeAudio> _youtubeResults = [];
   bool _isSearchingYouTube = false;
+  bool _isOffline = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   bool _hasMoreYouTubeResults = true;
   Timer? _debounceTimer;
@@ -38,6 +41,14 @@ class _SearchScreenState extends State<SearchScreen> {
     _youtubePlayer.registerScreen('search_screen');
     _searchFocusNode.requestFocus();
     _scrollController.addListener(_onScroll);
+    
+    // Check initial connectivity status
+    _checkConnectivity();
+    
+    // Subscribe to connectivity changes
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+      _checkConnectivity();
+    });
   }
 
 
@@ -51,7 +62,27 @@ class _SearchScreenState extends State<SearchScreen> {
     _scrollController.dispose();
     _searchScrollController.dispose();
     _debounceTimer?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      if (mounted) {
+        setState(() {
+          _isOffline = result == ConnectivityResult.none;
+        });
+      }
+    } catch (e) {
+      // Handle connectivity check errors (common on web)
+      if (mounted) {
+        setState(() {
+          // Assume online if we can't determine connectivity
+          _isOffline = false;
+        });
+      }
+    }
   }
 
   Future<void> _playAudio(YouTubeAudio audio) async {
@@ -119,6 +150,16 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
+    // Don't search YouTube if offline
+    if (_isOffline) {
+      if (mounted) {
+        setState(() {
+          _isSearchingYouTube = false;
+        });
+      }
+      return;
+    }
+    
     if (query.isEmpty) {
       if (mounted) {
         setState(() {
@@ -339,6 +380,22 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             // Always show mini player at bottom
             const MiniPlayerWidget(),
+            // Show offline status if applicable
+            if (_isOffline)
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                color: Colors.grey[900],
+                child: Center(
+                  child: Text(
+                    'Offline Mode - Showing local results only',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

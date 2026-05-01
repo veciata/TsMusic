@@ -47,7 +47,7 @@
         </intent>
     </queries>
 
-    <application
+<application
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:label="TS Music"
@@ -82,9 +82,10 @@
         
         <!-- Audio Service for background playback and notification controls -->
         <service android:name="com.ryanheise.audioservice.AudioService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="true">
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
             <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>

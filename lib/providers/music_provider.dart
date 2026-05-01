@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -179,33 +180,47 @@ class MusicProvider extends ChangeNotifier {
     _initialize();
   }
 
-  Future<void> _initialize() async {
-    // Initialize audio notification service
-    try {
-      debugPrint('Initializing audio notification service...');
-      final handler = await AudioNotificationService.init(
-        player: _player,
-        onCurrentSongChanged: (song) {
-          debugPrint('Notification song changed: ${song?.title}');
-        },
-        onPlaybackStateChanged: (isPlaying) {
-          debugPrint('Notification playback state: $isPlaying');
-        },
-      );
-      debugPrint('Audio notification service initialized: handler=${handler != null}');
-    } catch (e, stackTrace) {
-      debugPrint('Error initializing audio notification service: $e');
-      debugPrint('Stack trace: $stackTrace');
-    }
-
-    // Load Now Playing playlist first to show something immediately
-    await _loadNowPlayingPlaylist();
-
-    // Then load songs in the background
-    loadLocalMusic().catchError((e) {
-      debugPrint('Error during initialization: $e');
-    });
-  }
+   Future<void> _initialize() async {
+     debugPrint('╔══════════════════════════════════════════╗');
+     debugPrint('║  MusicProvider._initialize: START           ║');
+     debugPrint('╚══════════════════════════════════════════╝');
+     
+     // Initialize audio notification service
+     debugPrint('_initialize: About to init AudioNotificationService...');
+     try {
+       debugPrint('_initialize: Calling AudioNotificationService.init()...');
+       await AudioNotificationService.init(
+         player: _player,
+         onCurrentSongChanged: (song) {
+           debugPrint('Notification song changed: ${song?.title}');
+         },
+         onPlaybackStateChanged: (isPlaying) {
+           debugPrint('Notification playback state: $isPlaying');
+         },
+       );
+       debugPrint('_initialize: AudioNotificationService.init() returned handler=${AudioNotificationService.audioHandler}');
+     } on Exception catch (e, stackTrace) {
+       debugPrint('╔══════════════════════════════════════════╗');
+       debugPrint('║  _initialize: EXCEPTION CAUGHT             ║');
+       debugPrint('║  Error: $e');
+       debugPrint('╚══════════════════════════════════════════╝');
+       debugPrint('Stack: $stackTrace');
+     }
+     
+     // Load Now Playing playlist first to show something immediately
+     debugPrint('_initialize: Loading Now Playing playlist...');
+     await _loadNowPlayingPlaylist();
+     
+     // Then load songs in the background
+     debugPrint('_initialize: Loading local music in background...');
+     await loadLocalMusic().catchError((e) {
+       debugPrint('Error during initialization: $e');
+     });
+     
+     debugPrint('╔══════════════════════════════════════════╗');
+     debugPrint('║  MusicProvider._initialize: END             ║');
+     debugPrint('╚══════════════════════════════════════════╝');
+   }
 
   // ===== PLAYBACK CONTROLS =====
   Future<void> play() async {
@@ -213,7 +228,12 @@ class MusicProvider extends ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      await _player.play();
+      final audioHandler = AudioNotificationService.audioHandler;
+      if (audioHandler != null) {
+        await audioHandler.play();
+      } else {
+        await _player.play();
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -221,18 +241,59 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> pause() async {
-    await _player.pause();
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      await audioHandler.pause();
+    } else {
+      await _player.pause();
+    }
     notifyListeners();
   }
 
   Future<void> stop() async {
-    await _player.stop();
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      await audioHandler.stop();
+    } else {
+      await _player.stop();
+    }
     notifyListeners();
   }
 
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      await audioHandler.seek(position);
+    } else {
+      await _player.seek(position);
+    }
     notifyListeners();
+  }
+
+  Future<void> showTestNotification() async {
+    try {
+      final audioHandler = AudioNotificationService.audioHandler;
+      if (audioHandler != null) {
+        // Create a test song for notification
+        final testSong = Song(
+          id: 0,
+          title: 'Test Notification',
+          artists: ['TS Music'],
+          url: 'test://notification',
+          duration: 180000, // 3 minutes
+        );
+        
+        // Use the proper method to set current song
+        await setPlaylistAndPlay([testSong], 0);
+        
+        // Update notification via audio service
+        await audioHandler.play();
+      } else {
+        debugPrint('No audio handler available for test notification');
+      }
+    } catch (e) {
+      debugPrint('Error showing test notification: $e');
+    }
   }
 
   // ===== PLAYBACK SETTINGS =====

@@ -120,9 +120,9 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
 
         return Consumer<SettingsProvider>(
           builder: (context, settingsProvider, _) {
-            return MaterialApp(
-              title: 'TS Music',
-              debugShowCheckedModeBanner: false,
+              return MaterialApp(
+                title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
+                debugShowCheckedModeBanner: false,
               theme: lightTheme.copyWith(textTheme: textTheme),
               darkTheme: darkTheme.copyWith(textTheme: textTheme),
               themeMode: themeProvider.themeMode,

@@ -4,6 +4,8 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:tsmusic/models/song.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
 
 /// Audio handler that integrates MediaKit with audio_service for system notifications
 class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
@@ -12,7 +14,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final Function(bool) onPlaybackStateChanged;
   Song? _currentSong;
   
-  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged) {
+  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged) : super() {
     _init();
   }
 
@@ -165,33 +167,61 @@ class AudioNotificationService {
   static AudioPlayerHandler? get audioHandler => _audioHandler;
 
   /// Initialize audio service with MediaKit integration
-  static Future<AudioPlayerHandler> init({
+  static Future<AudioPlayerHandler?> init({
     required Player player,
     required Function(Song?) onCurrentSongChanged,
     required Function(bool) onPlaybackStateChanged,
   }) async {
-    // Configure audio session for music playback
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.music());
-    
-    // Initialize audio service
-    _audioHandler = await AudioService.init(
-      builder: () => AudioPlayerHandler(
-        player,
-        onCurrentSongChanged,
-        onPlaybackStateChanged,
-      ),
-      config: AudioServiceConfig(
-        androidNotificationChannelId: 'com.veciata.tsmusic.channel.audio',
-        androidNotificationChannelName: 'TsMusic Playback',
-        androidNotificationChannelDescription: 'TsMusic playback notification',
-        androidNotificationIcon: 'mipmap/ic_launcher',
-        androidShowNotificationBadge: true,
-        notificationColor: Colors.blue,
-      ),
-    );
-    
-    return _audioHandler!;
+    debugPrint('AudioNotificationService: init() called');
+    try {
+      debugPrint('AudioNotificationService: Getting audio session...');
+      final session = await AudioSession.instance;
+      debugPrint('AudioNotificationService: Got session, configuring...');
+      await session.configure(const AudioSessionConfiguration.music());
+      debugPrint('AudioNotificationService: Audio session configured');
+      
+      debugPrint('AudioNotificationService: Calling AudioService.init()...');
+      // Initialize audio service with detailed error handling
+      try {
+        _audioHandler = await AudioService.init(
+          builder: () => AudioPlayerHandler(
+            player,
+            onCurrentSongChanged,
+            onPlaybackStateChanged,
+          ),
+          config: AudioServiceConfig(
+            androidNotificationChannelId: 'com.veciata.tsmusic.channel.audio',
+            androidNotificationChannelName: 'TsMusic Playback',
+            androidNotificationChannelDescription: 'TsMusic playback notification',
+            androidShowNotificationBadge: true,
+            notificationColor: Colors.blue,
+          ),
+        );
+        debugPrint('AudioNotificationService: AudioService.init() returned handler=$_audioHandler');
+        
+        if (_audioHandler == null) {
+          debugPrint('AudioNotificationService: WARNING - handler is null!');
+          throw Exception('AudioService.init() returned null');
+        }
+        
+        return _audioHandler;
+      } catch (e) {
+        debugPrint('AudioNotificationService: Error during AudioService.init(): $e');
+        // Check if it's a platform exception
+        if (e is PlatformException) {
+          debugPrint('AudioNotificationService: PlatformException code: ${e.code}, message: ${e.message}');
+        }
+        rethrow;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('AudioNotificationService: Error initializing: $e');
+      debugPrint('AudioNotificationService: Stack trace: $stackTrace');
+      // If it's a platform exception, print more details
+      if (e is PlatformException) {
+        debugPrint('AudioNotificationService: PlatformException code: ${e.code}, message: ${e.message}, details: ${e.details}');
+      }
+      return null;
+    }
   }
 
   static Future<void> dispose() async {
