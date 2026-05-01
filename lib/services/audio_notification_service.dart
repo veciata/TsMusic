@@ -4,6 +4,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/services/notification_settings.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 
@@ -12,9 +13,11 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final Player _player;
   final Function(Song?) onCurrentSongChanged;
   final Function(bool) onPlaybackStateChanged;
+  final Function()? onSkipToNext;
+  final Function()? onSkipToPrevious;
   Song? _currentSong;
   
-  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged) : super() {
+  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged, {this.onSkipToNext, this.onSkipToPrevious}) : super() {
     _init();
   }
 
@@ -55,14 +58,24 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToNext() async {
-    // Handled by playlist manager
-    onCurrentSongChanged(null);
+    // Call callback if provided, otherwise handled by playlist manager
+    if (onSkipToNext != null) {
+      onSkipToNext!();
+    } else {
+      // Handled by playlist manager
+      onCurrentSongChanged(null);
+    }
   }
 
   @override
   Future<void> skipToPrevious() async {
-    // Handled by playlist manager
-    onCurrentSongChanged(null);
+    // Call callback if provided, otherwise handled by playlist manager
+    if (onSkipToPrevious != null) {
+      onSkipToPrevious!();
+    } else {
+      // Handled by playlist manager
+      onCurrentSongChanged(null);
+    }
   }
 
   @override
@@ -115,7 +128,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     if (_player.state.buffering) {
       return AudioProcessingState.buffering;
     }
-    if (_player.state.playing) {
+  if (mediaItem.value != null) {
       return AudioProcessingState.ready;
     }
     return AudioProcessingState.idle;
@@ -171,6 +184,8 @@ class AudioNotificationService {
     required Player player,
     required Function(Song?) onCurrentSongChanged,
     required Function(bool) onPlaybackStateChanged,
+    Function()? onSkipToNext,
+    Function()? onSkipToPrevious,
   }) async {
     debugPrint('AudioNotificationService: init() called');
     try {
@@ -183,20 +198,16 @@ class AudioNotificationService {
       debugPrint('AudioNotificationService: Calling AudioService.init()...');
       // Initialize audio service with detailed error handling
       try {
-        _audioHandler = await AudioService.init(
-          builder: () => AudioPlayerHandler(
-            player,
-            onCurrentSongChanged,
-            onPlaybackStateChanged,
-          ),
-          config: AudioServiceConfig(
-            androidNotificationChannelId: 'com.veciata.tsmusic.channel.audio',
-            androidNotificationChannelName: 'TsMusic Playback',
-            androidNotificationChannelDescription: 'TsMusic playback notification',
-            androidShowNotificationBadge: true,
-            notificationColor: Colors.blue,
-          ),
-        );
+         _audioHandler = await AudioService.init(
+           builder: () => AudioPlayerHandler(
+             player,
+             onCurrentSongChanged,
+             onPlaybackStateChanged,
+             onSkipToNext: onSkipToNext,
+             onSkipToPrevious: onSkipToPrevious,
+           ),
+           config: getNotificationSettings(),
+         );
         debugPrint('AudioNotificationService: AudioService.init() returned handler=$_audioHandler');
         
         if (_audioHandler == null) {

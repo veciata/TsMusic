@@ -189,15 +189,23 @@ class MusicProvider extends ChangeNotifier {
      debugPrint('_initialize: About to init AudioNotificationService...');
      try {
        debugPrint('_initialize: Calling AudioNotificationService.init()...');
-       await AudioNotificationService.init(
-         player: _player,
-         onCurrentSongChanged: (song) {
-           debugPrint('Notification song changed: ${song?.title}');
-         },
-         onPlaybackStateChanged: (isPlaying) {
-           debugPrint('Notification playback state: $isPlaying');
-         },
-       );
+        await AudioNotificationService.init(
+          player: _player,
+          onCurrentSongChanged: (song) {
+            debugPrint('Notification song changed: ${song?.title}');
+          },
+          onPlaybackStateChanged: (isPlaying) {
+            debugPrint('Notification playback state: $isPlaying');
+          },
+          onSkipToNext: () {
+            debugPrint('Skip to next from notification');
+            next();
+          },
+          onSkipToPrevious: () {
+            debugPrint('Skip to previous from notification');
+            previous();
+          },
+        );
        debugPrint('_initialize: AudioNotificationService.init() returned handler=${AudioNotificationService.audioHandler}');
      } on Exception catch (e, stackTrace) {
        debugPrint('╔══════════════════════════════════════════╗');
@@ -800,16 +808,23 @@ class MusicProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> togglePlayPause() async {
-    if (_player.state.playing) {
-      await _player.pause();
-    } else {
-      await _player.play();
-    }
-    await _updateNotification();
-    await _updateNowPlayingPlaylist();
-    notifyListeners();
-  }
+   Future<void> togglePlayPause() async {
+     final audioHandler = AudioNotificationService.audioHandler;
+     if (audioHandler != null) {
+       if (_player.state.playing) {
+         await audioHandler.pause();
+       } else {
+         await audioHandler.play();
+       }
+     } else {
+       if (_player.state.playing) {
+         await _player.pause();
+       } else {
+         await _player.play();
+       }
+     }
+     notifyListeners();
+   }
 
   // ===== COLLECTION METHODS =====
   String? getArtistImageUrl(String artistName) {
