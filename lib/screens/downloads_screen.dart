@@ -7,6 +7,7 @@ import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/services/download_notification_service.dart';
 import 'package:tsmusic/utils/permission_helper.dart';
 
 class DownloadsScreen extends StatefulWidget {
@@ -28,7 +29,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     final newSettingsProvider = Provider.of<SettingsProvider>(context);
 
-    // Rescan if settings provider changed or location changed
     if (_localFiles.isEmpty ||
         (_settingsProvider.downloadLocation !=
             newSettingsProvider.downloadLocation)) {
@@ -44,17 +44,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     super.initState();
     _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     _youTubeService.addListener(_onDownloadsChanged);
+    DownloadNotificationService().isDownloadsScreenVisible = true;
   }
 
   @override
   void dispose() {
     _youTubeService.removeListener(_onDownloadsChanged);
+    DownloadNotificationService().isDownloadsScreenVisible = false;
     super.dispose();
   }
 
   void _onDownloadsChanged() {
     if (mounted) {
-      setState(() {}); // Trigger a rebuild when downloads change
+      setState(() {});
     }
   }
 
@@ -191,7 +193,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               if (download.error != null) ...[
                 const SizedBox(height: 4),
                 Text(
-                  download.error!,
+                  download.error! == 'youtube_html_error'
+                      ? 'Download unavailable. Please try again later.'
+                      : download.error!,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.error,
                     fontSize: 12,
@@ -206,34 +210,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Widget _buildSongItem(Song song) => Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: ListTile(
-          leading: song.albumArtUrl?.isNotEmpty == true
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: song.albumArtUrl!,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 50,
-                      height: 50,
-                      color: Colors.grey[300],
-                      child: const Center(child: CircularProgressIndicator()),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: 50,
-                      height: 50,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.music_note),
-                    ),
-                  ),
-                )
-              : Container(
-                  width: 50,
-                  height: 50,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.music_note),
-                ),
+          leading: _buildThumbnail(song),
           title: Text(
             song.title,
             maxLines: 1,
@@ -294,9 +271,61 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ),
       );
 
+  Widget _buildThumbnail(Song song) {
+    // Use local thumbnail if available
+    if (song.localThumbnailPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Image.file(
+          File(song.localThumbnailPath!),
+          width: 50,
+          height: 50,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(
+            width: 50,
+            height: 50,
+            color: Colors.grey[300],
+            child: const Icon(Icons.music_note),
+          ),
+        ),
+      );
+    }
+
+    // Fall back to network image
+    if (song.albumArtUrl?.isNotEmpty == true) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: CachedNetworkImage(
+          imageUrl: song.albumArtUrl!,
+          width: 50,
+          height: 50,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: 50,
+            height: 50,
+            color: Colors.grey[300],
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+          errorWidget: (context, url, error) => Container(
+            width: 50,
+            height: 50,
+            color: Colors.grey[300],
+            child: const Icon(Icons.music_note),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 50,
+      height: 50,
+      color: Colors.grey[300],
+      child: const Icon(Icons.music_note),
+    );
+  }
+
   Future<void> _scanLocalFiles() async {
     try {
-      // Request necessary permissions first
       final hasPermission =
           await PermissionHelper.requestFileManagementPermission();
       if (!hasPermission) {
@@ -304,7 +333,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         return;
       }
 
-      // Scan ALL locations, not just current one
       final locations = ['internal', 'downloads', 'music'];
       final List<Song> allSongs = [];
 
@@ -340,7 +368,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         allSongs.addAll(songs);
       }
 
-      // Add scanned songs to MusicProvider playlist
       final musicProvider =
           Provider.of<music_provider.MusicProvider>(context, listen: false);
       for (final song in allSongs) {
@@ -418,17 +445,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       final fileName = song.url.split('/').last;
       final targetFile = File('${targetDir.path}/$fileName');
 
-      // Copy then delete source
       await sourceFile.copy(targetFile.path);
       await sourceFile.delete();
 
-      // Update song in provider
       final musicProvider =
           Provider.of<music_provider.MusicProvider>(context, listen: false);
       final updatedSong = song.copyWith(url: targetFile.path);
       musicProvider.addSongToPlaylist(updatedSong);
 
-      // Refresh UI
       await _scanLocalFiles();
 
       final locationLabels = {
@@ -469,14 +493,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
     if (confirmed == true) {
       try {
-        // Delete from DB and file via provider
         if (mounted) {
           await Provider.of<music_provider.MusicProvider>(context,
                   listen: false)
               .deleteSong(song);
         }
 
-        // Refresh local file list
         await _scanLocalFiles();
 
         if (mounted) {
@@ -524,14 +546,49 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           setState(() {
             _downloadProgress.remove(videoId);
           });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green),
+                  const SizedBox(width: 12),
+                  Text('Download completed: ${result.song.title}'),
+                ],
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       }).catchError((error) {
         if (mounted) {
           setState(() {
             _downloadProgress.remove(videoId);
           });
+          final errorStr = error.toString().toLowerCase();
+          final isHtmlError = errorStr.contains('youtube_html_error') ||
+              errorStr.contains('html') ||
+              errorStr.contains('ip') ||
+              errorStr.contains('consent') ||
+              errorStr.contains('blocked') ||
+              errorStr.contains('unavailable');
+
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Download failed: $error')),
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isHtmlError
+                          ? 'Download unavailable. Please try again later.'
+                          : 'Download failed: $error',
+                    ),
+                  ),
+                ],
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       });

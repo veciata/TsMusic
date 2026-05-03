@@ -26,13 +26,11 @@ class SettingsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon,
-                      size: 20, color: Theme.of(context).colorScheme.primary),
+                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                 ],
                 Text(
@@ -88,8 +86,7 @@ class ColorSelector extends StatelessWidget {
               ),
             ],
           ),
-          child:
-              isSelected ? const Icon(Icons.check, color: Colors.white) : null,
+          child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
         ),
       );
 }
@@ -99,7 +96,7 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(l10n.selectPlayerStyle),
+      title: Text(l10n.playerStyle),
       content: SizedBox(
         width: double.maxFinite,
         child: ListView(
@@ -111,8 +108,7 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
                 themeProvider.getPlayerStyleName(style),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color:
-                      isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
               ),
               leading: Radio<PlayerStyle>(
@@ -143,15 +139,13 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   );
 }
 
-void _showDownloadLocationDialog(
-    BuildContext context, SettingsProvider settingsProvider) {
+void _showDownloadLocationDialog(BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   final locations = ['internal', 'downloads', 'music'];
-
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Select Download Location'),
+      title: Text(l10n.selectDownloadLocation),
       content: SizedBox(
         width: double.maxFinite,
         child: ListView(
@@ -163,8 +157,7 @@ void _showDownloadLocationDialog(
                 settingsProvider.getDownloadLocationName(location),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color:
-                      isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
               ),
               leading: Radio<String>(
@@ -195,8 +188,7 @@ void _showDownloadLocationDialog(
   );
 }
 
-void _showAudioFormatDialog(
-    BuildContext context, SettingsProvider settingsProvider) {
+void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
@@ -213,8 +205,7 @@ void _showAudioFormatDialog(
                 settingsProvider.getAudioFormatName(format),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color:
-                      isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
               ),
               leading: Radio<AudioFormat>(
@@ -245,8 +236,7 @@ void _showAudioFormatDialog(
   );
 }
 
-void _showLanguageDialog(
-    BuildContext context, SettingsProvider settingsProvider) {
+void _showLanguageDialog(BuildContext context, SettingsProvider settingsProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
@@ -263,8 +253,7 @@ void _showLanguageDialog(
                 settingsProvider.getLanguageName(locale),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color:
-                      isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
                 ),
               ),
               leading: Radio<Locale>(
@@ -295,6 +284,60 @@ void _showLanguageDialog(
   );
 }
 
+String _getThemeModeName(AppLocalizations l10n, ThemeMode mode) {
+  switch (mode) {
+    case ThemeMode.light:
+      return l10n.lightMode;
+    case ThemeMode.dark:
+      return l10n.darkMode;
+    case ThemeMode.system:
+      return l10n.followSystem;
+  }
+}
+
+void _showThemeModeDialog(BuildContext context, ThemeProvider themeProvider) {
+  final l10n = AppLocalizations.of(context);
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.themeMode),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: ThemeMode.values.map((mode) {
+          final isSelected = mode == themeProvider.themeMode;
+          return ListTile(
+            leading: Icon(
+              mode == ThemeMode.light
+                  ? Icons.light_mode
+                  : mode == ThemeMode.dark
+                      ? Icons.dark_mode
+                      : Icons.settings_brightness,
+            ),
+            title: Text(
+              _getThemeModeName(l10n, mode),
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Theme.of(context).colorScheme.primary : null,
+              ),
+            ),
+            trailing: isSelected ? const Icon(Icons.check) : null,
+            onTap: () {
+              themeProvider.setThemeMode(mode);
+              Navigator.of(context).pop();
+            },
+          );
+        }).toList(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    ),
+  );
+}
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -302,7 +345,6 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
@@ -316,15 +358,22 @@ class SettingsScreen extends StatelessWidget {
             title: l10n.appearance,
             icon: Icons.palette,
             children: [
-              SwitchListTile(
-                title: Text(l10n.darkMode),
-                value: isDarkMode,
-                onChanged: (value) {
-                  themeProvider.setThemeMode(
-                    value ? ThemeMode.dark : ThemeMode.light,
-                  );
-                },
-                secondary: const Icon(Icons.dark_mode),
+              ListTile(
+                title: Text(l10n.themeMode),
+                leading: Icon(
+                  themeProvider.themeMode == ThemeMode.light
+                      ? Icons.light_mode
+                      : themeProvider.themeMode == ThemeMode.dark
+                          ? Icons.dark_mode
+                          : Icons.settings_brightness,
+                ),
+                trailing: Text(
+                  _getThemeModeName(l10n, themeProvider.themeMode),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                onTap: () => _showThemeModeDialog(context, themeProvider),
               ),
               const Divider(height: 1),
               ListTile(
@@ -336,14 +385,23 @@ class SettingsScreen extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                onTap: () {
-                  _showLanguageDialog(context, settingsProvider);
-                },
+                onTap: () => _showLanguageDialog(context, settingsProvider),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                title: Text(l10n.playerStyle),
+                leading: const Icon(Icons.style),
+                trailing: Text(
+                  themeProvider.getPlayerStyleName(themeProvider.playerStyle),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                onTap: () => _showPlayerStyleDialog(context, themeProvider),
               ),
               const Divider(height: 1),
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                 child: Text(l10n.accentColor),
               ),
               Padding(
@@ -371,19 +429,16 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(l10n.audioDownloadFormat),
                 leading: const Icon(Icons.audiotrack),
                 trailing: Text(
-                  settingsProvider
-                      .getAudioFormatName(settingsProvider.audioFormat),
+                  settingsProvider.getAudioFormatName(settingsProvider.audioFormat),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                onTap: () {
-                  _showAudioFormatDialog(context, settingsProvider);
-                },
+                onTap: () => _showAudioFormatDialog(context, settingsProvider),
               ),
               const Divider(height: 1),
               ListTile(
-                title: const Text('Download Location'),
+                title: Text(l10n.selectDownloadLocation),
                 leading: const Icon(Icons.folder),
                 trailing: Text(
                   settingsProvider.getDownloadLocationName(
@@ -392,9 +447,8 @@ class SettingsScreen extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                onTap: () {
-                  _showDownloadLocationDialog(context, settingsProvider);
-                },
+                onTap: () =>
+                    _showDownloadLocationDialog(context, settingsProvider),
               ),
             ],
           ),
@@ -469,28 +523,6 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          if (kDebugMode) ...[
-            const Divider(height: 1),
-            SettingsSection(
-              title: l10n.debug,
-              icon: Icons.bug_report,
-              children: [
-                ListTile(
-                  title: Text(l10n.playerStyle),
-                  leading: const Icon(Icons.style),
-                  trailing: Text(
-                    themeProvider.getPlayerStyleName(themeProvider.playerStyle),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  onTap: () {
-                    _showPlayerStyleDialog(context, themeProvider);
-                  },
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

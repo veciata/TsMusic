@@ -10,6 +10,7 @@ class Song {
   final List<String> tags;
   final int? trackNumber; // Track number in album
   final DateTime dateAdded; // When the song was added to the library
+  final String? localThumbnailPath; // Local path to downloaded thumbnail
 
   // For backward compatibility
   String get artist => artists.isNotEmpty ? artists.first : 'Unknown Artist';
@@ -43,6 +44,7 @@ class Song {
     List<String>? tags,
     this.trackNumber,
     DateTime? dateAdded,
+    this.localThumbnailPath,
   })  : tags = tags ?? [],
         dateAdded = dateAdded ?? DateTime.now();
 
@@ -60,6 +62,7 @@ class Song {
     List<String>? tags,
     int? trackNumber,
     DateTime? dateAdded,
+    String? localThumbnailPath,
   }) =>
       Song(
         id: id ?? this.id,
@@ -75,6 +78,7 @@ class Song {
         tags: tags ?? this.tags,
         trackNumber: trackNumber ?? this.trackNumber,
         dateAdded: dateAdded ?? this.dateAdded,
+        localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
       );
 
   factory Song.fromJson(Map<String, dynamic> json) {
@@ -106,6 +110,7 @@ class Song {
       dateAdded: json['dateAdded'] != null
           ? DateTime.parse(json['dateAdded'] as String)
           : null,
+      localThumbnailPath: json['localThumbnailPath'] as String?,
     );
   }
 
@@ -123,6 +128,7 @@ class Song {
         'tags': tags,
         'trackNumber': trackNumber,
         'dateAdded': dateAdded.toIso8601String(),
+        'localThumbnailPath': localThumbnailPath,
       };
 
   Map<String, dynamic> toDbMap() => {
@@ -132,6 +138,7 @@ class Song {
         'file_path': url,
         'duration': duration,
         'track_number': trackNumber,
+        'thumbnail_path': localThumbnailPath,
         'created_at': dateAdded.toIso8601String(),
       };
 

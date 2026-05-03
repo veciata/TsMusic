@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -41,12 +42,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   bool _isOffline = false;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   final ScrollController _scrollController = ScrollController();
-  late final LRUCache<String, String> _artistImageCache; // LRU cache for artist images
+  late final LRUCache<String, String> _artistImageCache;
 
   @override
   void initState() {
     super.initState();
-    _artistImageCache = LRUCache<String, String>(maxCapacity: 100); // Max 100 artist images in cache
+    _artistImageCache = LRUCache<String, String>(maxCapacity: 100);
     _youTubeService = context.read<YouTubeService>();
     _youtubePlayer = context.read<YouTubePlayerProvider>();
     _youtubePlayer.registerScreen('artist_screen');
@@ -55,10 +56,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _scrollController.addListener(_onScroll);
     _fetchArtistImageIfNeeded();
     
-    // Check initial connectivity status
     _checkConnectivity();
-    
-    // Subscribe to connectivity changes
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
       _checkConnectivity();
     });
@@ -74,13 +72,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   Future<void> _fetchArtistImageIfNeeded() async {
     if (widget.artistImageUrlNotifier.value != null) return;
     
-    // Check LRU cache first
     final cachedUrl = _artistImageCache.get(widget.artistName);
     if (cachedUrl != null) {
       setState(() {
         widget.artistImageUrlNotifier.value = cachedUrl;
       });
-      debugPrint('✅ Using cached artist image for: ${widget.artistName}');
       return;
     }
 
@@ -92,7 +88,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           setState(() {
             widget.artistImageUrlNotifier.value = song.thumbnailUrl;
           });
-          debugPrint('💾 Cached artist image for: ${widget.artistName}');
           break;
         }
       }
@@ -102,12 +97,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Future<void> _loadYouTubeSongs() async {
-    // Don't load YouTube songs if offline
     if (_isOffline) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _youtubeSongs = []; // Clear results when offline
+          _youtubeSongs = [];
         });
       }
       return;
@@ -133,12 +127,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Future<void> _loadMoreYouTubeSongs() async {
-    // Don't load more YouTube songs if offline
     if (_isOffline) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasMore = false; // No more results when offline
+          _hasMore = false;
         });
       }
       return;
@@ -148,28 +141,43 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
     setState(() => _isLoading = true);
     try {
-      final results =
-          await _youTubeService.searchAudioNextPage(widget.artistName);
-      setState(() {
-        _youtubeSongs.addAll(results);
-        _isLoading = false;
-        _hasMore = results.isNotEmpty;
-      });
+      final nextPage = await _youTubeService.searchAudioNextPage(widget.artistName);
+      if (nextPage.isEmpty) {
+        setState(() => _hasMore = false);
+      } else {
+        setState(() {
+          _youtubeSongs.addAll(nextPage);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading more songs: $e')),
-        );
-      }
     }
   }
 
-  Future<void> _playAllLocalSongs(List<Song> songs) async {
-    if (songs.isEmpty) return;
-    final musicProvider =
-        Provider.of<music_provider.MusicProvider>(context, listen: false);
-    await musicProvider.setPlaylistAndPlay(songs, 0);
+  void _checkConnectivity() {
+    Connectivity().checkConnectivity().then((result) {
+      if (mounted) {
+        setState(() {
+          _isOffline = result == ConnectivityResult.none;
+        });
+      }
+    });
+  }
+
+  String _normalizePath(String filePath) {
+    try {
+      String path = filePath.split('?')[0].split('#')[0].toLowerCase().trim();
+      const String emulatedPrefix = '/storage/emulated/0/';
+      if (path.startsWith(emulatedPrefix)) {
+        path = '/sdcard/${path.substring(emulatedPrefix.length)}';
+      }
+      final uri = Uri.file(path);
+      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+      return '/${segments.join('/')}';
+    } catch (e) {
+      return filePath.toLowerCase();
+    }
   }
 
   Future<void> _playAudio(YouTubeAudio audio) async {
@@ -178,284 +186,188 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Audio could not be played: $e'),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () => _playAudio(audio),
-            ),
-          ),
+          SnackBar(content: Text('Error playing audio: $e')),
         );
       }
     }
   }
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
-    if (!mounted) return;
-
-    final isDownloading =
-        _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
-    if (isDownloading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Download already in progress')),
-      );
-      _navigateToDownloads();
-      return;
-    }
-
-    try {
-      final settingsProvider =
-          Provider.of<SettingsProvider>(context, listen: false);
-      final result = await _youTubeService.downloadAudio(
-        videoId: audio.id,
-        preferredFormat: settingsProvider.audioFormat,
-        downloadLocation: settingsProvider.downloadLocation,
-      );
-      if (result != null && mounted) {
-        await Provider.of<music_provider.MusicProvider>(context, listen: false)
-            .loadFromDatabaseOnly();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download started: ${audio.title}')),
-        );
-        _navigateToDownloads();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
-        );
-      }
-    }
-  }
-
-  void _navigateToDownloads() {
-    if (!mounted) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const DownloadsScreen(),
-      ),
+    final settingsProvider = context.read<SettingsProvider>();
+    await _youTubeService.downloadAudio(
+      videoId: audio.id,
+      preferredFormat: settingsProvider.audioFormat,
+      downloadLocation: settingsProvider.downloadLocation,
     );
   }
 
-  @override
-  void dispose() {
-    // Unregister screen and stop YouTube audio when leaving artist screen
-    _youtubePlayer.unregisterScreen('artist_screen');
-    _tabController.dispose();
-    _scrollController.dispose();
-    _connectivitySubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _checkConnectivity() async {
-    try {
-      final result = await Connectivity().checkConnectivity();
-      if (mounted) {
-        setState(() {
-          _isOffline = result == ConnectivityResult.none;
-        });
-      }
-    } catch (e) {
-      // Handle connectivity check errors (common on web)
-      if (mounted) {
-        setState(() {
-          // Assume online if we can't determine connectivity
-          _isOffline = false;
-        });
-      }
+  void _playAllLocalSongs(List<Song> songs) {
+    final musicProvider = context.read<music_provider.MusicProvider>();
+    if (songs.isNotEmpty) {
+      musicProvider.playSong(songs.first);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final musicProvider = Provider.of<music_provider.MusicProvider>(context);
     final l10n = AppLocalizations.of(context);
-    final localSongs = musicProvider.getSongsByArtist(widget.artistName);
-
-    return WillPopScope(
-      onWillPop: () async {
-        await _youtubePlayer.stop();
-        return true;
-      },
-      child: Scaffold(
-        body: Column(
-          children: [
-            Expanded(
-              child: NestedScrollView(
-                headerSliverBuilder: (context, innerBoxIsScrolled) {
-                  return [
-                    SliverAppBar(
-                      expandedHeight: 200.0,
-                      pinned: true,
-                      flexibleSpace: ValueListenableBuilder<String?>(
-                        valueListenable: widget.artistImageUrlNotifier,
-                        builder: (context, artistImageUrl, child) {
-                          return FlexibleSpaceBar(
-                            title: Text(
-                              widget.artistName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 10,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            background: artistImageUrl != null
-                                ? CachedNetworkImage(
-                                    imageUrl: artistImageUrl,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) =>
-                                        Container(color: Colors.grey[800]),
-                                    errorWidget: (context, url, error) =>
-                                        _buildPlaceholderImage(),
-                                  )
-                                : _buildPlaceholderImage(),
-                          );
-                        },
-                      ),
-                      bottom: TabBar(
-                        controller: _tabController,
-                        tabs: [
-                          Tab(text: l10n.localSongs),
-                          Tab(text: l10n.online),
-                        ],
-                      ),
-                    ),
-                  ];
+    
+    return Scaffold(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            expandedHeight: 200,
+            floating: false,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(widget.artistName),
+              background: ValueListenableBuilder<String?>(
+                valueListenable: widget.artistImageUrlNotifier,
+                builder: (context, url, child) {
+                  if (url != null) {
+                    return CachedNetworkImage(
+                      imageUrl: url,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(color: Colors.grey),
+                      errorWidget: (context, url, error) => Container(color: Colors.grey),
+                    );
+                  }
+                  return Container(color: Theme.of(context).primaryColor);
                 },
-                body: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildLocalSongsTab(localSongs, musicProvider),
-                    _buildYouTubeTab(),
-                  ],
-                ),
               ),
             ),
-            const MiniPlayerWidget(),
-            if (_isOffline)
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                color: Colors.grey[900],
-                child: Center(
-                  child: Text(
-                    'Offline Mode - Showing local results only',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+          ),
+          SliverPersistentHeader(
+            delegate: _SliverTabBarDelegate(
+              TabBar(
+                controller: _tabController,
+                tabs: [
+                  Tab(text: l10n.localSongs),
+                  Tab(text: l10n.online),
+                ],
               ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildLocalSongsTab(),
+            _buildYouTubeTab(),
           ],
         ),
       ),
+      bottomNavigationBar: const MiniPlayerWidget(),
     );
   }
 
-  String _normalizePath(String path) {
-    try {
-      String normalized = path.split('?')[0].split('#')[0].toLowerCase().trim();
-      const String emulatedPrefix = '/storage/emulated/0/';
-      if (normalized.startsWith(emulatedPrefix)) {
-        normalized = '/sdcard/${normalized.substring(emulatedPrefix.length)}';
-      }
-      final uri = Uri.file(normalized);
-      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      return '/${segments.join('/')}';
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error normalizing path "$path": $e');
-      }
-      return path.toLowerCase();
-    }
-  }
-
-  Widget _buildLocalSongsTab(
-      List<Song> songs, music_provider.MusicProvider musicProvider) {
+  Widget _buildLocalSongsTab() {
+    final musicProvider = context.watch<music_provider.MusicProvider>();
     final l10n = AppLocalizations.of(context);
-    if (songs.isEmpty) return Center(child: Text(l10n.noLocalSongsForArtist));
 
-    final Map<int, Song> uniqueSongs = {};
-    final Set<String> seenPaths = {};
+    final songs = musicProvider.librarySongs
+        .where((song) => song.artists.any(
+            (artist) => artist.toLowerCase() == widget.artistName.toLowerCase()))
+        .toList();
 
-    for (final song in songs) {
-      try {
-        if (song.url.isEmpty) continue;
-
-        final normalizedPath = _normalizePath(song.url);
-        if (normalizedPath.isEmpty) continue;
-
-        if (!seenPaths.contains(normalizedPath)) {
-          seenPaths.add(normalizedPath);
-          uniqueSongs[song.id] = song;
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error processing song ${song.id}: $e');
-        }
-      }
-    }
-
-    final uniqueSongsList = uniqueSongs.values.toList();
-
-    if (uniqueSongsList.isEmpty) {
+    if (songs.isEmpty) {
       return Center(child: Text(l10n.noLocalSongsForArtist));
     }
 
-    return ListView.builder(
-      itemCount: uniqueSongsList.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton.icon(
-              onPressed: () => _playAllLocalSongs(uniqueSongsList),
-              icon: const Icon(Icons.play_arrow),
-              label: Text('${l10n.playAll} (${uniqueSongsList.length})'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
+    // Get artist thumbnail from first song that has one
+    String? artistThumbnail;
+    for (final song in songs) {
+      if (song.localThumbnailPath != null) {
+        artistThumbnail = song.localThumbnailPath;
+        break;
+      }
+    }
+
+    return Column(
+      children: [
+        if (artistThumbnail != null)
+          Container(
+            height: 200,
+            width: double.infinity,
+            margin: const EdgeInsets.all(8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(artistThumbnail!),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(),
               ),
             ),
-          );
-        }
-        final song = uniqueSongsList[index - 1];
-        final isCurrentSong = musicProvider.currentSong?.id == song.id;
-        return ListTile(
-          leading: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4.0),
-                  child: CachedNetworkImage(
-                    imageUrl: song.albumArtUrl!,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.music_note, size: 50),
-                  ),
-                )
-              : const Icon(Icons.music_note, size: 50),
-          title: Text(
-            song.title,
-            style: TextStyle(
-                fontWeight:
-                    isCurrentSong ? FontWeight.bold : FontWeight.normal),
           ),
-          subtitle: Text(song.album ?? l10n.unknownAlbum),
-          trailing: Text(song.formattedDuration),
-          onTap: () => musicProvider.playSong(song),
-        );
-      },
+        Expanded(
+          child: ListView.builder(
+            itemCount: songs.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: ElevatedButton.icon(
+                    onPressed: () => _playAllLocalSongs(songs),
+                    icon: const Icon(Icons.play_arrow),
+                    label: Text('${l10n.playAll} (${songs.length})'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                  ),
+                );
+              }
+              final song = songs[index - 1];
+              final isCurrentSong = musicProvider.currentSong?.id == song.id;
+              return ListTile(
+                leading: _buildSongThumbnail(song),
+                title: Text(
+                  song.title,
+                  style: TextStyle(
+                      fontWeight: isCurrentSong
+                          ? FontWeight.bold
+                          : FontWeight.normal),
+                ),
+                subtitle: Text(song.album ?? l10n.unknownAlbum),
+                trailing: Text(song.formattedDuration),
+                onTap: () => musicProvider.playSong(song),
+              );
+            },
+          ),
+        ),
+      ],
     );
+  }
+
+  Widget _buildSongThumbnail(Song song) {
+    if (song.localThumbnailPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4.0),
+        child: Image.file(
+          File(song.localThumbnailPath!),
+          width: 50,
+          height: 50,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.music_note, size: 50),
+        ),
+      );
+    }
+
+    if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4.0),
+        child: CachedNetworkImage(
+          imageUrl: song.albumArtUrl!,
+          width: 50,
+          height: 50,
+          fit: BoxFit.cover,
+          errorWidget: (context, url, error) =>
+              const Icon(Icons.music_note, size: 50),
+        ),
+      );
+    }
+
+    return const Icon(Icons.music_note, size: 50);
   }
 
   Widget _buildYouTubeTab() {
@@ -489,10 +401,35 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         child: Center(child: CircularProgressIndicator()),
       );
 
-  Widget _buildPlaceholderImage() => Container(
-        color: Colors.grey[800],
-        child: Center(
-          child: Icon(Icons.person, size: 120, color: Colors.grey[600]),
-        ),
-      );
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    _scrollController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+}
+
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+
+  _SliverTabBarDelegate(this.tabBar);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
+    return false;
+  }
 }

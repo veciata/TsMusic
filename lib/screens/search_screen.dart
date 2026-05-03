@@ -134,8 +134,30 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final errorStr = e.toString().toLowerCase();
+        final isHtmlError = errorStr.contains('youtube_html_error') ||
+            errorStr.contains('html') ||
+            errorStr.contains('ip') ||
+            errorStr.contains('consent') ||
+            errorStr.contains('blocked') ||
+            errorStr.contains('unavailable');
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isHtmlError
+                        ? 'Download unavailable. Please try again later.'
+                        : 'Download failed: $e',
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       }
     }

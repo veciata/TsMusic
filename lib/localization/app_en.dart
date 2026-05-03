@@ -71,7 +71,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
+  String get themeMode => 'Theme Mode';
+
+  @override
+  String get lightMode => 'Light';
+
+  @override
   String get darkMode => 'Dark Mode';
+
+  @override
+  String get followSystem => 'Follow System';
 
   @override
   String get playerStyle => 'Player Style';
@@ -96,6 +105,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancel => 'CANCEL';
+
+  @override
+  String get selectDownloadLocation => 'Select Download Location';
 
   @override
   String get createdBy => 'Created by Veciata';

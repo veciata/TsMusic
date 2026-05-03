@@ -247,19 +247,7 @@ class _HomeScreenState extends State<HomeScreen>
                 });
               },
             )
-          : Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: isDownloaded
-                  ? const Icon(Icons.download_done, color: Colors.green)
-                  : isLocal
-                      ? const Icon(Icons.folder, color: Colors.orange)
-                      : const Icon(Icons.music_note),
-            ),
+          : _buildSongThumbnail(song),
       title: Text(
         song.title.isNotEmpty ? song.title : l10n.unknownTitle,
         maxLines: 1,
@@ -321,6 +309,44 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
       onTap: () => musicProvider.playSongFromLibrary(song),
+    );
+  }
+
+  Widget _buildSongThumbnail(Song song) {
+    if (song.localThumbnailPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Image.file(
+          File(song.localThumbnailPath!),
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Icon(Icons.music_note),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: song.tags.contains('tsmusic')
+          ? const Icon(Icons.download_done, color: Colors.green)
+          : song.url.startsWith('/storage/emulated/0') ||
+                  song.url.startsWith('/data/user/')
+              ? const Icon(Icons.folder, color: Colors.orange)
+              : const Icon(Icons.music_note),
     );
   }
 

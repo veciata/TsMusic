@@ -71,7 +71,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get language => 'Dil';
 
   @override
+  String get themeMode => 'Tema Modu';
+
+  @override
+  String get lightMode => 'Aydınlık';
+
+  @override
   String get darkMode => 'Karanlık Mod';
+
+  @override
+  String get followSystem => 'Sistemi Takip Et';
 
   @override
   String get playerStyle => 'Oynatıcı Stili';
@@ -96,6 +105,9 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get cancel => 'İPTAL';
+
+  @override
+  String get selectDownloadLocation => 'İndirme Konumu Seç';
 
   @override
   String get createdBy => 'Veciata tarafından oluşturuldu';

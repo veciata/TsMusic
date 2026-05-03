@@ -50,6 +50,7 @@ class DatabaseHelper {
             s.title,
             s.file_path,
             s.duration,
+            s.thumbnail_path,
             COALESCE(a.$columnName, '') as artist
       FROM $tableSongs s
       LEFT JOIN (
@@ -86,17 +87,18 @@ class DatabaseHelper {
       final tagsData = await getTagsForSong(songId);
       final tags = tagsData.map((row) => row['name'] as String).toList();
 
-      songs.add(
-        Song(
-          id: songId,
-          title: map['title'] as String,
-          url: map['file_path'] as String,
-          duration: map['duration'] as int,
-          artists: artists,
-          tags: tags,
-          dateAdded: DateTime.parse(map['created_at'] as String),
-        ),
-      );
+    songs.add(
+      Song(
+        id: songId,
+        title: map['title'] as String,
+        url: map['file_path'] as String,
+        duration: map['duration'] as int,
+        artists: artists,
+        tags: tags,
+        dateAdded: DateTime.parse(map['created_at'] as String),
+        localThumbnailPath: map['thumbnail_path'] as String?,
+      ),
+    );
     }
     return songs;
   }
@@ -195,7 +197,7 @@ class DatabaseHelper {
   }
 
   // Increment this version when making schema changes
-  static const int databaseVersion = 4;
+  static const int databaseVersion = 5;
 
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), 'music_player.db');
@@ -280,6 +282,15 @@ class DatabaseHelper {
         debugPrint('Note: youtube_id column may already exist: $e');
       }
     }
+    if (oldVersion < 5) {
+      // Version 5: Add thumbnail_path column to songs table
+      try {
+        await db.execute('ALTER TABLE $tableSongs ADD COLUMN thumbnail_path TEXT');
+        debugPrint('Successfully added thumbnail_path column to songs table');
+      } catch (e) {
+        debugPrint('Note: thumbnail_path column may already exist: $e');
+      }
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -349,6 +360,7 @@ class DatabaseHelper {
         file_path TEXT NOT NULL UNIQUE,
         duration INTEGER,
         track_number INTEGER,
+        thumbnail_path TEXT,
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     ''');
@@ -506,6 +518,7 @@ class DatabaseHelper {
              s.title as title,
              s.file_path as file_path,
              s.duration as duration,
+             s.thumbnail_path as thumbnail_path,
              COALESCE(a.$columnName, '') as artist
       FROM $tableSongs s
       LEFT JOIN (
@@ -1120,6 +1133,7 @@ class DatabaseHelper {
     required String title,
     required List<String> artists,
     required int duration,
+    String? thumbnailPath,
   }) async {
     final db = await database;
     int? songId;
@@ -1140,6 +1154,7 @@ class DatabaseHelper {
           'file_path': filePath,
           'duration': duration,
           'youtube_id': videoId,
+          'thumbnail_path': thumbnailPath,
           'created_at': DateTime.now().toIso8601String(),
         };
 
@@ -1199,6 +1214,7 @@ class DatabaseHelper {
       tags: tags,
       isDownloaded: true, // It's a downloaded song
       dateAdded: DateTime.parse(map['created_at'] as String),
+      localThumbnailPath: map['thumbnail_path'] as String?,
     );
   }
 }

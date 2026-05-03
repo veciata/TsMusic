@@ -13,6 +13,7 @@ import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/song.dart' as ts;
 import 'package:tsmusic/utils/youtube_artist_parser.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
+import 'package:tsmusic/services/download_notification_service.dart';
 
 /// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
 /// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
@@ -294,9 +295,20 @@ class YouTubeService with ChangeNotifier {
 
   void _updateDownloadProgress(String videoId, double progress) {
     if (_activeDownloads.containsKey(videoId)) {
-      _activeDownloads[videoId]!.progress = progress;
-      _activeDownloads[videoId]!.isDownloading = progress < 1.0;
+      final download = _activeDownloads[videoId]!;
+      download.progress = progress;
+      download.isDownloading = progress < 1.0;
       _notifyProgressUpdate();
+
+      final downloadNotification = DownloadNotificationService();
+      if (progress > 0 && progress < 1.0) {
+        final totalDownloads = _activeDownloads.length;
+        downloadNotification.showDownloadProgress(
+          title: download.title,
+          progress: progress,
+          totalDownloads: totalDownloads,
+        );
+      }
     }
   }
 
@@ -304,6 +316,7 @@ class YouTubeService with ChangeNotifier {
     debugPrint('_completeDownload: Completing download for videoId: $videoId');
     if (_activeDownloads.containsKey(videoId)) {
       final download = _activeDownloads[videoId]!;
+      final title = download.title;
       if (!download.completer!.isCompleted) {
         download.completer!.complete();
       }
@@ -311,6 +324,12 @@ class YouTubeService with ChangeNotifier {
       _notifyProgressUpdate();
       debugPrint(
           '_completeDownload: Download for videoId: $videoId completed and removed from active list.');
+
+      final downloadNotification = DownloadNotificationService();
+      if (_activeDownloads.isEmpty) {
+        downloadNotification.cancelDownloadNotification();
+      }
+      downloadNotification.showDownloadComplete(title: title);
     }
   }
 
@@ -408,7 +427,17 @@ class YouTubeService with ChangeNotifier {
       return null;
     }
 
-    final video = await _yt.videos.get(videoId);
+    Video video;
+    try {
+      video = await _yt.videos.get(videoId);
+    } catch (e) {
+      debugPrint('downloadAudio: Failed to fetch video info: $e');
+      _addActiveDownload(videoId, 'Unknown');
+      _activeDownloads[videoId]?.error = 'Failed to fetch video information';
+      _notifyProgressUpdate();
+      _completeDownload(videoId);
+      throw Exception('youtube_html_error');
+    }
     _addActiveDownload(videoId, video.title);
     debugPrint('downloadAudio: Starting download for videoId: $videoId');
 
@@ -424,7 +453,14 @@ class YouTubeService with ChangeNotifier {
         debugPrint(
           'Failed to get manifest with androidVr client: $e. Trying default client.',
         );
-        manifest = await _yt.videos.streamsClient.getManifest(videoId);
+        try {
+          manifest = await _yt.videos.streamsClient.getManifest(videoId);
+        } catch (e2) {
+          debugPrint(
+            'Failed to get manifest with default client: $e2',
+          );
+          throw Exception('youtube_html_error');
+        }
       }
 
       // Select stream based on preferred format
@@ -518,16 +554,17 @@ class YouTubeService with ChangeNotifier {
               'downloadAudio: Video $videoId already downloaded at $existingPath');
           _completeDownload(videoId);
           return DownloadResult(
-            filePath: existingPath,
-            song: await _addDownloadedSongToLibrary(
-              videoId: videoId,
               filePath: existingPath,
-              title: video.title,
-              artists: YouTubeArtistParser.parseArtistName(
-                  video.title, video.author),
-              duration: video.duration?.inMilliseconds ?? 0,
-            ),
-          );
+              song: await _addDownloadedSongToLibrary(
+                videoId: videoId,
+                filePath: existingPath,
+                title: video.title,
+                artists: YouTubeArtistParser.parseArtistName(
+                    video.title, video.author),
+                duration: video.duration?.inMilliseconds ?? 0,
+                thumbnailUrl: video.thumbnails.mediumResUrl,
+              ),
+            );
         }
       }
 
@@ -554,6 +591,7 @@ class YouTubeService with ChangeNotifier {
               artists: YouTubeArtistParser.parseArtistName(
                   video.title, video.author),
               duration: video.duration?.inMilliseconds ?? 0,
+              thumbnailUrl: video.thumbnails.mediumResUrl,
             ),
           );
         } else {
@@ -632,6 +670,7 @@ class YouTubeService with ChangeNotifier {
         title: video.title,
         artists: YouTubeArtistParser.parseArtistName(video.title, video.author),
         duration: video.duration?.inMilliseconds ?? 0,
+        thumbnailUrl: video.thumbnails.mediumResUrl,
       );
 
       _updateDownloadProgress(videoId, 1.0);
@@ -644,8 +683,21 @@ class YouTubeService with ChangeNotifier {
       final download = _activeDownloads[videoId];
       if (download != null) {
         download.isDownloading = false;
-        download.error =
-            download.cancelRequested ? 'Canceled' : 'Download failed';
+        // Check if this is an HTML/IP error
+        final errorStr = e.toString().toLowerCase();
+        final isHtmlError = errorStr.contains('youtube_html_error') ||
+            errorStr.contains('html') ||
+            errorStr.contains('ip') ||
+            errorStr.contains('consent') ||
+            errorStr.contains('blocked') ||
+            errorStr.contains('unavailable');
+
+        if (isHtmlError) {
+          download.error = 'youtube_html_error';
+        } else {
+          download.error =
+              download.cancelRequested ? 'Canceled' : 'Download failed';
+        }
         _notifyProgressUpdate();
       }
       rethrow;
@@ -696,19 +748,57 @@ class YouTubeService with ChangeNotifier {
     required String title,
     required List<String> artists,
     required int duration,
+    String? thumbnailUrl,
   }) async {
     try {
       final dbHelper = DatabaseHelper();
+
+      // Download thumbnail if URL is provided
+      String? thumbnailPath;
+      if (thumbnailUrl != null) {
+        thumbnailPath = await _downloadThumbnail(videoId, thumbnailUrl);
+      }
+
       return await dbHelper.addSongFromYouTube(
         videoId: videoId,
         filePath: filePath,
         title: title,
         artists: artists,
         duration: duration,
+        thumbnailPath: thumbnailPath,
       );
     } catch (e) {
       debugPrint('Error adding downloaded song to library: $e');
       rethrow;
+    }
+  }
+
+  /// Downloads a thumbnail image and saves it locally
+  Future<String?> _downloadThumbnail(String videoId, String thumbnailUrl) async {
+    try {
+      final musicDir = await _getMusicDirectory('internal');
+      final thumbnailFile = File(
+        path.join(musicDir.path, '${videoId}_thumb.jpg'),
+      );
+
+      // Check if thumbnail already exists
+      if (await thumbnailFile.exists()) {
+        debugPrint('Thumbnail already exists: ${thumbnailFile.path}');
+        return thumbnailFile.path;
+      }
+
+      final response = await _httpClient.get(Uri.parse(thumbnailUrl));
+      if (response.statusCode == 200) {
+        await thumbnailFile.writeAsBytes(response.bodyBytes);
+        debugPrint('Thumbnail downloaded: ${thumbnailFile.path}');
+        return thumbnailFile.path;
+      } else {
+        debugPrint('Failed to download thumbnail: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error downloading thumbnail: $e');
+      return null;
     }
   }
 

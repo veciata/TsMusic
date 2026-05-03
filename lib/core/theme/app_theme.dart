@@ -53,6 +53,16 @@ ThemeData buildLightTheme(Color primaryColor) {
       foregroundColor: colorScheme.onSurface,
       elevation: 0,
     ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: colorScheme.surface,
+      contentTextStyle: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+      actionTextColor: colorScheme.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      behavior: SnackBarBehavior.floating,
+      showCloseIcon: true,
+      closeIconColor: colorScheme.onSurfaceVariant,
+      elevation: 4,
+    ),
   );
 }
 
@@ -117,6 +127,16 @@ ThemeData buildDarkTheme(Color primaryColor) {
       color: colorScheme.surface,
       surfaceTintColor: colorScheme.surfaceTint,
       shadowColor: Colors.black.withValues(alpha: 0.1),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: colorScheme.surface,
+      contentTextStyle: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+      actionTextColor: colorScheme.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      behavior: SnackBarBehavior.floating,
+      showCloseIcon: true,
+      closeIconColor: colorScheme.onSurfaceVariant,
+      elevation: 4,
     ),
   );
 }

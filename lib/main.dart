@@ -24,6 +24,8 @@ import 'package:tsmusic/utils/package_info_utils.dart';
 import 'package:tsmusic/widgets/bottom_navigation_widget.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
 
+import 'package:tsmusic/services/download_notification_service.dart';
+
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
@@ -32,6 +34,9 @@ Future<void> main() async {
   // Initialize MediaKit for audio playback
   MediaKit.ensureInitialized();
   await PackageInfoUtils.init();
+
+  // Initialize download notifications
+  await DownloadNotificationService().initialize();
 
   final youTubeService = YouTubeService();
 
@@ -135,7 +140,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
               ],
               supportedLocales: AppLocalizations.supportedLocales,
               home: _introCompleted
-                  ? const MainNavigationScreen()
+                  ? MainNavigationScreen(key: mainNavKey)
                   : IntroductionScreen(onComplete: _onIntroComplete),
             );
           },
@@ -212,6 +217,10 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       _selectedIndex = index;
       _pageController.jumpToPage(index);
     });
+  }
+
+  void goToDownloads() {
+    _onItemTapped(1);
   }
 
   String _getTitle() {

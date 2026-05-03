@@ -53,7 +53,10 @@ class AppLocalizations {
   String get appearance => throw UnimplementedError();
   String get about => throw UnimplementedError();
   String get language => throw UnimplementedError();
+  String get themeMode => throw UnimplementedError();
+  String get lightMode => throw UnimplementedError();
   String get darkMode => throw UnimplementedError();
+  String get followSystem => throw UnimplementedError();
   String get playerStyle => throw UnimplementedError();
   String get accentColor => throw UnimplementedError();
   String get audioDownloadFormat => throw UnimplementedError();
@@ -63,6 +66,7 @@ class AppLocalizations {
   String get selectAudioFormat => throw UnimplementedError();
   String get cancel => throw UnimplementedError();
   String get selectLanguage => throw UnimplementedError();
+  String get selectDownloadLocation => throw UnimplementedError();
   String get debug => throw UnimplementedError();
   String get createdBy => throw UnimplementedError();
   String get supportFeedback => throw UnimplementedError();
