@@ -125,24 +125,24 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
 
         return Consumer<SettingsProvider>(
           builder: (context, settingsProvider, _) {
-              return MaterialApp(
-                title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
-                debugShowCheckedModeBanner: false,
-              theme: lightTheme.copyWith(textTheme: textTheme),
-              darkTheme: darkTheme.copyWith(textTheme: textTheme),
-              themeMode: themeProvider.themeMode,
-              locale: settingsProvider.locale,
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: _introCompleted
-                  ? MainNavigationScreen(key: mainNavKey)
-                  : IntroductionScreen(onComplete: _onIntroComplete),
-            );
+                return MaterialApp(
+                  title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
+                  debugShowCheckedModeBanner: false,
+                  theme: lightTheme.copyWith(textTheme: textTheme),
+                  darkTheme: darkTheme.copyWith(textTheme: textTheme),
+                  themeMode: themeProvider.themeMode,
+                  locale: settingsProvider.locale,
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  home: _introCompleted
+                      ? MainNavigationScreen(key: mainNavKey)
+                      : IntroductionScreen(onComplete: _onIntroComplete),
+                );
           },
         );
       },
@@ -215,7 +215,11 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      _pageController.jumpToPage(index);
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     });
   }
 

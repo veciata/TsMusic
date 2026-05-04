@@ -38,6 +38,10 @@ class AppLocalizations {
   String get tsMusic => throw UnimplementedError();
   String get nowPlaying => throw UnimplementedError();
   String get songs => throw UnimplementedError();
+
+  String get selected => throw UnimplementedError();
+
+  String get songsMoved => throw UnimplementedError();
   String get music => throw UnimplementedError();
   String get artists => throw UnimplementedError();
   String get playlists => throw UnimplementedError();
@@ -48,6 +52,7 @@ class AppLocalizations {
   String get unknownArtist => throw UnimplementedError();
   String get unknownAlbum => throw UnimplementedError();
   String get playAll => throw UnimplementedError();
+  String get selectAll => throw UnimplementedError();
 
   // Settings
   String get appearance => throw UnimplementedError();
@@ -164,6 +169,10 @@ class AppLocalizations {
   String get grantPermission => throw UnimplementedError();
   String get permissionGranted => throw UnimplementedError();
   String get permissionGrantedDesc => throw UnimplementedError();
+
+  // Theme settings
+  String get highContrastAccent => throw UnimplementedError();
+  String get highContrastAccentDesc => throw UnimplementedError();
 }
 
 class _AppLocalizationsDelegate

@@ -8,7 +8,12 @@ import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/services/download_notification_service.dart';
-import 'package:tsmusic/utils/permission_helper.dart';
+import 'package:tsmusic/widgets/sliding_text.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
+
+import 'search_screen.dart';
+
+import 'package:animations/animations.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
@@ -22,6 +27,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   late SettingsProvider _settingsProvider;
   final Map<String, double> _downloadProgress = {};
   List<Song> _localFiles = [];
+  final Set<int> _selectedSongs = {};
+  bool _isMultiSelectMode = false;
 
   @override
   void didChangeDependencies() {
@@ -61,12 +68,80 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Downloads'),
-        ),
-        body: _buildDownloadsList(),
-      );
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: _isMultiSelectMode
+            ? Text('${_selectedSongs.length} selected')
+            : Text(l10n.downloads),
+        leading: _isMultiSelectMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(() {
+                    _isMultiSelectMode = false;
+                    _selectedSongs.clear();
+                  });
+                },
+              )
+            : null,
+        actions: [
+          if (_isMultiSelectMode) ...[
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              onPressed: () {
+                setState(() {
+                  final allSongs = context
+                      .read<music_provider.MusicProvider>()
+                      .youtubeSongs;
+                  if (_selectedSongs.length == allSongs.length) {
+                    _selectedSongs.clear();
+                  } else {
+                    _selectedSongs.clear();
+                    _selectedSongs.addAll(allSongs.map((s) => s.id));
+                  }
+                });
+              },
+              tooltip: l10n.selectAll,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed:
+                  _selectedSongs.isEmpty ? null : () => _deleteSelected(),
+              color: Colors.red,
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        FadeThroughTransition(
+                      animation: animation,
+                      secondaryAnimation: secondaryAnimation,
+                      child: const SearchScreen(),
+                    ),
+                  ),
+                );
+              },
+              tooltip: l10n.search,
+            ),
+            IconButton(
+              icon: const Icon(Icons.check_box_outlined),
+              onPressed: () {
+                setState(() => _isMultiSelectMode = true);
+              },
+              tooltip: 'Select items',
+            ),
+          ],
+        ],
+      ),
+      body: _buildDownloadsList(),
+    );
+  }
 
   Widget _buildDownloadsList() =>
       Consumer2<YouTubeService, music_provider.MusicProvider>(
@@ -210,11 +285,22 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Widget _buildSongItem(Song song) => Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: ListTile(
-          leading: _buildThumbnail(song),
-          title: Text(
+          leading: _isMultiSelectMode
+              ? Checkbox(
+                  value: _selectedSongs.contains(song.id),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedSongs.add(song.id);
+                      } else {
+                        _selectedSongs.remove(song.id);
+                      }
+                    });
+                  },
+                )
+              : _buildThumbnail(song),
+          title: SlidingText(
             song.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w500),
           ),
           subtitle: Text(
@@ -224,75 +310,62 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(song.formattedDuration),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'relocate') {
-                    _showRelocateDialog(song);
-                  } else if (value == 'delete') {
-                    _deleteSong(song);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'relocate',
-                    child: Row(
-                      children: [
-                        Icon(Icons.drive_file_move),
-                        SizedBox(width: 8),
-                        Text('Move to...'),
+          trailing: _isMultiSelectMode
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(song.formattedDuration),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'relocate') {
+                          _showRelocateDialog(song);
+                        } else if (value == 'delete') {
+                          _deleteSong(song);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'relocate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.drive_file_move),
+                              SizedBox(width: 8),
+                              Text('Move to...'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Delete',
+                                  style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          onTap: () {
-            final musicProvider = Provider.of<music_provider.MusicProvider>(
-              context,
-              listen: false,
-            );
-            musicProvider.playSong(song);
-          },
+                  ],
+                ),
+          onTap: _isMultiSelectMode
+              ? () {
+                  setState(() {
+                    if (_selectedSongs.contains(song.id)) {
+                      _selectedSongs.remove(song.id);
+                    } else {
+                      _selectedSongs.add(song.id);
+                    }
+                  });
+                }
+              : null,
         ),
       );
 
   Widget _buildThumbnail(Song song) {
-    // Use local thumbnail if available
-    if (song.localThumbnailPath != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.file(
-          File(song.localThumbnailPath!),
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-            width: 50,
-            height: 50,
-            color: Colors.grey[300],
-            child: const Icon(Icons.music_note),
-          ),
-        ),
-      );
-    }
-
-    // Fall back to network image
-    if (song.albumArtUrl?.isNotEmpty == true) {
+    if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: CachedNetworkImage(
@@ -300,22 +373,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           width: 50,
           height: 50,
           fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            width: 50,
-            height: 50,
-            color: Colors.grey[300],
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-          errorWidget: (context, url, error) => Container(
-            width: 50,
-            height: 50,
-            color: Colors.grey[300],
-            child: const Icon(Icons.music_note),
-          ),
+          placeholder: (context, url) =>
+              Container(width: 50, height: 50, color: Colors.grey[300]),
+          errorWidget: (context, url, error) =>
+              Container(width: 50, height: 50, color: Colors.grey[300]),
         ),
       );
     }
-
     return Container(
       width: 50,
       height: 50,
@@ -326,113 +390,49 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Future<void> _scanLocalFiles() async {
     try {
-      final hasPermission =
-          await PermissionHelper.requestFileManagementPermission();
-      if (!hasPermission) {
-        debugPrint('File management permission not granted');
-        return;
-      }
-
-      final locations = ['internal', 'downloads', 'music'];
-      final List<Song> allSongs = [];
-
-      for (final location in locations) {
-        final dir = await _getMusicDirectory(location);
-        if (!await dir.exists()) continue;
-
-        final files = await dir
-            .list()
-            .where((f) =>
-                f is File &&
-                (f.path.endsWith('.m4a') ||
-                    f.path.endsWith('.webm') ||
-                    f.path.endsWith('.mp3') ||
-                    f.path.endsWith('.opus')))
-            .toList();
-
-        final songs = files.map((file) {
-          final fileName = file.path.split('/').last;
-          final nameWithoutExt =
-              fileName.substring(0, fileName.lastIndexOf('.'));
-          final parts = nameWithoutExt.split('_');
-          final title = parts.first;
-          return Song(
-            id: 0,
-            title: title,
-            artists: ['Unknown'],
-            url: file.path,
-            duration: 0,
-          );
-        }).toList();
-
-        allSongs.addAll(songs);
-      }
-
       final musicProvider =
           Provider.of<music_provider.MusicProvider>(context, listen: false);
-      for (final song in allSongs) {
-        musicProvider.addSongToPlaylist(song);
-      }
+      final songs = musicProvider.youtubeSongs;
+      final List<Song> localFiles = List.from(songs);
 
       if (mounted) {
-        setState(() => _localFiles = allSongs);
+        setState(() {
+          _localFiles = localFiles;
+        });
       }
     } catch (e) {
       debugPrint('Error scanning local files: $e');
     }
   }
 
-  Future<Directory> _getMusicDirectory(String downloadLocation) async {
-    if (downloadLocation == 'downloads') {
-      return Directory('/storage/emulated/0/Download/tsmusic');
-    } else if (downloadLocation == 'music') {
-      return Directory('/storage/emulated/0/Music/tsmusic');
-    } else {
-      final appDir = await getApplicationDocumentsDirectory();
-      return Directory('${appDir.path}/tsmusic');
-    }
-  }
-
   Future<void> _showRelocateDialog(Song song) async {
-    final locations = [
-      {'value': 'internal', 'label': 'Internal Storage'},
-      {'value': 'downloads', 'label': 'Downloads folder'},
-      {'value': 'music', 'label': 'Music folder'},
-    ];
+    final settingsProvider =
+        Provider.of<SettingsProvider>(context, listen: false);
+    final currentLocation = settingsProvider.downloadLocation;
 
-    final selected = await showDialog<String>(
+    final targetLocation = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => SimpleDialog(
         title: const Text('Move to...'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: locations
-              .map((loc) => ListTile(
-                    title: Text(loc['label']!),
-                    onTap: () => Navigator.of(context).pop(loc['value']),
-                  ))
-              .toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
+        children: ['internal', 'downloads', 'music']
+            .where((loc) => loc != currentLocation)
+            .map((loc) => RadioListTile<String>(
+                  title: Text(loc[0].toUpperCase() + loc.substring(1)),
+                  value: loc,
+                  groupValue: null,
+                  onChanged: (value) => Navigator.pop(context, value),
+                ))
+            .toList(),
       ),
     );
 
-    if (selected != null) {
-      await _relocateSong(song, selected);
-    }
-  }
+    if (targetLocation == null) return;
 
-  Future<void> _relocateSong(Song song, String targetLocation) async {
     try {
       final sourceFile = File(song.url);
       if (!await sourceFile.exists()) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Source file not found')),
+          const SnackBar(content: Text('File not found')),
         );
         return;
       }
@@ -493,31 +493,80 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
     if (confirmed == true) {
       try {
-        if (mounted) {
-          await Provider.of<music_provider.MusicProvider>(context,
-                  listen: false)
-              .deleteSong(song);
+        final file = File(song.url);
+        if (await file.exists()) {
+          await file.delete();
         }
-
-        await _scanLocalFiles();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('"${song.title}" deleted')),
-          );
-        }
+        final musicProvider = Provider.of<music_provider.MusicProvider>(
+          context,
+          listen: false,
+        );
+        await musicProvider.deleteSong(song);
+        _scanLocalFiles();
       } catch (e) {
-        debugPrint('Error deleting song: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete: $e')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete: $e')),
+        );
       }
     }
   }
 
-  void addDownload(String videoId, String title) {
+  Future<void> _deleteSelected() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${_selectedSongs.length} songs?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isMultiSelectMode = false);
+      for (final songId in _selectedSongs.toList()) {
+        final song = _localFiles
+            .cast<Song?>()
+            .firstWhere(
+                (s) => s?.id == songId,
+                orElse: () => null,
+            );
+        if (song != null) {
+          try {
+            final file = File(song.url);
+            if (await file.exists()) {
+              await file.delete();
+            }
+            final musicProvider = Provider.of<music_provider.MusicProvider>(
+              context,
+              listen: false,
+            );
+            await musicProvider.deleteSong(song);
+          } catch (e) {
+            debugPrint('Error deleting song ${song.id}: $e');
+          }
+        }
+      }
+      _selectedSongs.clear();
+      _scanLocalFiles();
+    }
+  }
+
+  Future<Directory> _getMusicDirectory(String downloadLocation) async {
+    final baseDir = await getApplicationDocumentsDirectory();
+    return Directory('${baseDir.path}/tsmusic');
+  }
+
+  Future<void> addDownload(String videoId, String title) async {
     if (!_downloadProgress.containsKey(videoId)) {
       setState(() {
         _downloadProgress[videoId] = 0.0;
@@ -546,18 +595,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           setState(() {
             _downloadProgress.remove(videoId);
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 12),
-                  Text('Download completed: ${result.song.title}'),
-                ],
-              ),
-              duration: const Duration(seconds: 3),
-            ),
-          );
         }
       }).catchError((error) {
         if (mounted) {

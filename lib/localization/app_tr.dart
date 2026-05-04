@@ -31,6 +31,11 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get songs => 'Şarkılar';
 
+  String get selectAll => 'Tümünü Seç';
+
+  @override
+  String get selected => 'seçildi';
+
   @override
   String get music => 'Müzik';
 
@@ -348,5 +353,8 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get permissionGrantedDesc =>
-      'Artık müzik dosyalarınıza erişebilirsiniz. Devam etmek için İleri\'ye dokunun.';
+      'Artık müzik dosyalarınıza erişebilirsiniz. Devam etmek için İleri\'ye dokunun';
+
+  @override
+  String get songsMoved => 'şarkı taşındı';
 }

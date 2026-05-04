@@ -15,6 +15,7 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'search_screen.dart';
 import 'artist_detail_screen.dart';
 import 'playlist_detail_screen.dart';
+import 'package:tsmusic/widgets/sliding_text.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onSettingsTap;
@@ -227,9 +228,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildSongTile(Song song, music_provider.MusicProvider musicProvider) {
-    final isLocal = song.url.startsWith('/storage/emulated/0') ||
-        song.url.startsWith('/data/user/');
-    final isDownloaded = song.tags.contains('tsmusic');
     final isSelected = _selectedSongs.contains(song.id);
     final l10n = AppLocalizations.of(context);
 
@@ -248,10 +246,9 @@ class _HomeScreenState extends State<HomeScreen>
               },
             )
           : _buildSongThumbnail(song),
-      title: Text(
+      title: SlidingText(
         song.title.isNotEmpty ? song.title : l10n.unknownTitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.titleMedium,
       ),
       subtitle: Text(
         _getArtistsText(song.artists),
@@ -265,18 +262,20 @@ class _HomeScreenState extends State<HomeScreen>
                   ?.withValues(alpha: 0.7),
             ),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(_formatDuration(song.duration)),
-          PopupMenuButton<String>(
-            onSelected: (value) =>
-                _handleSongAction(value, song, musicProvider),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'move',
-                child: Row(
-                  children: [
+      trailing: _isMultiSelectMode
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_formatDuration(song.duration)),
+                PopupMenuButton<String>(
+                  onSelected: (value) =>
+                      _handleSongAction(value, song, musicProvider),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'move',
+                      child: Row(
+                        children: [
                     const Icon(Icons.drive_file_move_outline),
                     const SizedBox(width: 8),
                     Text(l10n.move),
@@ -308,8 +307,173 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      onTap: () => musicProvider.playSongFromLibrary(song),
+      onTap: _isMultiSelectMode
+          ? () {
+              setState(() {
+                if (_selectedSongs.contains(song.id)) {
+                  _selectedSongs.remove(song.id);
+                } else {
+                  _selectedSongs.add(song.id);
+                }
+              });
+            }
+          : () => musicProvider.playSongFromLibrary(song),
+      onLongPress: () {
+        if (!_isMultiSelectMode) {
+          setState(() {
+            _isMultiSelectMode = true;
+            _selectedSongs.add(song.id);
+          });
+        }
+      },
     );
+  }
+
+  PreferredSizeWidget _buildMultiSelectAppBar(AppLocalizations l10n) {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: () {
+          setState(() {
+            _isMultiSelectMode = false;
+            _selectedSongs.clear();
+          });
+        },
+      ),
+      title: Text('${_selectedSongs.length} ${l10n.selected}'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.drive_file_move_outline),
+          onPressed: _selectedSongs.isEmpty
+              ? null
+              : () => _moveSelectedSongs(context),
+          tooltip: l10n.move,
+        ),
+        IconButton(
+          icon: const Icon(Icons.playlist_add),
+          onPressed: _selectedSongs.isEmpty
+              ? null
+              : () => showPlaylistSelector(context),
+          tooltip: l10n.addToPlaylist,
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete),
+          onPressed: _selectedSongs.isEmpty
+              ? null
+              : () => _deleteSelectedSongs(context),
+          tooltip: l10n.delete,
+          color: Colors.red,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _deleteSelectedSongs(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.delete),
+        content: Text(
+            '${l10n.confirmDelete} ${_selectedSongs.length} ${l10n.songs}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.delete,
+                style: const TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final musicProvider =
+          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      for (final id in _selectedSongs) {
+        final song = musicProvider.songs.where((s) => s.id == id).firstOrNull;
+        if (song != null) {
+          await musicProvider.deleteSong(song);
+        }
+      }
+      setState(() {
+        _isMultiSelectMode = false;
+        _selectedSongs.clear();
+      });
+    }
+  }
+
+  Future<void> _moveSelectedSongs(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final locations = [
+      {'label': l10n.internalStorage, 'path': '/storage/emulated/0/Music/tsmusic'},
+      {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
+      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music'},
+    ];
+
+    final musicProvider =
+        Provider.of<music_provider.MusicProvider>(context, listen: false);
+
+    final selectedPath = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.moveTo),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: locations
+              .map((loc) => ListTile(
+                    title: Text(loc['label']!),
+                    onTap: () => Navigator.pop(context, loc['path']),
+                  ))
+              .toList(),
+        ),
+      ),
+    );
+
+    if (selectedPath != null) {
+      final targetDir = Directory(selectedPath);
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+      }
+
+      for (final id in _selectedSongs) {
+        final song = musicProvider.songs.where((s) => s.id == id).firstOrNull;
+        if (song != null) {
+          try {
+            final file = File(song.url);
+            final newPath = path.join(selectedPath, path.basename(song.url));
+            try {
+              await file.rename(newPath);
+            } on FileSystemException {
+              await file.copy(newPath);
+              await file.delete();
+            }
+            final updatedSong = song.copyWith(url: newPath);
+            musicProvider.addSongToPlaylist(updatedSong);
+          } catch (e) {
+            debugPrint('Error moving song ${song.id}: $e');
+          }
+        }
+      }
+
+      setState(() {
+        _isMultiSelectMode = false;
+        _selectedSongs.clear();
+      });
+
+      await musicProvider.refreshSongs();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_selectedSongs.length} ${l10n.songsMoved}'),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSongThumbnail(Song song) {
@@ -395,7 +559,20 @@ class _HomeScreenState extends State<HomeScreen>
             itemCount: sortedSongs.length,
             itemBuilder: (context, index) {
               final song = sortedSongs[index];
-              return _buildSongTile(song, musicProvider);
+              return TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: Duration(milliseconds: 300 + (index * 50).clamp(0, 500)),
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.translate(
+                      offset: Offset(0, 20 * (1 - value)),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildSongTile(song, musicProvider),
+              );
             },
           ),
         ),
@@ -667,6 +844,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (musicProvider.error != null && musicProvider.songs.isEmpty) {
       return Scaffold(
+        appBar: _isMultiSelectMode ? _buildMultiSelectAppBar(l10n) : null,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -700,6 +878,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return Scaffold(
+      appBar: _isMultiSelectMode ? _buildMultiSelectAppBar(l10n) : null,
       body: Column(
         children: [
           TabBar(

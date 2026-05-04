@@ -31,6 +31,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get songs => 'Songs';
 
+  String get selectAll => 'Select All';
+
+  @override
+  String get selected => 'selected';
+
+  @override
+  String get songsMoved => 'songs moved';
+
   @override
   String get music => 'Music';
 
