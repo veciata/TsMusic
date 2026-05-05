@@ -15,7 +15,7 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
-import 'downloads_screen.dart';
+import 'package:tsmusic/widgets/sliding_text.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
@@ -43,6 +43,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   final ScrollController _scrollController = ScrollController();
   late final LRUCache<String, String> _artistImageCache;
+  final Set<int> _selectedLocalSongs = {};
+  bool _isMultiSelectMode = false;
 
   @override
   void initState() {
@@ -55,7 +57,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _loadYouTubeSongs();
     _scrollController.addListener(_onScroll);
     _fetchArtistImageIfNeeded();
-    
+
     _checkConnectivity();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
       _checkConnectivity();
@@ -71,7 +73,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
   Future<void> _fetchArtistImageIfNeeded() async {
     if (widget.artistImageUrlNotifier.value != null) return;
-    
+
     final cachedUrl = _artistImageCache.get(widget.artistName);
     if (cachedUrl != null) {
       setState(() {
@@ -165,21 +167,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     });
   }
 
-  String _normalizePath(String filePath) {
-    try {
-      String path = filePath.split('?')[0].split('#')[0].toLowerCase().trim();
-      const String emulatedPrefix = '/storage/emulated/0/';
-      if (path.startsWith(emulatedPrefix)) {
-        path = '/sdcard/${path.substring(emulatedPrefix.length)}';
-      }
-      final uri = Uri.file(path);
-      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      return '/${segments.join('/')}';
-    } catch (e) {
-      return filePath.toLowerCase();
-    }
-  }
-
   Future<void> _playAudio(YouTubeAudio audio) async {
     try {
       await _youtubePlayer.playAudio(audio);
@@ -208,10 +195,65 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     }
   }
 
+  Future<void> _deleteSelectedLocalSongs() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Delete ${_selectedLocalSongs.length} songs?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isMultiSelectMode = false);
+      final musicProvider =
+          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      for (final songId in _selectedLocalSongs.toList()) {
+        final song = musicProvider.librarySongs
+            .cast<Song?>()
+            .firstWhere(
+                (s) => s?.id == songId,
+                orElse: () => null,
+            );
+        if (song != null) {
+          try {
+            final file = File(song.url);
+            if (await file.exists()) {
+              await file.delete();
+            }
+            await musicProvider.deleteSong(song);
+          } catch (e) {
+            debugPrint('Error deleting song ${song.id}: $e');
+          }
+        }
+      }
+      _selectedLocalSongs.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _scrollController.dispose();
+    _connectivitySubscription?.cancel();
+    _youtubePlayer.unregisterScreen('artist_screen');
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -229,7 +271,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                       imageUrl: url,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(color: Colors.grey),
-                      errorWidget: (context, url, error) => Container(color: Colors.grey),
+                      errorWidget: (context, url, error) =>
+                          Container(color: Colors.grey),
                     );
                   }
                   return Container(color: Theme.of(context).primaryColor);
@@ -258,6 +301,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         ),
       ),
       bottomNavigationBar: const MiniPlayerWidget(),
+      floatingActionButton: _isMultiSelectMode
+          ? FloatingActionButton(
+              onPressed: _selectedLocalSongs.isEmpty
+                  ? null
+                  : () => _deleteSelectedLocalSongs(),
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.delete),
+            )
+          : null,
     );
   }
 
@@ -274,53 +326,63 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       return Center(child: Text(l10n.noLocalSongsForArtist));
     }
 
-    // Get artist thumbnail from first song that has one
-    String? artistThumbnail;
-    for (final song in songs) {
-      if (song.localThumbnailPath != null) {
-        artistThumbnail = song.localThumbnailPath;
-        break;
-      }
-    }
-
     return Column(
       children: [
-        if (artistThumbnail != null)
-          Container(
-            height: 200,
-            width: double.infinity,
-            margin: const EdgeInsets.all(8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                File(artistThumbnail!),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _playAllLocalSongs(songs),
+                  icon: const Icon(Icons.play_arrow),
+                  label: Text('${l10n.playAll} (${songs.length})'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(_isMultiSelectMode
+                    ? Icons.close
+                    : Icons.check_box_outlined),
+                onPressed: () {
+                  setState(() {
+                    _isMultiSelectMode = !_isMultiSelectMode;
+                    if (!_isMultiSelectMode) {
+                      _selectedLocalSongs.clear();
+                    }
+                  });
+                },
+                tooltip: _isMultiSelectMode ? 'Cancel' : 'Select items',
+              ),
+            ],
           ),
+        ),
         Expanded(
           child: ListView.builder(
-            itemCount: songs.length + 1,
+            itemCount: songs.length,
             itemBuilder: (context, index) {
-              if (index == 0) {
-                return Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton.icon(
-                    onPressed: () => _playAllLocalSongs(songs),
-                    icon: const Icon(Icons.play_arrow),
-                    label: Text('${l10n.playAll} (${songs.length})'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                  ),
-                );
-              }
-              final song = songs[index - 1];
+              final song = songs[index];
               final isCurrentSong = musicProvider.currentSong?.id == song.id;
+              final isSelected = _selectedLocalSongs.contains(song.id);
               return ListTile(
-                leading: _buildSongThumbnail(song),
-                title: Text(
+                leading: _isMultiSelectMode
+                    ? Checkbox(
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedLocalSongs.add(song.id);
+                            } else {
+                              _selectedLocalSongs.remove(song.id);
+                            }
+                          });
+                        },
+                      )
+                    : _buildSongThumbnail(song),
+                title: SlidingText(
                   song.title,
                   style: TextStyle(
                       fontWeight: isCurrentSong
@@ -328,8 +390,20 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                           : FontWeight.normal),
                 ),
                 subtitle: Text(song.album ?? l10n.unknownAlbum),
-                trailing: Text(song.formattedDuration),
-                onTap: () => musicProvider.playSong(song),
+                trailing: _isMultiSelectMode
+                    ? null
+                    : Text(song.formattedDuration),
+                onTap: _isMultiSelectMode
+                    ? () {
+                        setState(() {
+                          if (_selectedLocalSongs.contains(song.id)) {
+                            _selectedLocalSongs.remove(song.id);
+                          } else {
+                            _selectedLocalSongs.add(song.id);
+                          }
+                        });
+                      }
+                    : () => musicProvider.playSong(song),
               );
             },
           ),
@@ -373,7 +447,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   Widget _buildYouTubeTab() {
     final l10n = AppLocalizations.of(context);
     if (_isLoading && _youtubeSongs.isEmpty)
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     if (_youtubeSongs.isEmpty)
       return Center(child: Text(l10n.noOnlineSongsFound));
 
@@ -383,16 +457,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       itemBuilder: (context, index) {
         if (index >= _youtubeSongs.length) return _buildLoadingIndicator();
         final audio = _youtubeSongs[index];
-        return _buildOnlineResultItem(audio);
+        return YouTubePlaybackWidget(
+          audio: audio,
+          onPlay: _playAudio,
+          onDownload: _handleDownload,
+        );
       },
-    );
-  }
-
-  Widget _buildOnlineResultItem(YouTubeAudio audio) {
-    return YouTubePlaybackWidget(
-      audio: audio,
-      onPlay: _playAudio,
-      onDownload: _handleDownload,
     );
   }
 
@@ -400,14 +470,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         padding: EdgeInsets.all(16.0),
         child: Center(child: CircularProgressIndicator()),
       );
-
-  @override
-  void dispose() {
-    _connectivitySubscription?.cancel();
-    _scrollController.dispose();
-    _tabController.dispose();
-    super.dispose();
-  }
 }
 
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
@@ -422,8 +484,10 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: tabBar,
     );
   }

@@ -10,7 +10,6 @@ const List<Color> availableColors = [
 ];
 
 ThemeData buildLightTheme(Color primaryColor) {
-  final baseTheme = ThemeData.light();
   final colorScheme = ColorScheme.light(
     primary: primaryColor,
     primaryContainer: primaryColor.withValues(alpha: 0.8),
@@ -18,7 +17,7 @@ ThemeData buildLightTheme(Color primaryColor) {
     onSurface: Colors.black87,
   );
 
-  return baseTheme.copyWith(
+  return ThemeData.light().copyWith(
     colorScheme: colorScheme,
     brightness: Brightness.light,
     primaryColor: primaryColor,
@@ -67,7 +66,6 @@ ThemeData buildLightTheme(Color primaryColor) {
 }
 
 ThemeData buildDarkTheme(Color primaryColor) {
-  final baseTheme = ThemeData.dark();
   final colorScheme = ColorScheme.dark(
     primary: primaryColor,
     primaryContainer: primaryColor.withValues(alpha: 0.8),
@@ -76,7 +74,7 @@ ThemeData buildDarkTheme(Color primaryColor) {
     onPrimary: Colors.white,
   );
 
-  return baseTheme.copyWith(
+  return ThemeData.dark().copyWith(
     colorScheme: colorScheme,
     brightness: Brightness.dark,
     primaryColor: primaryColor,
@@ -119,7 +117,7 @@ ThemeData buildDarkTheme(Color primaryColor) {
       foregroundColor: colorScheme.onSurface,
       elevation: 0,
     ),
-    cardTheme: baseTheme.cardTheme.copyWith(
+    cardTheme: ThemeData.dark().cardTheme.copyWith(
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

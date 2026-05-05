@@ -6,6 +6,7 @@ import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/main.dart';
+import 'package:tsmusic/widgets/sliding_text.dart';
 
 /// Reusable YouTube audio playback widget
 /// Used in search and artist screens to display YouTube results with playback status
@@ -46,10 +47,9 @@ class YouTubePlaybackWidget extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
         leading: _buildThumbnail(context, localThumbnailPath),
-        title: Text(
+        title: SlidingText(
           audio.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

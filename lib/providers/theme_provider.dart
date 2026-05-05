@@ -75,7 +75,21 @@ class ThemeProvider with ChangeNotifier {
   }
 
   ThemeData getLightTheme() => app_theme.buildLightTheme(_primaryColor);
+
   ThemeData getDarkTheme() => app_theme.buildDarkTheme(_primaryColor);
 
   String getPlayerStyleName(PlayerStyle style) => style.displayName;
+
+  String getPlayerStyleDescription(PlayerStyle style) {
+    switch (style) {
+      case PlayerStyle.classic:
+        return 'Traditional layout with large album art';
+      case PlayerStyle.modern:
+        return 'Full-screen blurred background with glow effects';
+      case PlayerStyle.compact:
+        return 'Small player with horizontal layout';
+      case PlayerStyle.minimal:
+        return 'Ultra-minimal with bottom sheet controls';
+    }
+  }
 }

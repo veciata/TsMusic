@@ -391,6 +391,10 @@ class SettingsScreen extends StatelessWidget {
               ListTile(
                 title: Text(l10n.playerStyle),
                 leading: const Icon(Icons.style),
+                subtitle: Text(
+                  themeProvider.getPlayerStyleDescription(themeProvider.playerStyle),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 trailing: Text(
                   themeProvider.getPlayerStyleName(themeProvider.playerStyle),
                   style: TextStyle(
