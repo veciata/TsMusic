@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -25,6 +26,9 @@ import 'package:tsmusic/widgets/bottom_navigation_widget.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
 
 import 'package:tsmusic/services/download_notification_service.dart';
+import 'package:tsmusic/services/home_widget_service.dart';
+import 'package:tsmusic/providers/update_notification_provider.dart';
+import 'package:tsmusic/widgets/update_notification_modal.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
@@ -38,15 +42,20 @@ Future<void> main() async {
   // Initialize download notifications
   await DownloadNotificationService().initialize();
 
+  // Initialize home screen widget
+  await HomeWidgetService.init();
+
   final youTubeService = YouTubeService();
 
   final prefs = await SharedPreferences.getInstance();
   final introCompleted = prefs.getBool('intro_completed') ?? false;
+  final lastSeenVersion = prefs.getString('last_seen_version') ?? '';
 
   runApp(
     MusicPlayerApp(
       youTubeService: youTubeService,
       introCompleted: introCompleted,
+      lastSeenVersion: lastSeenVersion,
     ),
   );
 
@@ -71,11 +80,13 @@ Future<void> main() async {
 class MusicPlayerApp extends StatefulWidget {
   final YouTubeService youTubeService;
   final bool introCompleted;
+  final String lastSeenVersion;
 
   const MusicPlayerApp({
     super.key,
     required this.youTubeService,
     required this.introCompleted,
+    required this.lastSeenVersion,
   });
 
   @override
@@ -101,10 +112,20 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
   Widget build(BuildContext context) => MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
-      ChangeNotifierProvider(create: (_) => music_provider.MusicProvider()),
+      ChangeNotifierProvider(
+        create: (ctx) => music_provider.MusicProvider(
+          notificationColor: ctx.read<ThemeProvider>().primaryColor,
+        ),
+      ),
       ChangeNotifierProvider(create: (_) => widget.youTubeService),
-      ChangeNotifierProvider(create: (_) => YouTubePlayerProvider(widget.youTubeService)),
+      ChangeNotifierProvider(
+        create: (_) => YouTubePlayerProvider(widget.youTubeService),
+      ),
       ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(
+        create: (_) =>
+            UpdateNotificationProvider(lastSeenVersion: widget.lastSeenVersion),
+      ),
     ],
     child: Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
@@ -125,24 +146,24 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
 
         return Consumer<SettingsProvider>(
           builder: (context, settingsProvider, _) {
-                return MaterialApp(
-                  title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
-                  debugShowCheckedModeBanner: false,
-                  theme: lightTheme.copyWith(textTheme: textTheme),
-                  darkTheme: darkTheme.copyWith(textTheme: textTheme),
-                  themeMode: themeProvider.themeMode,
-                  locale: settingsProvider.locale,
-                  localizationsDelegates: const [
-                    AppLocalizations.delegate,
-                    GlobalMaterialLocalizations.delegate,
-                    GlobalWidgetsLocalizations.delegate,
-                    GlobalCupertinoLocalizations.delegate,
-                  ],
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: _introCompleted
-                      ? MainNavigationScreen(key: mainNavKey)
-                      : IntroductionScreen(onComplete: _onIntroComplete),
-                );
+            return MaterialApp(
+              title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
+              debugShowCheckedModeBanner: false,
+              theme: lightTheme.copyWith(textTheme: textTheme),
+              darkTheme: darkTheme.copyWith(textTheme: textTheme),
+              themeMode: themeProvider.themeMode,
+              locale: settingsProvider.locale,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: _introCompleted
+                  ? MainNavigationScreen(key: mainNavKey)
+                  : IntroductionScreen(onComplete: _onIntroComplete),
+            );
           },
         );
       },
@@ -160,6 +181,9 @@ class MainNavigationScreen extends StatefulWidget {
 class MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
+  static const _navigationChannel = MethodChannel(
+    'com.veciata.tsmusic/navigation',
+  );
 
   final List<Widget> _pages = [
     const HomeScreen(),
@@ -172,13 +196,29 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _requestNotificationPermission();
+    _navigationChannel.setMethodCallHandler((call) {
+      switch (call.method) {
+        case 'openSearch':
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SearchScreen()),
+          );
+          return Future.value(true);
+        default:
+          return Future.value(false);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final musicProv = Provider.of<music_provider.MusicProvider>(
         context,
         listen: false,
       );
+      // Set up widget auto-update — fires on every notifyListeners
+      musicProv.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
       // Load from database first, then scan for new music in background
       _initializeMusic(musicProv);
+      // Check for GitHub releases and show update modal if new ones found.
+      _checkForUpdates();
     });
   }
 
@@ -200,6 +240,21 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       } catch (scanError) {
         debugPrint('Error during music scan: $scanError');
       }
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final provider = Provider.of<UpdateNotificationProvider>(
+        context,
+        listen: false,
+      );
+      final hasUpdates = await provider.checkForUpdates();
+      if (hasUpdates && mounted) {
+        await showUpdateNotificationModal(context);
+      }
+    } catch (e) {
+      debugPrint('Update check error: $e');
     }
   }
 
@@ -240,6 +295,32 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         return l10n.sql;
       default:
         return l10n.tsMusic;
+    }
+  }
+
+  void _onWidgetUpdate(music_provider.MusicProvider musicProv) {
+    try {
+      final youTubeService = Provider.of<YouTubeService>(
+        context,
+        listen: false,
+      );
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      HomeWidgetService.updatePlayerWidget(
+        currentSong: musicProv.currentSong,
+        isPlaying: musicProv.isPlaying,
+        isOnlinePlaying: youTubeService.isPlaying,
+        onlineTitle: youTubeService.currentAudio?.title,
+        onlineAuthor: youTubeService.currentAudio?.author,
+        isDarkMode: themeProvider.isDarkMode,
+      );
+      HomeWidgetService.updatePlaylistWidget(
+        currentSong: musicProv.currentSong,
+        queue: musicProv.queue,
+        isPlaying: musicProv.isPlaying,
+        isDarkMode: themeProvider.isDarkMode,
+      );
+    } catch (e) {
+      debugPrint('Widget update error: $e');
     }
   }
 

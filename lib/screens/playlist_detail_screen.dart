@@ -1,9 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/utils/format_utils.dart';
+import 'package:tsmusic/models/song.dart' as model;
+import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/utils/format_utils.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 
 class PlaylistDetailScreen extends StatefulWidget {
@@ -219,13 +225,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     Navigator.pop(context);
   }
 
-  String _formatDuration(int durationMs) {
-    final duration = Duration(milliseconds: durationMs);
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -319,7 +318,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(_formatDuration(song.duration)),
+                          Text(formatDurationFromMs(song.duration)),
                           if (_isEditMode)
                             const Icon(Icons.drag_handle, color: Colors.grey),
                         ],

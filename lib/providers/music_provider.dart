@@ -26,6 +26,18 @@ class MusicProvider extends ChangeNotifier {
 
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
+  VoidCallback? _onWidgetUpdateNeeded;
+
+  void setOnWidgetUpdateNeeded(VoidCallback callback) {
+    _onWidgetUpdateNeeded = callback;
+  }
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    _onWidgetUpdateNeeded?.call();
+  }
+
   void setYouTubeService(YouTubeService service) {
     _youTubeService = service;
     service.setStopOtherPlayerCallback(() => stop());
@@ -66,6 +78,10 @@ class MusicProvider extends ChangeNotifier {
   int _retryCount = 0;
   static const int _maxRetries = 3;
   static const int _baseRetryDelay = 3; // seconds
+
+  // Last played song for resume functionality
+  Song? _lastPlayedSong;
+  static const String _lastPlayedSongKey = 'last_played_song';
 
   // Cache for songs to avoid repeated database queries
   static final Map<String, Song> _songsMap = {};
@@ -147,11 +163,18 @@ class MusicProvider extends ChangeNotifier {
   ValueNotifier<bool> get loadingNotifier => _loadingNotifier;
   String? get error => _error;
 
+  final Color? _notificationColor;
+
   // ===== INITIALIZATION =====
-  MusicProvider() {
+  MusicProvider({Color? notificationColor}) : _notificationColor = notificationColor {
     // Listen to playlist mode changes
     _player.stream.playlistMode.listen((mode) {
       _loopMode = mode;
+      notifyListeners();
+    });
+
+    // Listen to playing state changes (e.g. from widget/notification)
+    _player.stream.playing.listen((_) {
       notifyListeners();
     });
 
@@ -189,8 +212,9 @@ class MusicProvider extends ChangeNotifier {
      debugPrint('_initialize: About to init AudioNotificationService...');
      try {
        debugPrint('_initialize: Calling AudioNotificationService.init()...');
-        await AudioNotificationService.init(
+         await AudioNotificationService.init(
           player: _player,
+          notificationColor: _notificationColor,
           onCurrentSongChanged: (song) {
             debugPrint('Notification song changed: ${song?.title}');
           },
@@ -216,8 +240,15 @@ class MusicProvider extends ChangeNotifier {
      }
      
      // Load Now Playing playlist first to show something immediately
-     debugPrint('_initialize: Loading Now Playing playlist...');
-     await _loadNowPlayingPlaylist();
+      debugPrint('_initialize: Loading Now Playing playlist...');
+      await _loadNowPlayingPlaylist();
+      
+      // Load last played song for resume functionality
+      debugPrint('_initialize: Loading last played song...');
+      _lastPlayedSong = await _loadLastPlayedSong();
+      if (_lastPlayedSong != null) {
+        debugPrint('_initialize: Last played song loaded: ${_lastPlayedSong!.title}');
+      }
      
      // Then load songs in the background
      debugPrint('_initialize: Loading local music in background...');
@@ -232,6 +263,12 @@ class MusicProvider extends ChangeNotifier {
 
   // ===== PLAYBACK CONTROLS =====
   Future<void> play() async {
+    // If no current song but have last played song, load it
+    if (currentSong == null && _lastPlayedSong != null) {
+      await playSong(_lastPlayedSong!);
+      return;
+    }
+    
     if (_playlist.isEmpty) return;
     try {
       _isLoading = true;
@@ -715,6 +752,11 @@ class MusicProvider extends ChangeNotifier {
       await _player.play();
       await _updateNotification();
       await _updateNowPlayingPlaylist();
+      
+      // Save as last played song
+      _lastPlayedSong = song;
+      _saveLastPlayedSong(song);
+      
       notifyListeners();
     }
   }
@@ -1198,6 +1240,33 @@ class MusicProvider extends ChangeNotifier {
         await audioHandler.pause();
       }
     }
+  }
+
+  /// Save last played song to SharedPreferences
+  Future<void> _saveLastPlayedSong(Song song) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastPlayedSongKey, jsonEncode(song.toJson()));
+      debugPrint('MusicProvider: Saved last played song: ${song.title}');
+    } catch (e) {
+      debugPrint('Error saving last played song: $e');
+    }
+  }
+
+  /// Load last played song from SharedPreferences
+  Future<Song?> _loadLastPlayedSong() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final songJson = prefs.getString(_lastPlayedSongKey);
+      if (songJson != null) {
+        final song = Song.fromJson(jsonDecode(songJson));
+        debugPrint('MusicProvider: Loaded last played song: ${song.title}');
+        return song;
+      }
+    } catch (e) {
+      debugPrint('Error loading last played song: $e');
+    }
+    return null;
   }
 
   /// Save songs to storage cache

@@ -13,11 +13,11 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : AudioServiceActivity() {
     private val STORAGE_PERMISSION_REQUEST_CODE = 1001
     private var resultCallback: MethodChannel.Result? = null
+    private var navigationChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
-        // Set up method channel for permission handling
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.veciata.tsmusic/permissions").setMethodCallHandler { call, result ->
             when (call.method) {
                 "requestStoragePermission" -> {
@@ -27,11 +27,28 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        navigationChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.veciata.tsmusic/navigation")
     }
-    
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleOpenSearchIntent(intent)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleOpenSearchIntent(intent)
+    }
+
+    private fun handleOpenSearchIntent(intent: android.content.Intent?) {
+        if (intent?.action == "com.veciata.tsmusic.OPEN_SEARCH") {
+            navigationChannel?.invokeMethod("openSearch", null)
+        }
+    }
+
     private fun requestStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // For Android 13+ (API 33+), use READ_MEDIA_AUDIO
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.READ_MEDIA_AUDIO
@@ -46,7 +63,6 @@ class MainActivity : AudioServiceActivity() {
                 resultCallback?.success(true)
             }
         } else {
-            // For older versions, use READ_EXTERNAL_STORAGE
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.READ_EXTERNAL_STORAGE
@@ -69,7 +85,7 @@ class MainActivity : AudioServiceActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        
+
         if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             resultCallback?.success(granted)

@@ -1,7 +1,8 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 
-/// Returns notification settings configuration for audio service
+const _defaultColor = Color(0xFF1DB954);
+
 AudioServiceConfig getNotificationSettings({
   String? channelId,
   String? channelName,
@@ -14,5 +15,5 @@ AudioServiceConfig getNotificationSettings({
   androidNotificationChannelDescription:
       channelDescription ?? 'TsMusic playback notification',
   androidShowNotificationBadge: showNotificationBadge ?? true,
-  notificationColor: notificationColor ?? Colors.blue,
+  notificationColor: notificationColor ?? _defaultColor,
 );

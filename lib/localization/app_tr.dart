@@ -357,4 +357,17 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get songsMoved => 'şarkı taşındı';
+
+  @override
+  String get whatsNew => "Yenilikler";
+
+  @override
+  String get gotIt => 'Anladım';
+
+  @override
+  String get updateCheckFailed =>
+      'Güncellemeler kontrol edilemedi. Bağlantınızı kontrol edin.';
+
+  @override
+  String get newUpdates => 'yeni güncelleme';
 }

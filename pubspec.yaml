@@ -2,7 +2,7 @@ name: tsmusic
 description: "A Flutter app for playing and downloading music."
 publish_to: "none"
 
-version: 1.1.7
+version: 1.1.8
 
 environment:
   sdk: ">=3.11.0 <4.0.0"
@@ -66,6 +66,9 @@ dependencies:
 
   # UI components
 
+  # Home Screen Widgets
+  home_widget: ^0.9.1
+
 dev_dependencies:
   integration_test:
     sdk: flutter
@@ -81,6 +84,9 @@ flutter_icons:
   android: true
   ios: true
   image_path: "assets/images/logo.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/images/logo.png"
+  adaptive_icon_padding: false
 
 flutter:
   uses-material-design: true

@@ -357,4 +357,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get permissionGrantedDesc =>
       'You can now access your music files. Tap Next to continue.';
+
+  @override
+  String get whatsNew => "What's New";
+
+  @override
+  String get gotIt => 'Got it';
+
+  @override
+  String get updateCheckFailed =>
+      'Could not check for updates. Please check your connection.';
+
+  @override
+  String get newUpdates => 'new updates';
 }

@@ -173,6 +173,12 @@ class AppLocalizations {
   // Theme settings
   String get highContrastAccent => throw UnimplementedError();
   String get highContrastAccentDesc => throw UnimplementedError();
+
+  // Update notification
+  String get whatsNew => throw UnimplementedError();
+  String get gotIt => throw UnimplementedError();
+  String get updateCheckFailed => throw UnimplementedError();
+  String get newUpdates => throw UnimplementedError();
 }
 
 class _AppLocalizationsDelegate

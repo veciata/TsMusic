@@ -1,23 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:tsmusic/models/song.dart';
-import 'package:tsmusic/providers/music_provider.dart';
+import 'package:tsmusic/models/style_params.dart';
 
-Widget buildModernStyle({
-  required ThemeData theme,
-  required MusicProvider musicProvider,
-  required Song currentSong,
-  required String? albumArtUrl,
-  required int duration,
-  required double currentPosition,
-  required Function(double) onSeek,
-  required VoidCallback togglePlay,
-  required String Function(int) formatDuration,
-  required Widget albumArt,
-  required Widget header,
-  required Widget progressBar,
-  required Widget playbackControls,
-  required Widget bottomControls,
-}) {
+Widget buildModernStyle(StyleParams params) {
+  final theme = params.theme;
+  final currentSong = params.currentSong;
+  final albumArtUrl = params.albumArtUrl;
+  final header = params.header;
+  final progressBar = params.progressBar;
+  final playbackControls = params.playbackControls;
+
   return Scaffold(
     backgroundColor: Colors.black,
     body: Stack(

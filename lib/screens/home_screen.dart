@@ -1,16 +1,19 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
-
+import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
-import 'package:tsmusic/widgets/skeleton_widgets.dart';
+import 'package:tsmusic/utils/format_utils.dart';
+import 'package:tsmusic/widgets/song_thumbnail.dart';
 import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
-import 'package:tsmusic/localization/app_localizations.dart';
+import 'package:tsmusic/widgets/skeleton_widgets.dart';
 
 import 'search_screen.dart';
 import 'artist_detail_screen.dart';
@@ -71,8 +74,11 @@ class _HomeScreenState extends State<HomeScreen>
 
       String getNormalizedPath(String filePath) {
         try {
-          String path =
-              filePath.split('?')[0].split('#')[0].toLowerCase().trim();
+          String path = filePath
+              .split('?')[0]
+              .split('#')[0]
+              .toLowerCase()
+              .trim();
           const String emulatedPrefix = '/storage/emulated/0/';
           if (path.startsWith(emulatedPrefix)) {
             path = '/sdcard/${path.substring(emulatedPrefix.length)}';
@@ -143,15 +149,10 @@ class _HomeScreenState extends State<HomeScreen>
     return artists.join(' & ');
   }
 
-  String _formatDuration(int durationMs) {
-    final duration = Duration(milliseconds: durationMs);
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-
   Widget _buildFilterBar(
-      music_provider.MusicProvider musicProvider, BuildContext context) {
+    music_provider.MusicProvider musicProvider,
+    BuildContext context,
+  ) {
     final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -170,8 +171,10 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         const Icon(Icons.sort_by_alpha, size: 18),
                         const SizedBox(width: 8),
-                        Text(l10n.sortByTitle,
-                            style: Theme.of(context).textTheme.bodySmall),
+                        Text(
+                          l10n.sortByTitle,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                     ),
                   ),
@@ -181,8 +184,10 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         const Icon(Icons.person, size: 18),
                         const SizedBox(width: 8),
-                        Text(l10n.sortByArtist,
-                            style: Theme.of(context).textTheme.bodySmall),
+                        Text(
+                          l10n.sortByArtist,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                     ),
                   ),
@@ -192,8 +197,10 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         const Icon(Icons.calendar_today, size: 18),
                         const SizedBox(width: 8),
-                        Text(l10n.sortByDate,
-                            style: Theme.of(context).textTheme.bodySmall),
+                        Text(
+                          l10n.sortByDate,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                     ),
                   ),
@@ -214,8 +221,9 @@ class _HomeScreenState extends State<HomeScreen>
               size: 20,
             ),
             onPressed: () => musicProvider.toggleSortDirection(),
-            tooltip:
-                musicProvider.sortAscending ? l10n.ascending : l10n.descending,
+            tooltip: musicProvider.sortAscending
+                ? l10n.ascending
+                : l10n.descending,
           ),
           IconButton(
             icon: const Icon(Icons.refresh, size: 20),
@@ -245,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen>
                 });
               },
             )
-          : _buildSongThumbnail(song),
+          : SongThumbnail(song: song, size: 40),
       title: SlidingText(
         song.title.isNotEmpty ? song.title : l10n.unknownTitle,
         style: Theme.of(context).textTheme.titleMedium,
@@ -255,19 +263,17 @@ class _HomeScreenState extends State<HomeScreen>
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.color
-                  ?.withValues(alpha: 0.7),
-            ),
+          color: Theme.of(
+            context,
+          ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+        ),
       ),
       trailing: _isMultiSelectMode
           ? null
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_formatDuration(song.duration)),
+                Text(formatDurationFromMs(song.duration)),
                 PopupMenuButton<String>(
                   onSelected: (value) =>
                       _handleSongAction(value, song, musicProvider),
@@ -276,37 +282,39 @@ class _HomeScreenState extends State<HomeScreen>
                       value: 'move',
                       child: Row(
                         children: [
-                    const Icon(Icons.drive_file_move_outline),
-                    const SizedBox(width: 8),
-                    Text(l10n.move),
+                          const Icon(Icons.drive_file_move_outline),
+                          const SizedBox(width: 8),
+                          Text(l10n.move),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete_outline, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text(
+                            l10n.delete,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'add_to_playlist',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.playlist_add),
+                          const SizedBox(width: 8),
+                          Text(l10n.addToPlaylist),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete_outline, color: Colors.red),
-                    const SizedBox(width: 8),
-                    Text(l10n.delete,
-                        style: const TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'add_to_playlist',
-                child: Row(
-                  children: [
-                    const Icon(Icons.playlist_add),
-                    const SizedBox(width: 8),
-                    Text(l10n.addToPlaylist),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
       onTap: _isMultiSelectMode
           ? () {
               setState(() {
@@ -375,7 +383,8 @@ class _HomeScreenState extends State<HomeScreen>
       builder: (context) => AlertDialog(
         title: Text(l10n.delete),
         content: Text(
-            '${l10n.confirmDelete} ${_selectedSongs.length} ${l10n.songs}?'),
+          '${l10n.confirmDelete} ${_selectedSongs.length} ${l10n.songs}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -383,16 +392,17 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.delete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      final musicProvider =
-          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProvider = Provider.of<music_provider.MusicProvider>(
+        context,
+        listen: false,
+      );
       for (final id in _selectedSongs) {
         final song = musicProvider.songs.where((s) => s.id == id).firstOrNull;
         if (song != null) {
@@ -409,13 +419,18 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _moveSelectedSongs(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
-      {'label': l10n.internalStorage, 'path': '/storage/emulated/0/Music/tsmusic'},
+      {
+        'label': l10n.internalStorage,
+        'path': '/storage/emulated/0/Music/tsmusic',
+      },
       {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
       {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music'},
     ];
 
-    final musicProvider =
-        Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(
+      context,
+      listen: false,
+    );
 
     final selectedPath = await showDialog<String>(
       context: context,
@@ -424,10 +439,12 @@ class _HomeScreenState extends State<HomeScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: locations
-              .map((loc) => ListTile(
-                    title: Text(loc['label']!),
-                    onTap: () => Navigator.pop(context, loc['path']),
-                  ))
+              .map(
+                (loc) => ListTile(
+                  title: Text(loc['label']!),
+                  onTap: () => Navigator.pop(context, loc['path']),
+                ),
+              )
               .toList(),
         ),
       ),
@@ -471,47 +488,9 @@ class _HomeScreenState extends State<HomeScreen>
           SnackBar(
             content: Text('${_selectedSongs.length} ${l10n.songsMoved}'),
           ),
-        );
+          );
       }
     }
-  }
-
-  Widget _buildSongThumbnail(Song song) {
-    if (song.localThumbnailPath != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.file(
-          File(song.localThumbnailPath!),
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Icon(Icons.music_note),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: song.tags.contains('tsmusic')
-          ? const Icon(Icons.download_done, color: Colors.green)
-          : song.url.startsWith('/storage/emulated/0') ||
-                  song.url.startsWith('/data/user/')
-              ? const Icon(Icons.folder, color: Colors.orange)
-              : const Icon(Icons.music_note),
-    );
   }
 
   Widget _buildNoMusicFound() {
@@ -561,7 +540,9 @@ class _HomeScreenState extends State<HomeScreen>
               final song = sortedSongs[index];
               return TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0.0, end: 1.0),
-                duration: Duration(milliseconds: 300 + (index * 50).clamp(0, 500)),
+                duration: Duration(
+                  milliseconds: 300 + (index * 50).clamp(0, 500),
+                ),
                 builder: (context, value, child) {
                   return Opacity(
                     opacity: value,
@@ -636,10 +617,12 @@ class _HomeScreenState extends State<HomeScreen>
               children: [
                 CircleAvatar(
                   radius: 40,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                  backgroundImage:
-                      imageUrl != null ? NetworkImage(imageUrl) : null,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.2),
+                  backgroundImage: imageUrl != null
+                      ? NetworkImage(imageUrl)
+                      : null,
                   child: imageUrl == null
                       ? Icon(
                           Icons.person,
@@ -659,12 +642,10 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   '${artistSongs.length} ${l10n.songs.toLowerCase()}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.color
-                            ?.withValues(alpha: 0.7),
-                      ),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
@@ -742,13 +723,18 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.queue_music,
-                          size: 64, color: Colors.grey),
+                      const Icon(
+                        Icons.queue_music,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         l10n.noPlaylists,
                         style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -762,10 +748,9 @@ class _HomeScreenState extends State<HomeScreen>
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .secondary
-                              .withValues(alpha: 0.1),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.secondary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -782,15 +767,18 @@ class _HomeScreenState extends State<HomeScreen>
                             )
                           : null,
                       trailing: IconButton(
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
                         onPressed: () async {
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: Text(l10n.deletePlaylist),
                               content: Text(
-                                  '${l10n.confirmDelete} "${playlist['name']}"?'),
+                                '${l10n.confirmDelete} "${playlist['name']}"?',
+                              ),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
@@ -800,15 +788,17 @@ class _HomeScreenState extends State<HomeScreen>
                                 TextButton(
                                   onPressed: () => Navigator.pop(context, true),
                                   style: TextButton.styleFrom(
-                                      foregroundColor: Colors.red),
+                                    foregroundColor: Colors.red,
+                                  ),
                                   child: Text(l10n.delete),
                                 ),
                               ],
                             ),
                           );
                           if (confirmed == true) {
-                            await DatabaseHelper()
-                                .deletePlaylist(playlist['id'] as int);
+                            await DatabaseHelper().deletePlaylist(
+                              playlist['id'] as int,
+                            );
                             await _loadPlaylists();
                           }
                         },
@@ -839,89 +829,116 @@ class _HomeScreenState extends State<HomeScreen>
     final l10n = AppLocalizations.of(context);
 
     if (musicProvider.isLoading) {
-      return const SkeletonHomeScreen();
+      return SkeletonHomeScreen();
     }
 
     if (musicProvider.error != null && musicProvider.songs.isEmpty) {
-      return Scaffold(
-        appBar: _isMultiSelectMode ? _buildMultiSelectAppBar(l10n) : null,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.music_off, size: 64, color: Colors.grey),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.noMusicFound,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Download music from YouTube',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                      ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () => musicProvider.refreshSongs(),
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.tryAgain),
-                ),
-              ],
+      return PopScope(
+        canPop: !_isMultiSelectMode,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_isMultiSelectMode) {
+            setState(() {
+              _isMultiSelectMode = false;
+              _selectedSongs.clear();
+            });
+          }
+        },
+        child: Scaffold(
+          appBar: _isMultiSelectMode ? _buildMultiSelectAppBar(l10n) : null,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.music_off, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.noMusicFound,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Download music from YouTube',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => musicProvider.refreshSongs(),
+                    icon: const Icon(Icons.refresh),
+                    label: Text(l10n.tryAgain),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       );
     }
 
-    return Scaffold(
-      appBar: _isMultiSelectMode ? _buildMultiSelectAppBar(l10n) : null,
-      body: Column(
-        children: [
-          TabBar(
-            controller: _tabController,
-            tabs: [
-              Tab(text: l10n.music),
-              Tab(text: l10n.artists),
-              Tab(text: l10n.playlists),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
+    return PopScope(
+      canPop: !_isMultiSelectMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_isMultiSelectMode) {
+          setState(() {
+            _isMultiSelectMode = false;
+            _selectedSongs.clear();
+          });
+        }
+      },
+      child: Scaffold(
+        appBar: _isMultiSelectMode ? _buildMultiSelectAppBar(l10n) : null,
+        body: Column(
+          children: [
+            TabBar(
               controller: _tabController,
-              children: [
-                _buildMusicTab(musicProvider),
-                _buildArtistsTab(musicProvider),
-                _buildPlaylistsTab(musicProvider),
+              tabs: [
+                Tab(text: l10n.music),
+                Tab(text: l10n.artists),
+                Tab(text: l10n.playlists),
               ],
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _tabController.animation!,
-        builder: (context, child) {
-          final value = _tabController.animation!.value;
-          if (value < 1.0) return const SizedBox.shrink();
-          
-          return Transform.scale(
-            scale: (value - 1.0).clamp(0.0, 1.0),
-            child: FloatingActionButton(
-              onPressed: _showCreatePlaylistDialog,
-              tooltip: l10n.createPlaylist,
-              child: const Icon(Icons.add),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMusicTab(musicProvider),
+                  _buildArtistsTab(musicProvider),
+                  _buildPlaylistsTab(musicProvider),
+                ],
+              ),
             ),
-          );
-        },
+          ],
+        ),
+        floatingActionButton: AnimatedBuilder(
+          animation: _tabController.animation!,
+          builder: (context, child) {
+            final value = _tabController.animation!.value;
+            if (value < 1.0) return const SizedBox.shrink();
+
+            return Transform.scale(
+              scale: (value - 1.0).clamp(0.0, 1.0),
+              child: FloatingActionButton(
+                onPressed: _showCreatePlaylistDialog,
+                tooltip: l10n.createPlaylist,
+                child: const Icon(Icons.add),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   void _handleSongAction(
-      String action, Song song, music_provider.MusicProvider provider) async {
+    String action,
+    Song song,
+    music_provider.MusicProvider provider,
+  ) async {
     switch (action) {
       case 'move':
         await _showMoveDialog(song);
@@ -938,7 +955,10 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _showMoveDialog(Song song) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
-      {'label': l10n.internalStorage, 'path': '/storage/emulated/0/Music/tsmusic'},
+      {
+        'label': l10n.internalStorage,
+        'path': '/storage/emulated/0/Music/tsmusic',
+      },
       {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
       {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music/tsmusic'},
     ];
@@ -950,10 +970,12 @@ class _HomeScreenState extends State<HomeScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: locations
-              .map((loc) => ListTile(
-                    title: Text(loc['label']!),
-                    onTap: () => Navigator.pop(context, loc['path']),
-                  ))
+              .map(
+                (loc) => ListTile(
+                  title: Text(loc['label']!),
+                  onTap: () => Navigator.pop(context, loc['path']),
+                ),
+              )
               .toList(),
         ),
       ),
@@ -966,7 +988,7 @@ class _HomeScreenState extends State<HomeScreen>
         if (!await targetDir.exists()) {
           await targetDir.create(recursive: true);
         }
-        
+
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
         try {
@@ -976,9 +998,9 @@ class _HomeScreenState extends State<HomeScreen>
           await file.delete();
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.move}: $selected')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${l10n.move}: $selected')));
         }
       } catch (e) {
         if (mounted) {
@@ -991,7 +1013,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _showDeleteConfirmation(
-      Song song, music_provider.MusicProvider provider) async {
+    Song song,
+    music_provider.MusicProvider provider,
+  ) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1016,15 +1040,15 @@ class _HomeScreenState extends State<HomeScreen>
       try {
         await provider.deleteSong(song);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.songDeleted)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.songDeleted)));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.error}: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${l10n.error}: $e')));
         }
       }
     }
