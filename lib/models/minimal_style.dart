@@ -1,24 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:tsmusic/models/song.dart';
-import 'package:tsmusic/providers/music_provider.dart';
+import 'package:tsmusic/models/style_params.dart';
 
-Widget buildMinimalStyle({
-  required ThemeData theme,
-  required MusicProvider musicProvider,
-  required Song currentSong,
-  required String? albumArtUrl,
-  required int duration,
-  required double currentPosition,
-  required Function(double) onSeek,
-  required VoidCallback togglePlay,
-  required String Function(int) formatDuration,
-  required Widget albumArt,
-  required Widget header,
-  required Widget progressBar,
-  required Widget playbackControls,
-  required Widget bottomControls,
-  VoidCallback? onQueuePressed,
-}) {
+Widget buildMinimalStyle(StyleParams params) {
+  final theme = params.theme;
+  final musicProvider = params.musicProvider;
+  final currentSong = params.currentSong;
+  final albumArt = params.albumArt;
+  final progressBar = params.progressBar;
+  final bottomControls = params.bottomControls;
+  final togglePlay = params.togglePlay;
+
   return Material(
     color: Colors.transparent,
     child: Stack(

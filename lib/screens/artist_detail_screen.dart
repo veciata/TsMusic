@@ -16,6 +16,7 @@ import 'package:tsmusic/widgets/mini_player_widget.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
+import 'package:tsmusic/widgets/song_thumbnail.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
@@ -381,7 +382,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                           });
                         },
                       )
-                    : _buildSongThumbnail(song),
+                    : SongThumbnail(song: song, size: 50, borderRadius: 4.0),
                 title: SlidingText(
                   song.title,
                   style: TextStyle(
@@ -410,38 +411,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         ),
       ],
     );
-  }
-
-  Widget _buildSongThumbnail(Song song) {
-    if (song.localThumbnailPath != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4.0),
-        child: Image.file(
-          File(song.localThumbnailPath!),
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.music_note, size: 50),
-        ),
-      );
-    }
-
-    if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4.0),
-        child: CachedNetworkImage(
-          imageUrl: song.albumArtUrl!,
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
-          errorWidget: (context, url, error) =>
-              const Icon(Icons.music_note, size: 50),
-        ),
-      );
-    }
-
-    return const Icon(Icons.music_note, size: 50);
   }
 
   Widget _buildYouTubeTab() {

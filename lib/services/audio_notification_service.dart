@@ -186,6 +186,7 @@ class AudioNotificationService {
     required Function(bool) onPlaybackStateChanged,
     Function()? onSkipToNext,
     Function()? onSkipToPrevious,
+    Color? notificationColor,
   }) async {
     debugPrint('AudioNotificationService: init() called');
     try {
@@ -206,7 +207,9 @@ class AudioNotificationService {
              onSkipToNext: onSkipToNext,
              onSkipToPrevious: onSkipToPrevious,
            ),
-           config: getNotificationSettings(),
+            config: getNotificationSettings(
+              notificationColor: notificationColor,
+            ),
          );
         debugPrint('AudioNotificationService: AudioService.init() returned handler=$_audioHandler');
         

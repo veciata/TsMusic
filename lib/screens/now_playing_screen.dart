@@ -5,8 +5,10 @@ import 'package:media_kit/media_kit.dart';
 import 'package:tsmusic/providers/music_provider.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/models/player_styles.dart';
+import 'package:tsmusic/models/style_params.dart';
 import 'package:tsmusic/widgets/now_playing_queue_bottom_sheet.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
+import 'package:tsmusic/utils/format_utils.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -62,12 +64,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     _albumArtController?.dispose();
     _positionSubscription?.cancel();
     super.dispose();
-  }
-
-  String _formatDuration(int seconds) {
-    final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
-    final remainingSeconds = (seconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$remainingSeconds';
   }
 
   Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title,
@@ -227,123 +223,44 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final playbackControls = _buildPlaybackControls(theme, musicProvider);
     final bottomControls = _buildBottomControls(theme, musicProvider);
 
+    final params = StyleParams(
+      theme: theme,
+      musicProvider: musicProvider,
+      currentSong: currentSong,
+      albumArtUrl: albumArtUrl,
+      duration: duration,
+      currentPosition: _currentPosition,
+      onSeek: (value) {
+        setState(() {
+          _currentPosition = value;
+          _isDragging = true;
+        });
+      },
+      togglePlay: () {
+        if (musicProvider.isPlaying) {
+          musicProvider.pause();
+        } else {
+          musicProvider.play();
+        }
+        _startOrStopAnimation();
+      },
+      formatDuration: formatDurationFromSeconds,
+      albumArt: albumArt,
+      header: header,
+      progressBar: progressBar,
+      playbackControls: playbackControls,
+      bottomControls: bottomControls,
+    );
+
     switch (playerStyle) {
       case PlayerStyle.classic:
-        return buildClassicStyle(
-          theme: theme,
-          musicProvider: musicProvider,
-          currentSong: currentSong,
-          albumArtUrl: albumArtUrl,
-          duration: duration,
-          currentPosition: _currentPosition,
-          onSeek: (value) {
-            setState(() {
-              _currentPosition = value;
-              _isDragging = true;
-            });
-          },
-          togglePlay: () {
-            if (musicProvider.isPlaying) {
-              musicProvider.pause();
-            } else {
-              musicProvider.play();
-            }
-            _startOrStopAnimation();
-          },
-          formatDuration: _formatDuration,
-          albumArt: albumArt,
-          header: header,
-          progressBar: progressBar,
-          playbackControls: playbackControls,
-          bottomControls: bottomControls,
-        );
+        return buildClassicStyle(params);
       case PlayerStyle.modern:
-        return buildModernStyle(
-          theme: theme,
-          musicProvider: musicProvider,
-          currentSong: currentSong,
-          albumArtUrl: albumArtUrl,
-          duration: duration,
-          currentPosition: _currentPosition,
-          onSeek: (value) {
-            setState(() {
-              _currentPosition = value;
-              _isDragging = true;
-            });
-          },
-          togglePlay: () {
-            if (musicProvider.isPlaying) {
-              musicProvider.pause();
-            } else {
-              musicProvider.play();
-            }
-            _startOrStopAnimation();
-          },
-          formatDuration: _formatDuration,
-          albumArt: albumArt,
-          header: header,
-          progressBar: progressBar,
-          playbackControls: playbackControls,
-          bottomControls: bottomControls,
-        );
+        return buildModernStyle(params);
       case PlayerStyle.compact:
-        return buildCompactStyle(
-          theme: theme,
-          musicProvider: musicProvider,
-          currentSong: currentSong,
-          albumArtUrl: albumArtUrl,
-          duration: duration,
-          currentPosition: _currentPosition,
-          onSeek: (value) {
-            setState(() {
-              _currentPosition = value;
-              _isDragging = true;
-            });
-          },
-          togglePlay: () {
-            if (musicProvider.isPlaying) {
-              musicProvider.pause();
-            } else {
-              musicProvider.play();
-            }
-            _startOrStopAnimation();
-          },
-          formatDuration: _formatDuration,
-          albumArt: albumArt,
-          header: header,
-          progressBar: progressBar,
-          playbackControls: playbackControls,
-          bottomControls: bottomControls,
-        );
+        return buildCompactStyle(params);
       case PlayerStyle.minimal:
-        return buildMinimalStyle(
-          theme: theme,
-          musicProvider: musicProvider,
-          currentSong: currentSong,
-          albumArtUrl: albumArtUrl,
-          duration: duration,
-          currentPosition: _currentPosition,
-          onSeek: (value) {
-            setState(() {
-              _currentPosition = value;
-              _isDragging = true;
-            });
-          },
-          togglePlay: () {
-            if (musicProvider.isPlaying) {
-              musicProvider.pause();
-            } else {
-              musicProvider.play();
-            }
-            _startOrStopAnimation();
-          },
-          formatDuration: _formatDuration,
-          albumArt: albumArt,
-          header: header,
-          progressBar: progressBar,
-          playbackControls: playbackControls,
-          bottomControls: bottomControls,
-        );
+        return buildMinimalStyle(params);
     }
   }
 
@@ -404,8 +321,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_formatDuration(_currentPosition.toInt())),
-                Text(_formatDuration(duration)),
+                Text(formatDurationFromSeconds(_currentPosition.toInt())),
+                Text(formatDurationFromSeconds(duration)),
               ],
             ),
           ),
