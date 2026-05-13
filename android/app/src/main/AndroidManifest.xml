@@ -73,6 +73,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.LAUNCH" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -118,18 +121,6 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/simple_player_widget_info" />
-        </receiver>
-
-        <!-- Home Widget: Now Playing Playlist Widget -->
-        <receiver android:name=".NowPlayingPlaylistWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.veciata.tsmusic.TOGGLE_PLAYLIST" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/now_playing_playlist_widget_info" />
         </receiver>
 
         <!-- Home Widget Background Receiver for interactive widgets -->

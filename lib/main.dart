@@ -199,10 +199,8 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
     _navigationChannel.setMethodCallHandler((call) {
       switch (call.method) {
         case 'openSearch':
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SearchScreen()),
-          );
+          final query = call.arguments as String?;
+          _openSearch(query);
           return Future.value(true);
         default:
           return Future.value(false);
@@ -220,6 +218,15 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       // Check for GitHub releases and show update modal if new ones found.
       _checkForUpdates();
     });
+  }
+
+  void _openSearch([String? query]) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchScreen(initialQuery: query),
+      ),
+    );
   }
 
   Future<void> _initializeMusic(music_provider.MusicProvider musicProv) async {
@@ -305,20 +312,17 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         listen: false,
       );
       final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      final isDarkMode = themeProvider.isDarkMode;
       HomeWidgetService.updatePlayerWidget(
         currentSong: musicProv.currentSong,
         isPlaying: musicProv.isPlaying,
         isOnlinePlaying: youTubeService.isPlaying,
         onlineTitle: youTubeService.currentAudio?.title,
         onlineAuthor: youTubeService.currentAudio?.author,
-        isDarkMode: themeProvider.isDarkMode,
+        isDarkMode: isDarkMode,
       );
-      HomeWidgetService.updatePlaylistWidget(
-        currentSong: musicProv.currentSong,
-        queue: musicProv.queue,
-        isPlaying: musicProv.isPlaying,
-        isDarkMode: themeProvider.isDarkMode,
-      );
+      HomeWidgetService.updateSearchWidget(isDarkMode: isDarkMode);
+
     } catch (e) {
       debugPrint('Widget update error: $e');
     }

@@ -3,6 +3,7 @@ package com.veciata.tsmusic
 import android.os.Build
 import android.os.Bundle
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -43,7 +44,8 @@ class MainActivity : AudioServiceActivity() {
 
     private fun handleOpenSearchIntent(intent: android.content.Intent?) {
         if (intent?.action == "com.veciata.tsmusic.OPEN_SEARCH") {
-            navigationChannel?.invokeMethod("openSearch", null)
+            val query = intent.getStringExtra(Intent.EXTRA_TEXT)
+            navigationChannel?.invokeMethod("openSearch", query)
         }
     }
 

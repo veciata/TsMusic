@@ -1,18 +1,36 @@
-import 'dart:async';
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:tsmusic/models/song.dart';
 
 class HomeWidgetService {
   static const String _playerWidgetClass = 'com.veciata.tsmusic.SimplePlayerWidgetProvider';
-  static const String _playlistWidgetClass = 'com.veciata.tsmusic.NowPlayingPlaylistWidgetProvider';
+  static const String _searchWidgetClass = 'com.veciata.tsmusic.SearchWidgetProvider';
 
   static Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId('group.com.veciata.tsmusic');
     } catch (e) {
       debugPrint('HomeWidgetService.init error: $e');
+    }
+  }
+
+  static Future<void> updateSearchWidget({bool isDarkMode = false}) async {
+    try {
+      const width = 300.0;
+      const height = 56.0;
+      final widget = _SearchBarPreview(isDarkMode: isDarkMode);
+
+      final path = await HomeWidget.renderFlutterWidget(
+        SizedBox(width: width, height: height, child: widget),
+        key: 'search_widget_image',
+        logicalSize: const Size(width, height),
+      );
+
+      await HomeWidget.saveWidgetData<String>('search_widget_image', path);
+      await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
+      await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
+    } catch (e) {
+      debugPrint('HomeWidgetService.updateSearchWidget error: $e');
     }
   }
 
@@ -57,51 +75,38 @@ class HomeWidgetService {
       debugPrint('HomeWidgetService.updatePlayerWidget error: $e');
     }
   }
+}
 
-  static Future<void> updatePlaylistWidget({
-    required Song? currentSong,
-    required List<Song> queue,
-    required bool isPlaying,
-    required bool isDarkMode,
-  }) async {
-    try {
-      final String title;
-      final String artist;
+class _SearchBarPreview extends StatelessWidget {
+  final bool isDarkMode;
 
-      if (currentSong != null) {
-        title = currentSong.title;
-        artist = currentSong.artists.isNotEmpty
-            ? currentSong.artists.join(' & ')
-            : '';
-      } else {
-        title = 'TS Music';
-        artist = 'Not playing';
-      }
+  const _SearchBarPreview({required this.isDarkMode});
 
-      final int currentIndex = currentSong != null
-          ? queue.indexOf(currentSong)
-          : 0;
-      final list = <Map<String, dynamic>>[];
-      for (var i = 0; i < queue.length; i++) {
-        final song = queue[i];
-        list.add({
-          'title': song.title,
-          'artist': song.artists.isNotEmpty ? song.artists.join(' & ') : '',
-          'isCurrent': i == currentIndex,
-        });
-      }
-      final playlistJson = jsonEncode(list);
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+    final iconColor = isDarkMode ? Colors.white70 : Colors.black54;
+    final hintColor = isDarkMode ? Colors.white38 : Colors.black38;
 
-      await HomeWidget.saveWidgetData<String>('widget_title', title);
-      await HomeWidget.saveWidgetData<String>('widget_artist', artist);
-      await HomeWidget.saveWidgetData<bool>(
-          'widget_is_playing', isPlaying);
-      await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
-      await HomeWidget.saveWidgetData<String>('playlist_json', playlistJson);
-
-      await HomeWidget.updateWidget(qualifiedAndroidName: _playlistWidgetClass);
-    } catch (e) {
-      debugPrint('HomeWidgetService.updatePlaylistWidget error: $e');
-    }
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode ? Colors.white24 : Colors.black12,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Icon(Icons.search, color: iconColor, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            'Search songs...',
+            style: TextStyle(color: hintColor, fontSize: 13),
+          ),
+        ],
+      ),
+    );
   }
 }

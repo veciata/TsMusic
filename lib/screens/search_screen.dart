@@ -12,7 +12,9 @@ import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialQuery;
+
+  const SearchScreen({super.key, this.initialQuery});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -41,6 +43,12 @@ class _SearchScreenState extends State<SearchScreen> {
     _youtubePlayer.registerScreen('search_screen');
     _searchFocusNode.requestFocus();
     _scrollController.addListener(_onScroll);
+
+    final initialQuery = widget.initialQuery;
+    if (initialQuery != null && initialQuery.isNotEmpty) {
+      _searchController.text = initialQuery;
+      _searchYouTube(initialQuery);
+    }
     
     // Check initial connectivity status
     _checkConnectivity();
