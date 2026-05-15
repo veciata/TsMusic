@@ -19,7 +19,7 @@ Widget buildMinimalStyle(StyleParams params) {
 
         // Gradient overlay
         Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -27,7 +27,7 @@ Widget buildMinimalStyle(StyleParams params) {
                 Colors.transparent,
                 Colors.black87,
               ],
-              stops: const [0.5, 1.0],
+              stops: [0.5, 1.0],
             ),
           ),
         ),

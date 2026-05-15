@@ -19,7 +19,7 @@ Widget buildModernStyle(StyleParams params) {
             child: Image.network(
               albumArtUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   Container(color: theme.colorScheme.surface),
             ),
           )

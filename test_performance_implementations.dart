@@ -84,7 +84,7 @@ void testPaginationService() {
   print('✅ Pagination Service test passed');
 }
 
-void paginateAndPrint(PaginatedSongsService service, int pageNumber) async {
+Future<void> paginateAndPrint(PaginatedSongsService service, int pageNumber) async {
   final result = await service.loadPage(pageNumber);
   print('Page $pageNumber: ${result.items.length} songs, '
       'Total: ${result.totalCount}, Has more: ${result.hasMore}');

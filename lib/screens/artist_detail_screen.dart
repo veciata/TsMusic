@@ -260,7 +260,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
             expandedHeight: 200,
-            floating: false,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(widget.artistName),
@@ -306,7 +305,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           ? FloatingActionButton(
               onPressed: _selectedLocalSongs.isEmpty
                   ? null
-                  : () => _deleteSelectedLocalSongs(),
+                  : _deleteSelectedLocalSongs,
               backgroundColor: Colors.red,
               child: const Icon(Icons.delete),
             )
@@ -382,7 +381,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                           });
                         },
                       )
-                    : SongThumbnail(song: song, size: 50, borderRadius: 4.0),
+                    : SongThumbnail(song: song),
                 title: SlidingText(
                   song.title,
                   style: TextStyle(
@@ -415,10 +414,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
   Widget _buildYouTubeTab() {
     final l10n = AppLocalizations.of(context);
-    if (_isLoading && _youtubeSongs.isEmpty)
+    if (_isLoading && _youtubeSongs.isEmpty) {
       return const Center(child: CircularProgressIndicator());
-    if (_youtubeSongs.isEmpty)
+    }
+    if (_youtubeSongs.isEmpty) {
       return Center(child: Text(l10n.noOnlineSongsFound));
+    }
 
     return ListView.builder(
       controller: _scrollController,
@@ -454,15 +455,11 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
+      BuildContext context, double shrinkOffset, bool overlapsContent) => Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: tabBar,
     );
-  }
 
   @override
-  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
 }

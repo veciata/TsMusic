@@ -348,13 +348,11 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildYouTubeResultItem(YouTubeAudio audio) {
-    return YouTubePlaybackWidget(
+  Widget _buildYouTubeResultItem(YouTubeAudio audio) => YouTubePlaybackWidget(
       audio: audio,
       onPlay: _playAudio,
       onDownload: _handleDownload,
     );
-  }
 
   @override
   Widget build(BuildContext context) {

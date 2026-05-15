@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/search_4x1_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="4dp">
+
+    <TextView
+        android:id="@+id/search_4x1_label"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_search_edittext_bg_light"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:singleLine="true"
+        android:text="Search songs..."
+        android:textColorHint="#99000000"
+        android:textSize="14sp" />
+
+    <ImageButton
+        android:id="@+id/search_4x1_button"
+        android:layout_width="40dp"
+        android:layout_height="match_parent"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Search"
+        android:scaleType="centerInside"
+        android:src="@drawable/preview_search" />
+
+</LinearLayout>

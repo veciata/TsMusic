@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/search_root"
+    android:id="@+id/search_2x1_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center"
@@ -8,10 +8,11 @@
     android:padding="8dp">
 
     <ImageView
-        android:id="@+id/search_image"
+        android:id="@+id/search_2x1_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:contentDescription="Search"
         android:scaleType="fitCenter"
-        android:contentDescription="Search" />
+        android:src="@drawable/preview_search" />
 
 </LinearLayout>

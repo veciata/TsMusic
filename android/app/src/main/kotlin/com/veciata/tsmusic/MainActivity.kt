@@ -37,12 +37,12 @@ class MainActivity : AudioServiceActivity() {
         handleOpenSearchIntent(intent)
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleOpenSearchIntent(intent)
     }
 
-    private fun handleOpenSearchIntent(intent: android.content.Intent?) {
+    private fun handleOpenSearchIntent(intent: Intent?) {
         if (intent?.action == "com.veciata.tsmusic.OPEN_SEARCH") {
             val query = intent.getStringExtra(Intent.EXTRA_TEXT)
             navigationChannel?.invokeMethod("openSearch", query)
@@ -54,8 +54,7 @@ class MainActivity : AudioServiceActivity() {
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.READ_MEDIA_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-            ) {
+            ) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(Manifest.permission.READ_MEDIA_AUDIO),
@@ -68,8 +67,7 @@ class MainActivity : AudioServiceActivity() {
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.READ_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-            ) {
+            ) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),

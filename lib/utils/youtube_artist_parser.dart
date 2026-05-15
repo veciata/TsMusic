@@ -41,7 +41,7 @@ class YouTubeArtistParser {
           caseSensitive: false,
         ).firstMatch(title);
 
-        List<String> artists = [];
+        final List<String> artists = [];
 
         // Always add main artist first
         if (mainArtistFromPattern != null && mainArtistFromPattern.isNotEmpty) {

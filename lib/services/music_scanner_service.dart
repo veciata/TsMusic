@@ -265,7 +265,7 @@ class MusicScannerService {
       {
         'name': albumName,
         'artist_id': artistId,
-        if (year != null) 'year': year,
+        'year': ?year,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );

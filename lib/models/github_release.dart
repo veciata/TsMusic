@@ -27,8 +27,7 @@ class GitHubRelease {
   }
 
   /// Create from GitHub API JSON.
-  factory GitHubRelease.fromJson(Map<String, dynamic> json) {
-    return GitHubRelease(
+  factory GitHubRelease.fromJson(Map<String, dynamic> json) => GitHubRelease(
       tagName: json['tag_name'] as String? ?? '',
       name: json['name'] as String? ?? '',
       body: json['body'] as String? ?? '',
@@ -38,5 +37,4 @@ class GitHubRelease {
           DateTime.now(),
       isPrerelease: json['prerelease'] as bool? ?? false,
     );
-  }
 }

@@ -108,7 +108,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             IconButton(
               icon: const Icon(Icons.delete),
               onPressed:
-                  _selectedSongs.isEmpty ? null : () => _deleteSelected(),
+                  _selectedSongs.isEmpty ? null : _deleteSelected,
               color: Colors.red,
             ),
           ] else ...[
@@ -185,8 +185,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
                 ...activeDownloads
-                    .map((download) => _buildDownloadItem(download))
-                    .toList(),
+                    .map(_buildDownloadItem)
+                    ,
                 const Divider(),
               ],
               if (allSongs.isNotEmpty) ...[
@@ -196,7 +196,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-                ...allSongs.map((song) => _buildSongItem(song)).toList(),
+                ...allSongs.map(_buildSongItem),
               ],
             ],
           );
@@ -255,7 +255,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (download.cancelRequested)
-                    Text(
+                    const Text(
                       'Canceling...',
                       style: TextStyle(
                         color: Colors.orange,
@@ -419,7 +419,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             .map((loc) => RadioListTile<String>(
                   title: Text(loc[0].toUpperCase() + loc.substring(1)),
                   value: loc,
-                  groupValue: null,
                   onChanged: (value) => Navigator.pop(context, value),
                 ))
             .toList(),

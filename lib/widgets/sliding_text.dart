@@ -49,7 +49,7 @@ class _SlidingTextState extends State<SlidingText>
     }
   }
 
-  void _startScrolling() async {
+  Future<void> _startScrolling() async {
     while (mounted && _needsScroll) {
       await Future.delayed(Duration(seconds: widget.pauseDuration.toInt()));
       if (!mounted) return;
@@ -73,8 +73,7 @@ class _SlidingTextState extends State<SlidingText>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ClipRect(
+  Widget build(BuildContext context) => ClipRect(
       child: SingleChildScrollView(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
@@ -82,7 +81,6 @@ class _SlidingTextState extends State<SlidingText>
         child: Text(widget.text, style: widget.style, maxLines: 1),
       ),
     );
-  }
 
   @override
   void dispose() {

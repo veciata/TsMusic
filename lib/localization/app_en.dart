@@ -31,6 +31,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get songs => 'Songs';
 
+  @override
   String get selectAll => 'Select All';
 
   @override
@@ -370,4 +371,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newUpdates => 'new updates';
+
+  @override
+  String get changelog => 'Changelog';
+
+  @override
+  String get licenses => 'Licenses';
 }

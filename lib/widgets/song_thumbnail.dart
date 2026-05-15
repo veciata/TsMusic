@@ -46,8 +46,7 @@ class SongThumbnail extends StatelessWidget {
     return _buildFallback(context);
   }
 
-  Widget _buildFallback(BuildContext context) {
-    return Container(
+  Widget _buildFallback(BuildContext context) => Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -60,5 +59,4 @@ class SongThumbnail extends StatelessWidget {
         color: Theme.of(context).colorScheme.primary,
       ),
     );
-  }
 }

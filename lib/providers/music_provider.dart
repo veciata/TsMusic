@@ -40,7 +40,7 @@ class MusicProvider extends ChangeNotifier {
 
   void setYouTubeService(YouTubeService service) {
     _youTubeService = service;
-    service.setStopOtherPlayerCallback(() => stop());
+    service.setStopOtherPlayerCallback(stop);
   }
 
   
@@ -104,7 +104,7 @@ class MusicProvider extends ChangeNotifier {
   Duration get position => _player.state.position;
   Duration get duration => _player.state.duration;
   Song? get currentSong {
-    List<Song> activePlaylist =
+    final List<Song> activePlaylist =
         _isUsingTempPlaylist ? _tempPlaylist : _playlist;
     return activePlaylist.isNotEmpty &&
             _currentIndex >= 0 &&
@@ -114,7 +114,7 @@ class MusicProvider extends ChangeNotifier {
   }
 
   int? get currentIndex {
-    List<Song> activePlaylist =
+    final List<Song> activePlaylist =
         _isUsingTempPlaylist ? _tempPlaylist : _playlist;
     return (activePlaylist.isNotEmpty &&
             _currentIndex >= 0 &&
@@ -149,8 +149,9 @@ class MusicProvider extends ChangeNotifier {
     final artistSet = <String>{};
     for (final song in _songsMap.values) {
       for (final artist in song.artists) {
-        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist')
+        if (artist.isNotEmpty && artist.toLowerCase() != 'unknown artist') {
           artistSet.add(artist);
+        }
       }
     }
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
@@ -519,7 +520,7 @@ class MusicProvider extends ChangeNotifier {
         notifyListeners();
 
         debugPrint(
-            'MusicProvider: Auto-retrying in ${delaySeconds} seconds...');
+            'MusicProvider: Auto-retrying in $delaySeconds seconds...');
         await Future.delayed(Duration(seconds: delaySeconds));
 
         // Recursive retry
@@ -817,7 +818,7 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> next() async {
-    List<Song> currentPlaylist =
+    final List<Song> currentPlaylist =
         _isUsingTempPlaylist ? _tempPlaylist : _playlist;
     if (currentPlaylist.isEmpty) return;
     if (_shuffleEnabled) {
@@ -838,7 +839,7 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> previous() async {
-    List<Song> currentPlaylist =
+    final List<Song> currentPlaylist =
         _isUsingTempPlaylist ? _tempPlaylist : _playlist;
     if (currentPlaylist.isEmpty) return;
     _currentIndex = (_currentIndex - 1) % currentPlaylist.length;

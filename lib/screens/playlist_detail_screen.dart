@@ -106,7 +106,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         await _loadSongs();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Song removed from playlist')),
+            const SnackBar(content: Text('Song removed from playlist')),
           );
         }
       } catch (e) {

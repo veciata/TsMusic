@@ -79,8 +79,7 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme, AppLocalizations l10n) {
-    return Container(
+  Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
       decoration: BoxDecoration(
@@ -111,7 +110,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
         ],
       ),
     );
-  }
 
   Widget _buildBody(
     UpdateCheckState state,
@@ -181,8 +179,7 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
     );
   }
 
-  Widget _buildReleaseCard(GitHubRelease release, ThemeData theme) {
-    return Card(
+  Widget _buildReleaseCard(GitHubRelease release, ThemeData theme) => Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -262,10 +259,8 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
         ),
       ),
     );
-  }
 
-  Widget _buildActions(ThemeData theme, AppLocalizations l10n) {
-    return Padding(
+  Widget _buildActions(ThemeData theme, AppLocalizations l10n) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -280,9 +275,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
         ],
       ),
     );
-  }
 
-  String _formatDate(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-  }
+  String _formatDate(DateTime dt) => '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }

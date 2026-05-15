@@ -50,7 +50,6 @@ Widget buildClassicStyle(StyleParams params) {
                               border: Border.all(
                                 color:
                                     theme.colorScheme.primary.withValues(alpha: 0.3),
-                                width: 1,
                               ),
                             ),
                             child: Text(

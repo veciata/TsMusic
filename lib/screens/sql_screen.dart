@@ -21,6 +21,106 @@ class _SqlScreenState extends State<SqlScreen> {
   void initState() {
     super.initState();
     _overviewFuture = _loadOverview();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showChangelog(context));
+  }
+
+  void _showChangelog(BuildContext context) {
+    final entries = <_ChangelogEntry>[
+      _ChangelogEntry('1.1.9', '2026-05-15', [
+        'Settings: version shows changelog modal, licenses moved to separate modal',
+        'Settings: added changelog and licenses localization strings',
+        'Search widget: fixed layout issues (TextView instead of EditText)',
+        'Search widget: proper padding and resizing to 3x1 default',
+        'Player widget: tapping thumbnail or song name opens the app',
+      ]),
+      _ChangelogEntry('1.1.8', '2026-05-15', [
+        'Search widget: 4x1 layout with search bar + button',
+        'Search widget: 2x1 compact icon-only layout',
+        'Search widget: resizable (3x1 default, down to 1x1)',
+        'Player widget: thumbnail and title now open the app on tap',
+      ]),
+      _ChangelogEntry('1.1.7', '2026-05-10', [
+        'Added SQL Explorer debug screen',
+        'Fixed path normalization for duplicate detection',
+        'Improved database cleaning utilities',
+      ]),
+      _ChangelogEntry('1.1.6', '2026-05-05', [
+        'Home screen: always show search bar at top',
+        'Settings: added player style selection (Modern / Compact)',
+        'Fixed brightness toggle in fullscreen player',
+      ]),
+      _ChangelogEntry('1.1.5', '2026-04-28', [
+        'Player widget: play/pause, prev/next controls',
+        'Flutter-rendered widget backgrounds (dark/light mode)',
+        'Auto-update player widget on song change',
+      ]),
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.history, size: 24),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Changelog')),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final entry in entries) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 4),
+                  child: Row(
+                    children: [
+                      Text(
+                        entry.version,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        entry.date,
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                for (final line in entry.lines)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 2, bottom: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('• ', style: TextStyle(fontSize: 14)),
+                        Expanded(child: Text(line, style: const TextStyle(fontSize: 14))),
+                      ],
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<_DbOverview> _loadOverview() async {
@@ -405,7 +505,7 @@ class _SqlScreenState extends State<SqlScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: Text('• $name (${data.counts[name] ?? 0} records)'),
                   ))
-              .toList(),
+              ,
         ],
       );
 }
@@ -418,7 +518,7 @@ class _TablesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView.separated(
         itemCount: tableNames.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final name = tableNames[index];
           final count = counts[name] ?? 0;
@@ -508,7 +608,7 @@ class _SimpleListTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView.separated(
         itemCount: rows.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final row = rows[index];
           final title = row[titleKey]?.toString() ?? '(null)';
@@ -522,6 +622,13 @@ class _SimpleListTab extends StatelessWidget {
           );
         },
       );
+}
+
+class _ChangelogEntry {
+  final String version;
+  final String date;
+  final List<String> lines;
+  _ChangelogEntry(this.version, this.date, this.lines);
 }
 
 class _DbOverview {

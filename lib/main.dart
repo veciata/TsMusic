@@ -59,7 +59,7 @@ Future<void> main() async {
     ),
   );
 
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+  if (Platform.isMacOS) {
     await windowManager.ensureInitialized();
 
     final WindowOptions windowOptions = const WindowOptions(
@@ -145,8 +145,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
         );
 
         return Consumer<SettingsProvider>(
-          builder: (context, settingsProvider, _) {
-            return MaterialApp(
+          builder: (context, settingsProvider, _) => MaterialApp(
               title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
               debugShowCheckedModeBanner: false,
               theme: lightTheme.copyWith(textTheme: textTheme),
@@ -163,8 +162,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> {
               home: _introCompleted
                   ? MainNavigationScreen(key: mainNavKey)
                   : IntroductionScreen(onComplete: _onIntroComplete),
-            );
-          },
+            ),
         );
       },
     ),

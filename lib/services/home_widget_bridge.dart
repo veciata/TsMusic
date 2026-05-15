@@ -17,6 +17,8 @@ class HomeWidgetBridge {
         case 'previous':
           await musicProv.previous();
           break;
+        case 'openSearch':
+          break;
       }
     });
   }

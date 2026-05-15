@@ -337,8 +337,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  PreferredSizeWidget _buildMultiSelectAppBar(AppLocalizations l10n) {
-    return AppBar(
+  PreferredSizeWidget _buildMultiSelectAppBar(AppLocalizations l10n) => AppBar(
       leading: IconButton(
         icon: const Icon(Icons.close),
         onPressed: () {
@@ -374,7 +373,6 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ],
     );
-  }
 
   Future<void> _deleteSelectedSongs(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
@@ -543,15 +541,13 @@ class _HomeScreenState extends State<HomeScreen>
                 duration: Duration(
                   milliseconds: 300 + (index * 50).clamp(0, 500),
                 ),
-                builder: (context, value, child) {
-                  return Opacity(
+                builder: (context, value, child) => Opacity(
                     opacity: value,
                     child: Transform.translate(
                       offset: Offset(0, 20 * (1 - value)),
                       child: child,
                     ),
-                  );
-                },
+                  ),
                 child: _buildSongTile(song, musicProvider),
               );
             },
@@ -829,7 +825,7 @@ class _HomeScreenState extends State<HomeScreen>
     final l10n = AppLocalizations.of(context);
 
     if (musicProvider.isLoading) {
-      return SkeletonHomeScreen();
+      return const SkeletonHomeScreen();
     }
 
     if (musicProvider.error != null && musicProvider.songs.isEmpty) {
@@ -867,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () => musicProvider.refreshSongs(),
+                    onPressed: musicProvider.refreshSongs,
                     icon: const Icon(Icons.refresh),
                     label: Text(l10n.tryAgain),
                   ),
@@ -934,7 +930,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _handleSongAction(
+  Future<void> _handleSongAction(
     String action,
     Song song,
     music_provider.MusicProvider provider,

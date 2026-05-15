@@ -2,10 +2,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/notification_settings.dart';
-import 'dart:io';
 import 'package:flutter/services.dart';
 
 /// Audio handler that integrates MediaKit with audio_service for system notifications

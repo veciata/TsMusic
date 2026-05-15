@@ -115,14 +115,10 @@ class YouTubePlayerProvider extends ChangeNotifier {
   }
 
   /// Check if a specific audio is currently playing
-  bool isCurrentAudio(String videoId) {
-    return currentAudio?.id == videoId;
-  }
+  bool isCurrentAudio(String videoId) => currentAudio?.id == videoId;
 
   /// Check if a specific audio is currently loading
-  bool isLoadingAudio(String videoId) {
-    return _loadingVideoId == videoId;
-  }
+  bool isLoadingAudio(String videoId) => _loadingVideoId == videoId;
 
   /// Set loading state
   void _setLoading(String videoId) {

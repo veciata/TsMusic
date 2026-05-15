@@ -41,7 +41,7 @@ class StreamedFileListingService {
     Set<String>? processedPaths,
   }) async* {
     final startTime = DateTime.now();
-    int totalScanned = 0;
+    final int totalScanned = 0;
     final List<File> batchFiles = [];
     const batchSize = 50; // Emit every 50 files
 

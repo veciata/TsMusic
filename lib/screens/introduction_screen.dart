@@ -246,8 +246,7 @@ class _IntroPageView extends StatelessWidget {
   const _IntroPageView({required this.page});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
+  Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -280,7 +279,6 @@ class _IntroPageView extends StatelessWidget {
         ],
       ),
     );
-  }
 }
 
 class _PermissionPageView extends StatelessWidget {
@@ -295,8 +293,7 @@ class _PermissionPageView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
+  Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -337,7 +334,6 @@ class _PermissionPageView extends StatelessWidget {
         ],
       ),
     );
-  }
 }
 
 class _DotIndicator extends StatelessWidget {
@@ -347,8 +343,7 @@ class _DotIndicator extends StatelessWidget {
   const _DotIndicator({required this.isActive, required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget build(BuildContext context) => Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
       width: isActive ? 24 : 8,
       height: 8,
@@ -357,5 +352,4 @@ class _DotIndicator extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
     );
-  }
 }

@@ -71,14 +71,12 @@ class SkeletonHomeScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => Scaffold(
       body: ListView.builder(
         itemCount: itemCount,
         itemBuilder: (context, index) => const SkeletonListTile(),
       ),
     );
-  }
 }
 
 class SkeletonDownloadsScreen extends StatelessWidget {

@@ -84,7 +84,7 @@ class DownloadNotificationService {
       2,
       'Download Complete',
       '$title has been downloaded',
-      NotificationDetails(
+      const NotificationDetails(
         android: androidDetails,
         iOS: darwinDetails,
         macOS: darwinDetails,

@@ -81,13 +81,13 @@ class YouTubePlaybackWidget extends StatelessWidget {
             if (isLoading)
               IconButton(
                 icon: Icon(Icons.stop, color: Theme.of(context).colorScheme.primary),
-                onPressed: () => youtubePlayer.stop(),
+                onPressed: youtubePlayer.stop,
                 tooltip: 'Stop/Kill',
               )
             else if (isCurrent && isPlaying)
               IconButton(
                 icon: Icon(Icons.stop, color: Theme.of(context).colorScheme.primary),
-                onPressed: () => youtubePlayer.stop(),
+                onPressed: youtubePlayer.stop,
                 tooltip: 'Stop/Kill',
               )
             else

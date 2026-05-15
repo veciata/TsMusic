@@ -2,7 +2,7 @@ name: tsmusic
 description: "A Flutter app for playing and downloading music."
 publish_to: "none"
 
-version: 1.1.8
+version: 1.1.9
 
 environment:
   sdk: ">=3.11.0 <4.0.0"
@@ -88,8 +88,6 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/images/logo.png"
   adaptive_icon_padding: false
   web:
-    generate: true
-  windows:
     generate: true
   macos:
     generate: true

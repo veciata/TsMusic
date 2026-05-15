@@ -31,6 +31,7 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get songs => 'Şarkılar';
 
+  @override
   String get selectAll => 'Tümünü Seç';
 
   @override
@@ -359,7 +360,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get songsMoved => 'şarkı taşındı';
 
   @override
-  String get whatsNew => "Yenilikler";
+  String get whatsNew => 'Yenilikler';
 
   @override
   String get gotIt => 'Anladım';
@@ -370,4 +371,10 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get newUpdates => 'yeni güncelleme';
+
+  @override
+  String get changelog => 'Değişiklik Günlüğü';
+
+  @override
+  String get licenses => 'Lisanslar';
 }

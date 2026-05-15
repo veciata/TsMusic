@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -284,6 +283,115 @@ void _showLanguageDialog(BuildContext context, SettingsProvider settingsProvider
   );
 }
 
+void _showChangelogDialog(BuildContext context, AppLocalizations l10n) {
+  final entries = [
+    _ChangelogEntry('1.1.9', '2026-05-15', [
+      'Settings: version shows changelog modal, licenses moved to separate modal',
+      'Settings: added changelog and licenses localization strings',
+      'Search widget: fixed layout issues (TextView instead of EditText)',
+      'Search widget: proper padding and resizing to 3x1 default',
+      'Player widget: tapping thumbnail or song name opens the app',
+    ]),
+    _ChangelogEntry('1.1.8', '2026-05-15', [
+      'Search widget: 4x1 layout with search bar + button',
+      'Search widget: 2x1 compact icon-only layout',
+      'Search widget: resizable (3x1 default, down to 1x1)',
+      'Player widget: thumbnail and title now open the app on tap',
+    ]),
+    _ChangelogEntry('1.1.7', '2026-05-10', [
+      'Added SQL Explorer debug screen',
+      'Fixed path normalization for duplicate detection',
+      'Improved database cleaning utilities',
+    ]),
+    _ChangelogEntry('1.1.6', '2026-05-05', [
+      'Home screen: always show search bar at top',
+      'Settings: added player style selection (Modern / Compact)',
+      'Fixed brightness toggle in fullscreen player',
+    ]),
+    _ChangelogEntry('1.1.5', '2026-04-28', [
+      'Player widget: play/pause, prev/next controls',
+      'Flutter-rendered widget backgrounds (dark/light mode)',
+      'Auto-update player widget on song change',
+    ]),
+  ];
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.history, size: 24),
+          const SizedBox(width: 8),
+          Expanded(child: Text(l10n.changelog)),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final entry in entries) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      entry.version,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      entry.date,
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              for (final line in entry.lines)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 2, bottom: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('• ', style: TextStyle(fontSize: 14)),
+                      Expanded(
+                        child: Text(line,
+                            style: const TextStyle(fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(l10n.gotIt),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ChangelogEntry {
+  final String version;
+  final String date;
+  final List<String> lines;
+  _ChangelogEntry(this.version, this.date, this.lines);
+}
+
 String _getThemeModeName(AppLocalizations l10n, ThemeMode mode) {
   switch (mode) {
     case ThemeMode.light:
@@ -466,18 +574,14 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: Text(PackageInfoUtils.version),
                 leading: const Icon(Icons.info_outline),
                 onTap: () {
-                  showAboutDialog(
-                    context: context,
-                    applicationName: 'TS Music',
-                    applicationVersion: PackageInfoUtils.version,
-                    applicationIcon: const Icon(Icons.music_note, size: 50),
-                    children: const [
-                      Text('A beautiful music player app'),
-                      SizedBox(height: 8),
-                      Text('© 2025 TS Music. All rights reserved.'),
-                    ],
-                  );
+                  _showChangelogDialog(context, l10n);
                 },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                title: Text(l10n.licenses),
+                leading: const Icon(Icons.description),
+                onTap: () => showLicensePage(context: context),
               ),
               const Divider(height: 1),
               ListTile(

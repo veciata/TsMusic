@@ -27,11 +27,11 @@ class PermissionService {
 
     if (sdkInt >= 33) { // Android 13+
       // Request audio permission for reading music
-      var audioStatus = await Permission.audio.request();
+      final audioStatus = await Permission.audio.request();
       
       // Request notification permission for media controls
       if (audioStatus.isGranted) {
-        var notificationStatus = await Permission.notification.status;
+        final notificationStatus = await Permission.notification.status;
         if (notificationStatus.isDenied) {
           await Permission.notification.request();
         }
@@ -40,11 +40,11 @@ class PermissionService {
       return audioStatus.isGranted;
     } else if (sdkInt >= 30) { // Android 11-12
       // Request storage permission
-      var status = await Permission.storage.request();
+      final status = await Permission.storage.request();
       
       // Request manage external storage for full file access
       if (status.isGranted) {
-        var manageStatus = await Permission.manageExternalStorage.status;
+        final manageStatus = await Permission.manageExternalStorage.status;
         if (manageStatus.isDenied) {
           await Permission.manageExternalStorage.request();
         }
@@ -52,7 +52,7 @@ class PermissionService {
       
       return status.isGranted;
     } else { // Android 10 and below
-      var status = await Permission.storage.request();
+      final status = await Permission.storage.request();
       return status.isGranted;
     }
   }

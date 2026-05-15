@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": {
+    "dart": {
+      "command": ["dart", "language-server", "--protocol=lsp"],
+      "extensions": [".dart"],
+      "initialization": {
+        "closingLabels": true,
+        "outline": true,
+        "flutterOutline": true
+      }
+    }
+  }
+}

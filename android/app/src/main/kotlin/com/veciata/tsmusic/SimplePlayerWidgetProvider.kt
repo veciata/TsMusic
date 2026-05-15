@@ -32,6 +32,14 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
         val tintColor = if (isDarkMode) Color.parseColor("#FFFFFF") else Color.parseColor("#000000")
 
         appWidgetIds.forEach { widgetId ->
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val openAppPendingIntent = PendingIntent.getActivity(
+                context, widgetId + 3000, openAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             val views = RemoteViews(context.packageName, R.layout.simple_player_widget).apply {
                 setInt(R.id.widget_root, "setBackgroundResource", bgRes)
                 setTextViewText(R.id.widget_title, title)
@@ -49,6 +57,9 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
                 } else {
                     setImageViewResource(R.id.widget_thumbnail, android.R.drawable.ic_menu_gallery)
                 }
+
+                setOnClickPendingIntent(R.id.widget_thumbnail, openAppPendingIntent)
+                setOnClickPendingIntent(R.id.widget_info_container, openAppPendingIntent)
 
                 setImageViewResource(
                     R.id.widget_play_pause,

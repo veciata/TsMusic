@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:tsmusic/models/song.dart';
 
 String formatDurationFromMs(int durationMs) {
   final duration = Duration(milliseconds: durationMs);

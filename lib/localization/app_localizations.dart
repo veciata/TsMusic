@@ -179,6 +179,10 @@ class AppLocalizations {
   String get gotIt => throw UnimplementedError();
   String get updateCheckFailed => throw UnimplementedError();
   String get newUpdates => throw UnimplementedError();
+
+  // Changelog
+  String get changelog => throw UnimplementedError();
+  String get licenses => throw UnimplementedError();
 }
 
 class _AppLocalizationsDelegate
@@ -186,16 +190,12 @@ class _AppLocalizationsDelegate
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) {
-    return AppLocalizations.supportedLocales.any(
+  bool isSupported(Locale locale) => AppLocalizations.supportedLocales.any(
       (supportedLocale) => supportedLocale.languageCode == locale.languageCode,
     );
-  }
 
   @override
-  Future<AppLocalizations> load(Locale locale) async {
-    return AppLocalizations._getLocalizedValues(locale);
-  }
+  Future<AppLocalizations> load(Locale locale) async => AppLocalizations._getLocalizedValues(locale);
 
   @override
   bool shouldReload(LocalizationsDelegate<AppLocalizations> old) => false;

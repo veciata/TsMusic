@@ -68,7 +68,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
   Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title,
       {bool circular = false, bool spin = true, double size = 280}) {
-    Widget content = Container(
+    final Widget content = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -136,7 +136,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         width: _showVolumeSlider ? 200 : 48,
         height: 48,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant,
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(24),
         ),
         child: _showVolumeSlider
@@ -264,8 +264,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     }
   }
 
-  Widget _buildHeader(ThemeData theme) {
-    return Padding(
+  Widget _buildHeader(ThemeData theme) => Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
@@ -292,11 +291,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ],
       ),
     );
-  }
 
   Widget _buildProgressBar(
-      ThemeData theme, int duration, MusicProvider musicProvider) {
-    return Padding(
+      ThemeData theme, int duration, MusicProvider musicProvider) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
@@ -329,11 +326,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ],
       ),
     );
-  }
 
   Widget _buildPlaybackControls(ThemeData theme, MusicProvider musicProvider,
-      {bool compact = false}) {
-    return Padding(
+      {bool compact = false}) => Padding(
       padding: EdgeInsets.symmetric(vertical: 32, horizontal: compact ? 0 : 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -395,10 +390,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ],
       ),
     );
-  }
 
-  Widget _buildBottomControls(ThemeData theme, MusicProvider musicProvider) {
-    return Padding(
+  Widget _buildBottomControls(ThemeData theme, MusicProvider musicProvider) => Padding(
       padding: const EdgeInsets.only(bottom: 32, left: 24, right: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -414,7 +407,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ],
       ),
     );
-  }
 
   void _showStyleSelector(BuildContext context, ThemeProvider themeProvider) {
     final l10n = AppLocalizations.of(context);
@@ -445,7 +437,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   Navigator.pop(context);
                 },
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
