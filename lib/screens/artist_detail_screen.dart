@@ -41,7 +41,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   bool _isLoading = false;
   bool _hasMore = true;
   bool _isOffline = false;
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final ScrollController _scrollController = ScrollController();
   late final LRUCache<String, String> _artistImageCache;
   final Set<int> _selectedLocalSongs = {};
@@ -60,7 +60,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _fetchArtistImageIfNeeded();
 
     _checkConnectivity();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       _checkConnectivity();
     });
   }
@@ -159,10 +159,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   void _checkConnectivity() {
-    Connectivity().checkConnectivity().then((result) {
+    Connectivity().checkConnectivity().then((results) {
       if (mounted) {
         setState(() {
-          _isOffline = result == ConnectivityResult.none;
+          _isOffline = results.contains(ConnectivityResult.none);
         });
       }
     });

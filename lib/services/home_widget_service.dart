@@ -17,7 +17,6 @@ class HomeWidgetService {
   static Future<void> updateSearchWidget({bool isDarkMode = false}) async {
     try {
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
-      await HomeWidget.saveWidgetData<String?>('search_widget_image', null);
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
     } catch (e) {
       debugPrint('HomeWidgetService.updateSearchWidget error: $e');

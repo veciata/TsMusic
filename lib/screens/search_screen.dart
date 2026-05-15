@@ -28,7 +28,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<YouTubeAudio> _youtubeResults = [];
   bool _isSearchingYouTube = false;
   bool _isOffline = false;
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   bool _hasMoreYouTubeResults = true;
   Timer? _debounceTimer;
@@ -54,7 +54,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _checkConnectivity();
     
     // Subscribe to connectivity changes
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       _checkConnectivity();
     });
   }
@@ -76,10 +76,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _checkConnectivity() async {
     try {
-      final result = await Connectivity().checkConnectivity();
+      final results = await Connectivity().checkConnectivity();
       if (mounted) {
         setState(() {
-          _isOffline = result == ConnectivityResult.none;
+          _isOffline = results.contains(ConnectivityResult.none);
         });
       }
     } catch (e) {

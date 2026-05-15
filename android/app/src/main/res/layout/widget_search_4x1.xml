@@ -13,12 +13,10 @@
         android:layout_height="match_parent"
         android:layout_marginEnd="4dp"
         android:layout_weight="1"
-        android:background="@drawable/widget_search_edittext_bg_light"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:singleLine="true"
         android:text="Search songs..."
-        android:textColorHint="#99000000"
         android:textSize="14sp" />
 
     <ImageButton
@@ -28,6 +26,6 @@
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="Search"
         android:scaleType="centerInside"
-        android:src="@drawable/preview_search" />
+        android:src="@android:drawable/ic_menu_search" />
 
 </LinearLayout>

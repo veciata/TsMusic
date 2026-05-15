@@ -25,7 +25,7 @@ class DownloadNotificationService {
       macOS: darwinSettings,
     );
 
-    await _notifications.initialize(initSettings);
+    await _notifications.initialize(settings: initSettings);
     _isInitialized = true;
     debugPrint('Download notification service initialized');
   }
@@ -54,10 +54,10 @@ class DownloadNotificationService {
     const darwinDetails = DarwinNotificationDetails();
 
     await _notifications.show(
-      _downloadProgressNotificationId,
-      'Downloading: $title',
-      '$percent% complete',
-      NotificationDetails(
+      id: _downloadProgressNotificationId,
+      title: 'Downloading: $title',
+      body: '$percent% complete',
+      notificationDetails: NotificationDetails(
         android: androidDetails,
         iOS: darwinDetails,
         macOS: darwinDetails,
@@ -81,10 +81,10 @@ class DownloadNotificationService {
     const darwinDetails = DarwinNotificationDetails();
 
     await _notifications.show(
-      2,
-      'Download Complete',
-      '$title has been downloaded',
-      const NotificationDetails(
+      id: 2,
+      title: 'Download Complete',
+      body: '$title has been downloaded',
+      notificationDetails: const NotificationDetails(
         android: androidDetails,
         iOS: darwinDetails,
         macOS: darwinDetails,
@@ -93,6 +93,6 @@ class DownloadNotificationService {
   }
 
   Future<void> cancelDownloadNotification() async {
-    await _notifications.cancel(_downloadProgressNotificationId);
+    await _notifications.cancel(id: _downloadProgressNotificationId);
   }
 }
