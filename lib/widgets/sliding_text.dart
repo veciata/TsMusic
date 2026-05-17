@@ -1,17 +1,18 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 class SlidingText extends StatefulWidget {
   final String text;
   final TextStyle? style;
   final double pauseDuration;
-  final double slideDuration;
+  final double scrollSpeed;
 
   const SlidingText(
     this.text, {
     super.key,
     this.style,
     this.pauseDuration = 2.0,
-    this.slideDuration = 3.0,
+    this.scrollSpeed = 80,
   });
 
   @override
@@ -45,7 +46,7 @@ class _SlidingTextState extends State<SlidingText>
 
     if (_textWidth > _containerWidth) {
       setState(() => _needsScroll = true);
-      _startScrolling();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
     }
   }
 
@@ -54,20 +55,26 @@ class _SlidingTextState extends State<SlidingText>
       await Future.delayed(Duration(seconds: widget.pauseDuration.toInt()));
       if (!mounted) return;
 
-      final maxScroll = _textWidth - _containerWidth + 20;
+      final maxScroll = max(0.0, _textWidth - _containerWidth + 10);
+      final slideDuration = Duration(
+        milliseconds: max(1, (maxScroll / widget.scrollSpeed * 1000).round()),
+      );
       await _scrollController.animateTo(
         maxScroll,
-        duration: Duration(seconds: widget.slideDuration.toInt()),
-        curve: Curves.easeInOut,
+        duration: slideDuration,
+        curve: Curves.linear,
       );
 
       if (!mounted) return;
       await Future.delayed(const Duration(seconds: 1));
 
+      final returnDuration = Duration(
+        milliseconds: max(1, (maxScroll / widget.scrollSpeed * 1000).round()),
+      );
       await _scrollController.animateTo(
         0,
-        duration: Duration(seconds: widget.slideDuration.toInt()),
-        curve: Curves.easeInOut,
+        duration: returnDuration,
+        curve: Curves.linear,
       );
     }
   }

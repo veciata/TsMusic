@@ -1,31 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/search_4x1_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="4dp">
+    android:orientation="horizontal">
 
-    <TextView
-        android:id="@+id/search_4x1_label"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:id="@+id/search_4x1_container"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginEnd="4dp"
-        android:layout_weight="1"
-        android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:singleLine="true"
-        android:text="Search songs..."
-        android:textSize="14sp" />
+        android:gravity="center"
+        android:orientation="horizontal">
 
-    <ImageButton
-        android:id="@+id/search_4x1_button"
-        android:layout_width="40dp"
-        android:layout_height="match_parent"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Search"
-        android:scaleType="centerInside"
-        android:src="@android:drawable/ic_menu_search" />
+        <LinearLayout
+            android:id="@+id/search_4x1_input_box"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="6dp"
+            android:paddingHorizontal="10dp">
+
+            <ImageView
+                android:id="@+id/search_4x1_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Search"
+                android:scaleType="fitCenter"
+                android:src="@drawable/custom_search_light" />
+
+            <TextView
+                android:id="@+id/search_4x1_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:singleLine="true"
+                android:text="Search songs..."
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

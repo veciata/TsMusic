@@ -55,13 +55,27 @@ jobs:
             --build-name=${{ steps.versioning.outputs.v_name }} \
             --build-number=${{ steps.versioning.outputs.v_num }}
 
+      - name: Rename APK
+        run: |
+          for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk; do
+            if [ -f "$f" ]; then
+              dir=$(dirname "$f")
+              mv "$f" "$dir/tsmusic-release.apk"
+              break
+            fi
+          done
+          # Verify
+          ls build/app/outputs/flutter-apk/tsmusic-release.apk build/app/outputs/apk/release/tsmusic-release.apk 2>/dev/null || true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/tsmusic-release.apk
+            build/app/outputs/apk/release/tsmusic-release.apk
           name: "Sürüm ${{ steps.versioning.outputs.v_name }}"
           body: "Otomatik Build - No: ${{ steps.versioning.outputs.v_num }}"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.versioning.outputs.v_name) }}
           draft: false
           prerelease: false
 
@@ -69,4 +83,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tsmusic-release-${{ steps.versioning.outputs.v_name }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/tsmusic-release.apk
+            build/app/outputs/apk/release/tsmusic-release.apk

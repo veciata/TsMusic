@@ -21,7 +21,10 @@ class SearchWidgetProvider : HomeWidgetProvider() {
         Log.d("SearchWidget", "onUpdate called for ${appWidgetIds.size} widget(s)")
 
         val isDarkMode = widgetData.getBoolean("widget_is_dark_mode", false)
+        val primaryColor = widgetData.getLong("widget_primary_color", 0xFF1DB954L).toInt()
         val textColor = if (isDarkMode) Color.WHITE else Color.BLACK
+        val containerBg = if (isDarkMode) R.drawable.widget_search_edittext_bg_dark
+                          else R.drawable.widget_search_edittext_bg_light
 
         val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -43,18 +46,21 @@ class SearchWidgetProvider : HomeWidgetProvider() {
 
                 if (minWidth >= 200) {
                     val views = RemoteViews(context.packageName, R.layout.widget_search_4x1).apply {
+                        setInt(R.id.search_4x1_icon, "setColorFilter", primaryColor)
+                        setInt(R.id.search_4x1_input_box, "setBackgroundResource", containerBg)
                         setTextColor(R.id.search_4x1_label, textColor)
                         val pi = PendingIntent.getActivity(context, widgetId, searchIntent, pendingFlags)
-                        setOnClickPendingIntent(R.id.search_4x1_root, pi)
-                        setOnClickPendingIntent(R.id.search_4x1_button, pi)
+                        setOnClickPendingIntent(R.id.search_4x1_input_box, pi)
                     }
                     appWidgetManager.updateAppWidget(widgetId, views)
                     Log.d("SearchWidget", "Widget $widgetId → 4x1 layout")
                 } else {
                     val views = RemoteViews(context.packageName, R.layout.widget_search_2x1).apply {
+                        setInt(R.id.search_2x1_icon, "setColorFilter", primaryColor)
+                        setInt(R.id.search_2x1_input_box, "setBackgroundResource", containerBg)
                         setTextColor(R.id.search_2x1_label, textColor)
                         val pi = PendingIntent.getActivity(context, widgetId, searchIntent, pendingFlags)
-                        setOnClickPendingIntent(R.id.search_2x1_root, pi)
+                        setOnClickPendingIntent(R.id.search_2x1_input_box, pi)
                     }
                     appWidgetManager.updateAppWidget(widgetId, views)
                     Log.d("SearchWidget", "Widget $widgetId → 2x1 layout")

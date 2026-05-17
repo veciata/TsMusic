@@ -1,29 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/search_2x1_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center"
-    android:orientation="horizontal"
-    android:padding="6dp">
+    android:orientation="horizontal">
 
-    <ImageView
-        android:id="@+id/search_2x1_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:src="@android:drawable/ic_menu_search"
-        android:contentDescription="Search"
-        android:scaleType="fitCenter"
-        android:layout_marginEnd="6dp" />
+    <LinearLayout
+        android:id="@+id/search_2x1_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="horizontal">
 
-    <TextView
-        android:id="@+id/search_2x1_label"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Search songs..."
-        android:textSize="14sp"
-        android:singleLine="true"
-        android:ellipsize="end" />
+        <LinearLayout
+            android:id="@+id/search_2x1_input_box"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="6dp"
+            android:paddingHorizontal="10dp">
+
+            <ImageView
+                android:id="@+id/search_2x1_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="6dp"
+                android:contentDescription="Search"
+                android:scaleType="fitCenter"
+                android:src="@drawable/custom_search_light" />
+
+            <TextView
+                android:id="@+id/search_2x1_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Search songs..."
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

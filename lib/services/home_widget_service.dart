@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:tsmusic/models/song.dart';
 
@@ -14,9 +14,10 @@ class HomeWidgetService {
     }
   }
 
-  static Future<void> updateSearchWidget({bool isDarkMode = false}) async {
+  static Future<void> updateSearchWidget({bool isDarkMode = false, Color? primaryColor}) async {
     try {
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
+      await HomeWidget.saveWidgetData<int>('widget_primary_color', primaryColor?.value ?? 0xFF1DB954);
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
     } catch (e) {
       debugPrint('HomeWidgetService.updateSearchWidget error: $e');
