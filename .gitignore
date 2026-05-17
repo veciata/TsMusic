@@ -57,6 +57,9 @@ PERFORMANCE_OPTIMIZATIONS.md
 # Backups
 *.backup
 
+# Environment files (local secrets)
+.env
+
 # Database files
 ruvector.db
 /node_modules
