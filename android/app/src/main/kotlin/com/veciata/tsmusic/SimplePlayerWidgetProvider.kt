@@ -46,7 +46,12 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val views = RemoteViews(context.packageName, R.layout.simple_player_widget).apply {
+            val options = appWidgetManager.getAppWidgetOptions(widgetId)
+            val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+            val layoutRes = if (minHeight < 80) R.layout.simple_player_widget_compact
+                            else R.layout.simple_player_widget
+
+            val views = RemoteViews(context.packageName, layoutRes).apply {
                 setInt(R.id.widget_root, "setBackgroundResource", bgRes)
                 setTextViewText(R.id.widget_title, title)
                 setTextViewText(R.id.widget_artist, artist)

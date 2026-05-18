@@ -8,6 +8,7 @@ import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Build
 import android.util.Log
+import android.util.TypedValue
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetProvider
 
@@ -41,29 +42,53 @@ class SearchWidgetProvider : HomeWidgetProvider() {
             try {
                 val options = appWidgetManager.getAppWidgetOptions(widgetId)
                 val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+                val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
 
-                Log.d("SearchWidget", "Widget $widgetId width=$minWidth")
+                val isTall = minHeight >= 80
+                val vertPadPx = if (isTall) {
+                    TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, 24f,
+                        context.resources.displayMetrics
+                    ).toInt()
+                } else {
+                    TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, 6f,
+                        context.resources.displayMetrics
+                    ).toInt()
+                }
+                val horizPadPx = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 12f,
+                    context.resources.displayMetrics
+                ).toInt()
+
+                Log.d("SearchWidget", "Widget $widgetId width=$minWidth height=$minHeight isTall=$isTall")
 
                 if (minWidth >= 200) {
                     val views = RemoteViews(context.packageName, R.layout.widget_search_4x1).apply {
                         setInt(R.id.search_4x1_icon, "setColorFilter", primaryColor)
                         setInt(R.id.search_4x1_input_box, "setBackgroundResource", containerBg)
                         setTextColor(R.id.search_4x1_label, textColor)
+                        setViewPadding(
+                            R.id.search_4x1_input_box, horizPadPx, vertPadPx, horizPadPx, vertPadPx
+                        )
                         val pi = PendingIntent.getActivity(context, widgetId, searchIntent, pendingFlags)
                         setOnClickPendingIntent(R.id.search_4x1_input_box, pi)
                     }
                     appWidgetManager.updateAppWidget(widgetId, views)
-                    Log.d("SearchWidget", "Widget $widgetId → 4x1 layout")
+                    Log.d("SearchWidget", "Widget $widgetId → 4x1 layout (tall=$isTall)")
                 } else {
                     val views = RemoteViews(context.packageName, R.layout.widget_search_2x1).apply {
                         setInt(R.id.search_2x1_icon, "setColorFilter", primaryColor)
                         setInt(R.id.search_2x1_input_box, "setBackgroundResource", containerBg)
                         setTextColor(R.id.search_2x1_label, textColor)
+                        setViewPadding(
+                            R.id.search_2x1_input_box, horizPadPx, vertPadPx, horizPadPx, vertPadPx
+                        )
                         val pi = PendingIntent.getActivity(context, widgetId, searchIntent, pendingFlags)
                         setOnClickPendingIntent(R.id.search_2x1_input_box, pi)
                     }
                     appWidgetManager.updateAppWidget(widgetId, views)
-                    Log.d("SearchWidget", "Widget $widgetId → 2x1 layout")
+                    Log.d("SearchWidget", "Widget $widgetId → 2x1 layout (tall=$isTall)")
                 }
             } catch (e: Exception) {
                 Log.e("SearchWidget", "Error updating widget $widgetId: ${e.message}", e)

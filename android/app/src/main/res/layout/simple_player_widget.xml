@@ -5,13 +5,14 @@
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingVertical="3dp"
+    android:paddingVertical="6dp"
     android:paddingHorizontal="8dp">
 
     <ImageView
         android:id="@+id/widget_thumbnail"
         android:layout_width="40dp"
         android:layout_height="40dp"
+        android:layout_marginEnd="8dp"
         android:scaleType="centerCrop"
         android:contentDescription="Album art" />
 
@@ -27,9 +28,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="TS Music"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:maxLines="2"
+            android:maxLines="1"
             android:ellipsize="end" />
 
         <TextView
@@ -37,37 +38,46 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Not playing"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:maxLines="1"
             android:ellipsize="end" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <ImageButton
+                android:id="@+id/widget_previous"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_media_previous"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Previous"
+                android:scaleType="center" />
+
+            <ImageButton
+                android:id="@+id/widget_play_pause"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_media_play"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Play/Pause"
+                android:scaleType="center" />
+
+            <ImageButton
+                android:id="@+id/widget_next"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_media_next"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Next"
+                android:scaleType="center" />
+
+        </LinearLayout>
+
     </LinearLayout>
-
-    <ImageButton
-        android:id="@+id/widget_previous"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_media_previous"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Previous"
-        android:scaleType="center" />
-
-    <ImageButton
-        android:id="@+id/widget_play_pause"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_media_play"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Play/Pause"
-        android:scaleType="center" />
-
-    <ImageButton
-        android:id="@+id/widget_next"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_media_next"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Next"
-        android:scaleType="center" />
 
 </LinearLayout>

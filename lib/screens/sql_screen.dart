@@ -26,6 +26,20 @@ class _SqlScreenState extends State<SqlScreen> {
 
   void _showChangelog(BuildContext context) {
     final entries = <_ChangelogEntry>[
+      _ChangelogEntry('1.1.12', '2026-05-18', [
+        'Player widget: adaptive layout (horizontal for 4x1, vertical for 4x2+)',
+        'Player widget: buttons use accent/theme color',
+        'Player widget: larger 32dp buttons in vertical layout, right-aligned',
+        'Search widget: fills available width, more height in 4x2 layout',
+        'Player widget: wrap_content height for proper sizing',
+      ]),
+      _ChangelogEntry('1.1.11', '2026-05-18', [
+        'Player widget: improved UI with accent color support',
+        'Fixed sliding text animation',
+      ]),
+      _ChangelogEntry('1.1.10', '2026-05-15', [
+        'Search widget: redesigned with transparent background',
+      ]),
       _ChangelogEntry('1.1.9', '2026-05-15', [
         'Settings: version shows changelog modal, licenses moved to separate modal',
         'Settings: added changelog and licenses localization strings',
