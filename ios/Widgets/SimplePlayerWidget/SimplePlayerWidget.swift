@@ -27,7 +27,13 @@ struct SimplePlayerProvider: TimelineProvider {
         let title = data?["widget_title"] as? String ?? "TS Music"
         let artist = data?["widget_artist"] as? String ?? "Not playing"
         let isPlaying = data?["widget_is_playing"] as? Bool ?? false
-        return SimplePlayerEntry(title: title, artist: artist, isPlaying: isPlaying)
+        let primaryColor = data?["widget_primary_color"] as? Int ?? 0x1DB954
+        return SimplePlayerEntry(
+            title: title,
+            artist: artist,
+            isPlaying: isPlaying,
+            primaryColor: primaryColor
+        )
     }
 }
 
@@ -36,10 +42,18 @@ struct SimplePlayerEntry: TimelineEntry {
     let title: String
     let artist: String
     let isPlaying: Bool
+    let primaryColor: Int
 }
 
 struct SimplePlayerWidgetEntryView : View {
     var entry: SimplePlayerProvider.Entry
+
+    private var accentColor: Color {
+        let r = Double((entry.primaryColor >> 16) & 0xFF) / 255.0
+        let g = Double((entry.primaryColor >> 8) & 0xFF) / 255.0
+        let b = Double(entry.primaryColor & 0xFF) / 255.0
+        return Color(red: r, green: g, blue: b)
+    }
 
     var body: some View {
         HStack {
@@ -54,12 +68,15 @@ struct SimplePlayerWidgetEntryView : View {
                     .lineLimit(1)
             }
             Spacer()
+            Image(systemName: "backward.fill")
+                .font(.title2)
+                .foregroundColor(accentColor)
             Image(systemName: entry.isPlaying ? "pause.fill" : "play.fill")
                 .font(.title2)
-                .foregroundColor(.accentColor)
+                .foregroundColor(accentColor)
             Image(systemName: "forward.fill")
                 .font(.title2)
-                .foregroundColor(.accentColor)
+                .foregroundColor(accentColor)
         }
         .padding()
         .containerBackground(.background, for: .widget)

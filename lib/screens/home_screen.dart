@@ -239,6 +239,10 @@ class _HomeScreenState extends State<HomeScreen>
     final isSelected = _selectedSongs.contains(song.id);
     final l10n = AppLocalizations.of(context);
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      musicProvider.requestThumbnail(song, priority: 1);
+    });
+
     return ListTile(
       leading: _isMultiSelectMode
           ? Checkbox(

@@ -318,6 +318,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         onlineTitle: youTubeService.currentAudio?.title,
         onlineAuthor: youTubeService.currentAudio?.author,
         isDarkMode: isDarkMode,
+        primaryColor: themeProvider.primaryColor,
       );
       HomeWidgetService.updateSearchWidget(
         isDarkMode: isDarkMode,

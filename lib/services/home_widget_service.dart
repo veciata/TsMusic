@@ -31,6 +31,7 @@ class HomeWidgetService {
     String? onlineTitle,
     String? onlineAuthor,
     bool isDarkMode = false,
+    Color? primaryColor,
   }) async {
     try {
       final String title;
@@ -59,6 +60,7 @@ class HomeWidgetService {
           'widget_is_playing', isPlaying || isOnlinePlaying);
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
       await HomeWidget.saveWidgetData<String?>('widget_thumbnail', thumbnailPath);
+      await HomeWidget.saveWidgetData<int>('widget_primary_color', primaryColor?.value ?? 0xFF1DB954);
 
       await HomeWidget.updateWidget(qualifiedAndroidName: _playerWidgetClass);
     } catch (e) {

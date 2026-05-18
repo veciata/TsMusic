@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.PorterDuff
 import android.view.KeyEvent
 import android.widget.RemoteViews
 import com.ryanheise.audioservice.MediaButtonReceiver
@@ -25,11 +26,16 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
         val isDarkMode = widgetData.getBoolean("widget_is_dark_mode", false)
         val thumbPath = widgetData.getString("widget_thumbnail", null)
 
+        val defaultPrimary = if (isDarkMode) Color.parseColor("#FFFFFF") else Color.parseColor("#1DB954")
+        val primaryColor = try {
+            widgetData.getInt("widget_primary_color", defaultPrimary)
+        } catch (e: ClassCastException) {
+            widgetData.getLong("widget_primary_color", defaultPrimary.toLong()).toInt()
+        }
         val bgRes = if (isDarkMode) R.drawable.widget_background_dark
                     else R.drawable.widget_background
         val titleColor = if (isDarkMode) Color.WHITE else Color.BLACK
         val artistColor = if (isDarkMode) Color.parseColor("#BBBBBB") else Color.parseColor("#666666")
-        val tintColor = if (isDarkMode) Color.parseColor("#FFFFFF") else Color.parseColor("#000000")
 
         appWidgetIds.forEach { widgetId ->
             val openAppIntent = Intent(context, MainActivity::class.java).apply {
@@ -99,6 +105,10 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
+
+                setInt(R.id.widget_play_pause, "setColorFilter", primaryColor)
+                setInt(R.id.widget_previous, "setColorFilter", primaryColor)
+                setInt(R.id.widget_next, "setColorFilter", primaryColor)
             }
             appWidgetManager.updateAppWidget(widgetId, views)
         }

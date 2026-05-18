@@ -1114,6 +1114,17 @@ class DatabaseHelper {
     await db.close();
   }
 
+  /// Updates a song's thumbnail path by song ID
+  Future<void> updateThumbnailPath(int songId, String thumbnailPath) async {
+    final db = await database;
+    await db.update(
+      tableSongs,
+      {'thumbnail_path': thumbnailPath},
+      where: '$columnId = ?',
+      whereArgs: [songId],
+    );
+  }
+
   /// Deletes a song by its ID from the database.
   /// Related rows in junction tables (song_artist, song_genre, song_tags,
   /// playlist_songs) are removed automatically via ON DELETE CASCADE.

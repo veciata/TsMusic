@@ -15,6 +15,7 @@ import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/services/audio_notification_service.dart';
 import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/services/thumbnail_service.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 
 /// Main music provider class for managing music playback and library
@@ -73,6 +74,11 @@ class MusicProvider extends ChangeNotifier {
   final int _enrichedCount = 0;
   bool _shuffleEnabled = false;
   PlaylistMode _loopMode = PlaylistMode.none;
+
+  // ===== THUMBNAIL LAZY LOADING =====
+  ThumbnailService? _thumbnailService;
+  final Set<String> _thumbnailLoadingIds = {};
+  bool _thumbnailBgStarted = false;
 
   // Auto-retry tracking
   int _retryCount = 0;
@@ -240,9 +246,12 @@ class MusicProvider extends ChangeNotifier {
        debugPrint('Stack: $stackTrace');
      }
      
-     // Load Now Playing playlist first to show something immediately
-      debugPrint('_initialize: Loading Now Playing playlist...');
-      await _loadNowPlayingPlaylist();
+      // Initialize thumbnail service with lazy loading
+      _initThumbnailService();
+
+      // Load Now Playing playlist first to show something immediately
+       debugPrint('_initialize: Loading Now Playing playlist...');
+       await _loadNowPlayingPlaylist();
       
       // Load last played song for resume functionality
       debugPrint('_initialize: Loading last played song...');
@@ -261,6 +270,74 @@ class MusicProvider extends ChangeNotifier {
      debugPrint('║  MusicProvider._initialize: END             ║');
      debugPrint('╚══════════════════════════════════════════╝');
    }
+
+  // ===== THUMBNAIL SERVICE =====
+  void _initThumbnailService() {
+    _thumbnailService = ThumbnailService();
+    _thumbnailService!.onThumbnailReady = (song, localPath) {
+      final updated = song.copyWith(localThumbnailPath: localPath);
+      _updateSongInPlace(updated);
+      _thumbnailLoadingIds.remove(song.youtubeId);
+
+      _databaseHelper.updateThumbnailPath(song.id, localPath);
+
+      debugPrint('Thumbnail ready for ${song.title}: $localPath');
+    };
+    _thumbnailService!.onThumbnailFailed = (song) {
+      _thumbnailLoadingIds.remove(song.youtubeId);
+    };
+  }
+
+  void _updateSongInPlace(Song updated) {
+    for (int i = 0; i < _playlist.length; i++) {
+      if (_playlist[i].id == updated.id) {
+        _playlist[i] = updated;
+      }
+    }
+    for (int i = 0; i < _displayedSongs.length; i++) {
+      if (_displayedSongs[i].id == updated.id) {
+        _displayedSongs[i] = updated;
+      }
+    }
+    if (_songsMap.containsKey(updated.url)) {
+      _songsMap[updated.url] = updated;
+    }
+    notifyListeners();
+  }
+
+  bool isThumbnailLoading(Song song) {
+    if (song.localThumbnailPath != null) return false;
+    if (song.youtubeId == null) return false;
+    return _thumbnailLoadingIds.contains(song.youtubeId!);
+  }
+
+  void requestThumbnail(Song song, {int priority = 2}) {
+    if (song.youtubeId == null || song.youtubeId!.isEmpty) return;
+    if (song.localThumbnailPath != null) return;
+    if (_thumbnailLoadingIds.contains(song.youtubeId!)) return;
+    _thumbnailLoadingIds.add(song.youtubeId!);
+    _thumbnailService?.requestThumbnail(song, priority: priority);
+  }
+
+  void _startBackgroundThumbnails() {
+    if (_thumbnailBgStarted) return;
+    _thumbnailBgStarted = true;
+
+    Future.delayed(const Duration(seconds: 3), () {
+      final songs = _songsMap.values
+          .where((s) =>
+              s.youtubeId != null &&
+              s.youtubeId!.isNotEmpty &&
+              s.localThumbnailPath == null)
+          .toList();
+      for (final song in songs) {
+        if (!_thumbnailLoadingIds.contains(song.youtubeId!)) {
+          _thumbnailLoadingIds.add(song.youtubeId!);
+        }
+      }
+      _thumbnailService?.requestThumbnailForAll(songs);
+    });
+  }
 
   // ===== PLAYBACK CONTROLS =====
   Future<void> play() async {
@@ -421,10 +498,19 @@ class MusicProvider extends ChangeNotifier {
   Future<void> refreshSongs() async {
     debugPrint('MusicProvider: refreshSongs() called');
     try {
+      // Reset thumbnail loading state so new songs get thumbnails
+      _thumbnailBgStarted = false;
+      _thumbnailLoadingIds.clear();
+      _thumbnailService?.dispose();
+      _thumbnailService = null;
+
       // Always clear static cache so a fresh DB query is performed
       _songsMap.clear();
       _playlist.clear();
       _displayedSongs.clear();
+
+      // Re-initialize thumbnail service
+      _initThumbnailService();
 
       // First load from database
       await _loadSongsFromDatabase();
@@ -753,11 +839,14 @@ class MusicProvider extends ChangeNotifier {
       await _player.play();
       await _updateNotification();
       await _updateNowPlayingPlaylist();
-      
+
+      // Prioritize thumbnail for currently playing song
+      requestThumbnail(song, priority: 0);
+
       // Save as last played song
       _lastPlayedSong = song;
       _saveLastPlayedSong(song);
-      
+
       notifyListeners();
     }
   }
@@ -785,6 +874,7 @@ class MusicProvider extends ChangeNotifier {
       await _player.play();
       await _updateNotification();
       await _updateNowPlayingPlaylist();
+      requestThumbnail(song, priority: 0);
       notifyListeners();
       debugPrint('Playing from library: ${song.title}, queue size: ${_playlist.length}');
     }
@@ -808,6 +898,7 @@ class MusicProvider extends ChangeNotifier {
     await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
+    requestThumbnail(songs[startIndex], priority: 0);
     notifyListeners();
   }
 
@@ -835,6 +926,7 @@ class MusicProvider extends ChangeNotifier {
     await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
+    requestThumbnail(currentPlaylist[_currentIndex], priority: 0);
     notifyListeners();
   }
 
@@ -848,6 +940,7 @@ class MusicProvider extends ChangeNotifier {
     await _player.play();
     await _updateNotification();
     await _updateNowPlayingPlaylist();
+    requestThumbnail(currentPlaylist[_currentIndex], priority: 0);
     notifyListeners();
   }
 
@@ -1140,6 +1233,7 @@ class MusicProvider extends ChangeNotifier {
       }
 
       _displayedSongs = List.from(_playlist);
+      _startBackgroundThumbnails();
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading songs from database: $e');

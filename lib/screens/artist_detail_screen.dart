@@ -367,6 +367,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
               final song = songs[index];
               final isCurrentSong = musicProvider.currentSong?.id == song.id;
               final isSelected = _selectedLocalSongs.contains(song.id);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.read<music_provider.MusicProvider>().requestThumbnail(song, priority: 1);
+              });
               return ListTile(
                 leading: _isMultiSelectMode
                     ? Checkbox(
