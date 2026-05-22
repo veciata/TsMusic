@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/painting.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:tsmusic/models/song.dart';
 
@@ -9,8 +10,7 @@ class HomeWidgetService {
   static Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId('group.com.veciata.tsmusic');
-    } catch (e) {
-      debugPrint('HomeWidgetService.init error: $e');
+    } catch (_) {
     }
   }
 
@@ -19,8 +19,7 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
       await HomeWidget.saveWidgetData<int>('widget_primary_color', primaryColor?.value ?? 0xFF1DB954);
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
-    } catch (e) {
-      debugPrint('HomeWidgetService.updateSearchWidget error: $e');
+    } catch (_) {
     }
   }
 
@@ -32,6 +31,7 @@ class HomeWidgetService {
     String? onlineAuthor,
     bool isDarkMode = false,
     Color? primaryColor,
+    List<Song>? queue,
   }) async {
     try {
       final String title;
@@ -58,13 +58,19 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<String>('widget_artist', artist);
       await HomeWidget.saveWidgetData<bool>(
           'widget_is_playing', isPlaying || isOnlinePlaying);
+      await HomeWidget.saveWidgetData<bool>('widget_is_online', isOnlinePlaying);
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
       await HomeWidget.saveWidgetData<String?>('widget_thumbnail', thumbnailPath);
       await HomeWidget.saveWidgetData<int>('widget_primary_color', primaryColor?.value ?? 0xFF1DB954);
 
+      final queueItems = (queue ?? []).take(10).map((s) => {
+        'title': s.title,
+        'artists': s.artists.join(', '),
+      }).toList();
+      await HomeWidget.saveWidgetData<String>('widget_queue', jsonEncode(queueItems));
+
       await HomeWidget.updateWidget(qualifiedAndroidName: _playerWidgetClass);
-    } catch (e) {
-      debugPrint('HomeWidgetService.updatePlayerWidget error: $e');
+    } catch (_) {
     }
   }
 }
