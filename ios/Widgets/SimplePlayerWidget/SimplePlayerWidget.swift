@@ -7,7 +7,8 @@ struct SimplePlayerProvider: TimelineProvider {
         SimplePlayerEntry(
             title: "TS Music",
             artist: "Not playing",
-            isPlaying: false
+            isPlaying: false,
+            isOnline: false
         )
     }
 
@@ -27,11 +28,13 @@ struct SimplePlayerProvider: TimelineProvider {
         let title = data?["widget_title"] as? String ?? "TS Music"
         let artist = data?["widget_artist"] as? String ?? "Not playing"
         let isPlaying = data?["widget_is_playing"] as? Bool ?? false
+        let isOnline = data?["widget_is_online"] as? Bool ?? false
         let primaryColor = data?["widget_primary_color"] as? Int ?? 0x1DB954
         return SimplePlayerEntry(
             title: title,
             artist: artist,
             isPlaying: isPlaying,
+            isOnline: isOnline,
             primaryColor: primaryColor
         )
     }
@@ -42,6 +45,7 @@ struct SimplePlayerEntry: TimelineEntry {
     let title: String
     let artist: String
     let isPlaying: Bool
+    let isOnline: Bool
     let primaryColor: Int
 }
 
@@ -68,15 +72,19 @@ struct SimplePlayerWidgetEntryView : View {
                     .lineLimit(1)
             }
             Spacer()
-            Image(systemName: "backward.fill")
-                .font(.title2)
-                .foregroundColor(accentColor)
+            if !entry.isOnline {
+                Image(systemName: "backward.fill")
+                    .font(.title2)
+                    .foregroundColor(accentColor)
+            }
             Image(systemName: entry.isPlaying ? "pause.fill" : "play.fill")
                 .font(.title2)
                 .foregroundColor(accentColor)
-            Image(systemName: "forward.fill")
-                .font(.title2)
-                .foregroundColor(accentColor)
+            if !entry.isOnline {
+                Image(systemName: "forward.fill")
+                    .font(.title2)
+                    .foregroundColor(accentColor)
+            }
         }
         .padding()
         .containerBackground(.background, for: .widget)

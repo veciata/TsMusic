@@ -42,6 +42,59 @@ class MusicProvider extends ChangeNotifier {
   void setYouTubeService(YouTubeService service) {
     _youTubeService = service;
     service.setStopOtherPlayerCallback(stop);
+    service.addListener(_onYouTubeServiceStateChanged);
+  }
+
+  void _onYouTubeServiceStateChanged() {
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler == null) return;
+
+    final audio = _youTubeService?.currentAudio;
+    final isOnlinePlaying = _youTubeService?.isPlaying ?? false;
+
+    if (audio != null) {
+      final song = Song(
+        id: -1,
+        youtubeId: audio.id,
+        title: audio.title,
+        artists: audio.artists.isNotEmpty ? audio.artists : [audio.author],
+        album: 'YouTube',
+        duration: audio.duration?.inMilliseconds ?? 0,
+        albumArtUrl: audio.thumbnailUrl,
+        url: audio.audioUrl ?? '',
+      );
+      if (!audioHandler.isOnlineMode) {
+        audioHandler.setOnlineMode(
+          online: true,
+          onPlay: () => _youTubeService?.play(),
+          onPause: () => _youTubeService?.pause(),
+          onStop: _stopOnlineAndResumeLocal,
+        );
+      }
+      audioHandler.setOnlineMedia(song, isPlaying: isOnlinePlaying);
+    } else {
+      if (audioHandler.isOnlineMode) {
+        audioHandler.setOnlineMode(online: false);
+        if (currentSong != null) {
+          _updateNotification();
+        }
+      }
+    }
+  }
+
+  Future<void> _stopOnlineAndResumeLocal() async {
+    await _youTubeService?.stop();
+    final audioHandler = AudioNotificationService.audioHandler;
+    audioHandler?.setOnlineMode(online: false);
+
+    if (_playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length) {
+      await _setAudioSource(_playlist[_currentIndex]);
+      await _player.play();
+      await _updateNotification();
+      await _updateNowPlayingPlaylist();
+      requestThumbnail(_playlist[_currentIndex], priority: 0);
+    }
+    notifyListeners();
   }
 
   
@@ -249,22 +302,22 @@ class MusicProvider extends ChangeNotifier {
       // Initialize thumbnail service with lazy loading
       _initThumbnailService();
 
-      // Load Now Playing playlist first to show something immediately
-       debugPrint('_initialize: Loading Now Playing playlist...');
-       await _loadNowPlayingPlaylist();
-      
       // Load last played song for resume functionality
       debugPrint('_initialize: Loading last played song...');
       _lastPlayedSong = await _loadLastPlayedSong();
       if (_lastPlayedSong != null) {
         debugPrint('_initialize: Last played song loaded: ${_lastPlayedSong!.title}');
       }
-     
-     // Then load songs in the background
-     debugPrint('_initialize: Loading local music in background...');
-     await loadLocalMusic().catchError((e) {
-       debugPrint('Error during initialization: $e');
-     });
+
+      // Load the music library first to populate _songsMap
+      debugPrint('_initialize: Loading local music...');
+      await loadLocalMusic().catchError((e) {
+        debugPrint('Error during initialization: $e');
+      });
+
+      // Then load Now Playing playlist (fills from _songsMap if DB is empty)
+      debugPrint('_initialize: Loading Now Playing playlist...');
+      await _loadNowPlayingPlaylist();
      
      debugPrint('╔══════════════════════════════════════════╗');
      debugPrint('║  MusicProvider._initialize: END             ║');
@@ -523,9 +576,12 @@ class MusicProvider extends ChangeNotifier {
       await _loadSongsFromDatabase();
 
       _applySorting();
-      notifyListeners();
+
+      // Restore now-playing playlist from DB
+      await _loadNowPlayingPlaylist();
+
       debugPrint(
-          'MusicProvider: refreshSongs() completed - ${_playlist.length} songs loaded');
+          'MusicProvider: refreshSongs() completed - ${_songsMap.length} songs in library');
     } catch (e) {
       debugPrint('Error refreshing songs: $e');
     }
@@ -713,12 +769,12 @@ class MusicProvider extends ChangeNotifier {
       // Load from database only
       await _loadSongsFromDatabase();
 
-      // Update displayed songs
-      _displayedSongs = List.from(_playlist);
+      // Restore now-playing playlist from DB or fill from library
+      await _loadNowPlayingPlaylist();
       _isLoading = false;
       _loadingNotifier.value = false;
 
-      if (_playlist.isEmpty) {
+      if (_songsMap.isEmpty) {
         // If no songs in database, automatically scan for music
         debugPrint('No songs in database, scanning for music...');
         await _scanLocalStorageForMusic();
@@ -734,8 +790,8 @@ class MusicProvider extends ChangeNotifier {
       _isLoading = false;
       _loadingNotifier.value = false;
 
-      // Only set error if playlist is still empty
-      if (_playlist.isEmpty) {
+      // Only set error if library is still empty
+      if (_songsMap.isEmpty) {
         notifyListeners();
       } else {
         // If we have songs, clear error and notify anyway
@@ -756,21 +812,19 @@ class MusicProvider extends ChangeNotifier {
       _error = 'Loading music...';
       notifyListeners();
 
-      // Clear current lists
-      _playlist.clear();
+      // Clear only displayed songs, preserve playback queue
       _displayedSongs.clear();
 
       // If we have cached songs and not forcing rescan, use them
       if (_songsMap.isNotEmpty && !forceRescan) {
-        _playlist = _cachedSongs;
-        _displayedSongs = List.from(_playlist);
+        _displayedSongs = _cachedSongs;
 
         // Ensure cached songs are also in database for consistency
         await _ensureCachedSongsInDatabase();
 
         _isLoading = false;
         _loadingNotifier.value = false;
-        _error = null; // Clear error on success
+        _error = null;
         notifyListeners();
         return;
       }
@@ -784,11 +838,11 @@ class MusicProvider extends ChangeNotifier {
       await _loadSongsFromDatabase();
 
       // If we have songs, update UI
-      if (_playlist.isNotEmpty) {
-        _displayedSongs = List.from(_playlist);
+      if (_songsMap.isNotEmpty) {
+        _displayedSongs = _cachedSongs;
         _isLoading = false;
         _loadingNotifier.value = false;
-        _error = null; // Clear error on success
+        _error = null;
         notifyListeners();
 
         // Check for new music in background
@@ -806,14 +860,14 @@ class MusicProvider extends ChangeNotifier {
       _loadingNotifier.value = false;
 
       // Try to recover by forcing a rescan
-      if (_playlist.isEmpty) {
+      if (_songsMap.isEmpty) {
         await _scanLocalStorageForMusic();
       }
     } finally {
       _isLoading = false;
       _loadingNotifier.value = false;
       // Clear error if we have songs
-      if (_playlist.isNotEmpty) {
+      if (_songsMap.isNotEmpty) {
         _error = null;
       }
       notifyListeners();
@@ -909,6 +963,10 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> next() async {
+    if (_youTubeService?.currentAudio != null) {
+      await _stopOnlineAndResumeLocal();
+      return;
+    }
     final List<Song> currentPlaylist =
         _isUsingTempPlaylist ? _tempPlaylist : _playlist;
     if (currentPlaylist.isEmpty) return;
@@ -931,6 +989,10 @@ class MusicProvider extends ChangeNotifier {
   }
 
   Future<void> previous() async {
+    if (_youTubeService?.currentAudio != null) {
+      await _stopOnlineAndResumeLocal();
+      return;
+    }
     final List<Song> currentPlaylist =
         _isUsingTempPlaylist ? _tempPlaylist : _playlist;
     if (currentPlaylist.isEmpty) return;
@@ -1144,8 +1206,8 @@ class MusicProvider extends ChangeNotifier {
         '🔍 _loadSongsFromDatabase called, _songsMap.isNotEmpty=${_songsMap.isNotEmpty}, _songsMap.length=${_songsMap.length}');
 
     if (_songsMap.isNotEmpty) {
-      _playlist = _cachedSongs;
-      debugPrint('⚡ Using cached songs: ${_playlist.length} songs');
+      _displayedSongs = _cachedSongs;
+      debugPrint('⚡ Using cached songs: ${_songsMap.length} songs');
       return;
     }
 
@@ -1175,8 +1237,7 @@ class MusicProvider extends ChangeNotifier {
       final songs = await db.rawQuery(songsQuery);
       debugPrint('📊 SQL query returned ${songs.length} songs');
 
-      // Clear current data
-      _playlist.clear();
+      // Clear only library cache, not the playback queue
       _songsMap.clear();
 
       // Process all songs in a single batch
@@ -1225,14 +1286,13 @@ class MusicProvider extends ChangeNotifier {
           // Use URL as key to prevent duplicates
           if (!_songsMap.containsKey(song.url)) {
             _songsMap[song.url] = song;
-            _playlist.add(song);
           }
         } catch (e) {
           debugPrint('Error loading song from database: $e');
         }
       }
 
-      _displayedSongs = List.from(_playlist);
+      _displayedSongs = _cachedSongs;
       _startBackgroundThumbnails();
       notifyListeners();
     } catch (e) {
@@ -1246,9 +1306,8 @@ class MusicProvider extends ChangeNotifier {
     try {
       final songMaps =
           await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
-      // Clear current playlist and add songs from database
+      // Clear current playlist to restore from DB
       _playlist.clear();
-      _songsMap.clear(); // Clear the map when reloading the playlist
 
       for (final songData in songMaps) {
         final songId = songData['id'] as int;
@@ -1267,9 +1326,18 @@ class MusicProvider extends ChangeNotifier {
               ? DateTime.parse(songData['created_at'] as String)
               : DateTime.now(),
         );
-        _addSongIfNotExists(song);
+        _playlist.add(song);
       }
-      _displayedSongs = List.from(_playlist);
+
+      if (_playlist.isEmpty && _songsMap.isNotEmpty) {
+        _playlist.addAll(_songsMap.values);
+        await _updateNowPlayingPlaylist();
+      }
+
+      if (_currentIndex >= _playlist.length) {
+        _currentIndex = 0;
+      }
+
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
@@ -1589,13 +1657,13 @@ class MusicProvider extends ChangeNotifier {
             await db.rawQuery('SELECT COUNT(*) as count FROM songs');
         final count = countResult.first['count'] as int? ?? 0;
 
-        if (_playlist.isEmpty && count == 0) {
+        if (_songsMap.isEmpty && count == 0) {
           _error =
               'No music found. Add music to your device or download from YouTube.';
         } else {
           _error = null;
           debugPrint(
-              '✅ SUCCESSFULLY ADDED ${_playlist.length} SONGS TO DATABASE');
+              '✅ SUCCESSFULLY ADDED ${_songsMap.length} SONGS TO DATABASE');
         }
       }
 
@@ -1919,8 +1987,7 @@ class MusicProvider extends ChangeNotifier {
       List<File> musicFiles, bool background) async {
     debugPrint('🔄 PROCESSING ${musicFiles.length} MUSIC FILES...');
 
-    // Clear existing data
-    _playlist.clear();
+    // Clear only library cache, preserve playback queue
     _songsMap.clear();
 
     // Get database connection
@@ -2001,13 +2068,14 @@ class MusicProvider extends ChangeNotifier {
       }
     });
 
-    // Update in-memory playlist
+    // Update in-memory library cache
     for (final song in validSongs) {
-      _addSongIfNotExists(song);
+      if (!_songsMap.containsKey(song.url)) {
+        _songsMap[song.url] = song;
+      }
     }
 
-    _displayedSongs = List.from(_playlist);
-    await _updateNowPlayingPlaylist();
+    _displayedSongs = _cachedSongs;
 
     debugPrint('🎉 SUCCESSFULLY ADDED ${validSongs.length} SONGS TO DATABASE');
 

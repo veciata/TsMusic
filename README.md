@@ -1,6 +1,6 @@
 # TS Music
 
-A modern, cross-platform music player with local library support and YouTube integration, built with Flutter.
+A modern, cross-platform music player with local library support, YouTube integration, and home screen widgets, built with Flutter.
 
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev/)
@@ -16,7 +16,9 @@ A modern, cross-platform music player with local library support and YouTube int
 - Search and filter your music library
 - Material 3 design with dynamic theming
 - Responsive layout for mobile and desktop
-- Internationalization support
+- **Internationalization** — Turkish (Türkçe) and English support
+- **Home screen widgets** — dynamic player widget with queue display
+- R8-optimized release builds with resource shrinking
 
 ## Screenshots
 
@@ -35,7 +37,7 @@ A modern, cross-platform music player with local library support and YouTube int
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/tsmusic.git
+   git clone https://github.com/veciata/TsMusic.git
    cd tsmusic
    ```
 
@@ -49,6 +51,16 @@ A modern, cross-platform music player with local library support and YouTube int
    flutter run
    ```
 
+### Release Build
+
+```bash
+# Build a release APK with R8 shrinking
+flutter build apk --release
+
+# For a smaller APK per architecture
+flutter build apk --release --split-per-abi
+```
+
 ## Project Structure
 
 ```
@@ -61,66 +73,28 @@ lib/
 ├── models/             # Data models and DTOs
 ├── providers/          # State management
 ├── screens/            # App screens/pages
-│   ├── home/           # Home screen components
-│   ├── settings/       # Settings screen components
-│   └── ...
 ├── widgets/            # Reusable UI components
 ├── routes/             # Navigation routes
-└── localization/       # Internationalization files
+└── localization/       # Internationalization (en, tr)
 ```
 
 ## Tech Stack
 
 - **Framework**: Flutter
-- **Language**: Dart
+- **Language**: Dart + Kotlin (Android)
 - **State Management**: Provider
 - **Audio Playback**: media_kit
 - **Database**: sqflite
 - **Networking**: http
 - **YouTube Integration**: youtube_explode_dart
 - **UI**: Material 3, FlexColorScheme
+- **Home Widgets**: home_widget (Android)
+- **Localization**: Flutter intl, custom l10n
 
 ## Code Style
 
-This project follows the [Effective Dart](https://dart.dev/guides/language/effective-dart) style guide. Please ensure your code adheres to these guidelines before submitting pull requests.
-
-Key points:
-- Use `camelCase` for variables and functions
-- Use `PascalCase` for class names
-- Use `UPPER_CASE` for constants
-- Use `_private` for private members
-- Always include documentation for public APIs
-- Keep methods short and focused on a single responsibility
-
-## Contributing
-
-Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) before submitting pull requests.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+This project follows the [Effective Dart](https://dart.dev/guides/language/effective-dart) style guide.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## TODO
-- [ ] Perminant notification
-- [ ] Playlist download and auto playlist generation
-- [x] ~~Improved UI and color scheme support~~
-- [x] ~~New player screen styles~~
-- [ ] Auto detect language support
-- [ ] More language support
-
-## Acknowledgments
-
-- [Flutter](https://flutter.dev/) team for the amazing framework
-- [media_kit](https://pub.dev/packages/media_kit) for audio playback
-- [youtube_explode_dart](https://pub.dev/packages/youtube_explode_dart) for YouTube integration
-- All contributors who have helped improve this project
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+This project is licensed under the MIT License.

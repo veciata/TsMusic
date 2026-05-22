@@ -16,6 +16,7 @@ import 'package:tsmusic/screens/sql_screen.dart';
 import 'package:tsmusic/screens/introduction_screen.dart';
 import 'package:tsmusic/screens/search_screen.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
+import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/services/youtube_service.dart';
@@ -209,6 +210,12 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         context,
         listen: false,
       );
+      final youTubeService = Provider.of<YouTubeService>(
+        context,
+        listen: false,
+      );
+      // Connect YouTube service to MusicProvider for notification integration
+      musicProv.setYouTubeService(youTubeService);
       // Set up widget auto-update — fires on every notifyListeners
       musicProv.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
       // Load from database first, then scan for new music in background
@@ -311,6 +318,18 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       );
       final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       final isDarkMode = themeProvider.isDarkMode;
+      final allSongs = musicProv.allSongs;
+      final currentIdx = musicProv.currentIndex;
+      final List<Song> queue;
+      if (currentIdx != null && allSongs.length > 1) {
+        queue = [
+          ...allSongs.sublist(currentIdx + 1),
+          ...allSongs.sublist(0, currentIdx),
+        ];
+      } else {
+        queue = [];
+      }
+
       HomeWidgetService.updatePlayerWidget(
         currentSong: musicProv.currentSong,
         isPlaying: musicProv.isPlaying,
@@ -319,14 +338,14 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         onlineAuthor: youTubeService.currentAudio?.author,
         isDarkMode: isDarkMode,
         primaryColor: themeProvider.primaryColor,
+        queue: queue,
       );
       HomeWidgetService.updateSearchWidget(
         isDarkMode: isDarkMode,
         primaryColor: themeProvider.primaryColor,
       );
 
-    } catch (e) {
-      debugPrint('Widget update error: $e');
+    } catch (_) {
     }
   }
 

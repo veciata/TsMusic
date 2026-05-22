@@ -14,9 +14,47 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final Function()? onSkipToNext;
   final Function()? onSkipToPrevious;
   Song? _currentSong;
+
+  bool _isOnlineMode = false;
+  VoidCallback? _onOnlinePlay;
+  VoidCallback? _onOnlinePause;
+  Function()? _onOnlineStop;
   
   AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged, {this.onSkipToNext, this.onSkipToPrevious}) : super() {
     _init();
+  }
+
+  bool get isOnlineMode => _isOnlineMode;
+
+  void setOnlineMode({
+    required bool online,
+    VoidCallback? onPlay,
+    VoidCallback? onPause,
+    Function()? onStop,
+  }) {
+    _isOnlineMode = online;
+    if (online) {
+      _onOnlinePlay = onPlay;
+      _onOnlinePause = onPause;
+      _onOnlineStop = onStop;
+    } else {
+      _onOnlinePlay = null;
+      _onOnlinePause = null;
+      _onOnlineStop = null;
+    }
+    if (!online) {
+      _updatePlaybackState(_player.state.playing);
+    }
+  }
+
+  void setOnlineMedia(Song song, {required bool isPlaying}) {
+    final duration = song.duration > 0
+        ? Duration(milliseconds: song.duration)
+        : _player.state.duration;
+    final mediaItem = _createMediaItem(song, duration);
+    this.mediaItem.add(mediaItem);
+    queue.add([mediaItem]);
+    _updatePlaybackState(isPlaying);
   }
 
   void _init() {
@@ -32,18 +70,30 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> play() async {
+    if (_isOnlineMode && _onOnlinePlay != null) {
+      _onOnlinePlay!();
+      return;
+    }
     await _player.play();
     onPlaybackStateChanged(true);
   }
 
   @override
   Future<void> pause() async {
+    if (_isOnlineMode && _onOnlinePause != null) {
+      _onOnlinePause!();
+      return;
+    }
     await _player.pause();
     onPlaybackStateChanged(false);
   }
 
   @override
   Future<void> stop() async {
+    if (_isOnlineMode && _onOnlineStop != null) {
+      _onOnlineStop!();
+      return;
+    }
     await _player.stop();
     onPlaybackStateChanged(false);
     await super.stop();
@@ -56,22 +106,26 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToNext() async {
-    // Call callback if provided, otherwise handled by playlist manager
+    if (_isOnlineMode && _onOnlineStop != null) {
+      _onOnlineStop!();
+      return;
+    }
     if (onSkipToNext != null) {
       onSkipToNext!();
     } else {
-      // Handled by playlist manager
       onCurrentSongChanged(null);
     }
   }
 
   @override
   Future<void> skipToPrevious() async {
-    // Call callback if provided, otherwise handled by playlist manager
+    if (_isOnlineMode && _onOnlineStop != null) {
+      _onOnlineStop!();
+      return;
+    }
     if (onSkipToPrevious != null) {
       onSkipToPrevious!();
     } else {
-      // Handled by playlist manager
       onCurrentSongChanged(null);
     }
   }
@@ -84,23 +138,31 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   Future<void> setVolume(double volume) => _player.setVolume(volume);
 
   void _updatePlaybackState(bool isPlaying) {
+    final controls = _isOnlineMode
+        ? [
+            isPlaying ? MediaControl.pause : MediaControl.play,
+            MediaControl.stop,
+          ]
+        : [
+            MediaControl.skipToPrevious,
+            isPlaying ? MediaControl.pause : MediaControl.play,
+            MediaControl.stop,
+            MediaControl.skipToNext,
+          ];
+    final compactIndices = _isOnlineMode ? const [0] : const [0, 1, 3];
+
     playbackState.add(PlaybackState(
-      controls: [
-        MediaControl.skipToPrevious,
-        isPlaying ? MediaControl.pause : MediaControl.play,
-        MediaControl.stop,
-        MediaControl.skipToNext,
-      ],
+      controls: controls,
       systemActions: const {
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
       },
-      androidCompactActionIndices: const [0, 1, 3],
+      androidCompactActionIndices: compactIndices,
       processingState: _mapProcessingState(),
       playing: isPlaying,
-      updatePosition: _player.state.position,
-      bufferedPosition: _player.state.buffer,
+      updatePosition: _isOnlineMode ? Duration.zero : _player.state.position,
+      bufferedPosition: _isOnlineMode ? Duration.zero : _player.state.buffer,
       speed: _player.state.rate,
       queueIndex: 0,
     ));

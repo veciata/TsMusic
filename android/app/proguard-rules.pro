@@ -1,0 +1,5 @@
+-keep class com.veciata.tsmusic.** { *; }
+-keep class es.antonborri.home_widget.** { *; }
+-keep class com.mediakit.** { *; }
+-dontwarn com.mediakit.**
+-dontwarn androidx.glance.**

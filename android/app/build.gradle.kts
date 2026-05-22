@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -10,18 +9,10 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
 
-    aarMetadata {
-        enabled = false
-    }
-
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
@@ -36,9 +27,9 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
+            val keystore = System.getenv("KEYSTORE_PATH")
+            if (keystore != null) {
+                storeFile = file(keystore)
                 storePassword = System.getenv("KEY_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
@@ -51,8 +42,28 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig = signingConfigs.findByName("release")?.takeIf {
+                it.storeFile != null
+            } ?: signingConfigs.getByName("debug")
         }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+tasks.whenTaskAdded {
+    if (name.startsWith("check") && name.endsWith("AarMetadata")) {
+        enabled = false
     }
 }
 
@@ -60,12 +71,11 @@ flutter {
     source = "../.."
 }
 
-configurations.all {
-    resolutionStrategy {
-        force("androidx.glance:glance-appwidget:1.1.1")
-    }
-}
-
 dependencies {
+    constraints {
+        implementation("androidx.glance:glance-appwidget:1.1.1") {
+            because("home_widget's 1.+ resolves to alpha requiring SDK 37")
+        }
+    }
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
