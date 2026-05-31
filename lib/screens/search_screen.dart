@@ -254,7 +254,7 @@ class _SearchScreenState extends State<SearchScreen> {
           song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
           (song.album?.toLowerCase().contains(query) ?? false)).toList();
 
-    final isLoadingYouTube = _isSearchingYouTube && _youtubeResults.isEmpty;
+    final isLoadingYouTube = _isSearchingYouTube;
     final hasYouTubeResults = _youtubeResults.isNotEmpty;
 
     return ListView(
@@ -377,20 +377,23 @@ class _SearchScreenState extends State<SearchScreen> {
               hintText: 'Search songs...',
               border: InputBorder.none,
             ),
-            onChanged: (value) {
-              _debounceTimer?.cancel();
-              if (value.isNotEmpty) {
-                setState(() => _isSearchingYouTube = true);
-                _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-                  _searchYouTube(value);
-                });
-              } else {
-                setState(() {
-                  _youtubeResults.clear();
-                  _isSearchingYouTube = false;
-                });
-              }
-            },
+onChanged: (value) {
+  _debounceTimer?.cancel();
+  if (value.isNotEmpty) {
+    setState(() {
+      _isSearchingYouTube = true;
+      _youtubeResults.clear(); // Clear results immediately for better UX
+    });
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _searchYouTube(value);
+    });
+  } else {
+    setState(() {
+      _youtubeResults.clear();
+      _isSearchingYouTube = false;
+    });
+  }
+},
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),

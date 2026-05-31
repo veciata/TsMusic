@@ -155,12 +155,15 @@ class YouTubeService with ChangeNotifier {
   // Play audio from YouTube
   Future<void> playAudio(YouTubeAudio audio) async {
     try {
+      // Stop local player first to avoid double sound — MUST be before
+      // any notifyListeners() call, otherwise the online mode flag set
+      // by _onYouTubeServiceStateChanged causes the stop to route through
+      // _stopOnlineAndResumeLocal which re-starts the local song.
+      _stopOtherPlayer?.call();
+
       _currentAudio = audio;
       isLoading.value = true;
       notifyListeners();
-
-      // Stop local player first to avoid double sound
-      _stopOtherPlayer?.call();
 
       // Clear any previous errors
       await _player.stop();

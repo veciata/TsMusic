@@ -86,10 +86,12 @@ class ThemeProvider with ChangeNotifier {
         return 'Traditional layout with large album art';
       case PlayerStyle.modern:
         return 'Full-screen blurred background with glow effects';
-      case PlayerStyle.compact:
-        return 'Small player with horizontal layout';
       case PlayerStyle.minimal:
         return 'Ultra-minimal with bottom sheet controls';
+      case PlayerStyle.square:
+        return 'Massive square album art focus';
+      case PlayerStyle.glass:
+        return 'Glassmorphism interface with heavily blurred backgrounds';
     }
   }
 }

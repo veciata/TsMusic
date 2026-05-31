@@ -86,103 +86,115 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
                     context, widgetId + 3000, openAppIntent, pendingFlags
                 )
 
-                val options = appWidgetManager.getAppWidgetOptions(widgetId)
-                val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
-                val layoutRes = when {
-                    minHeight < 80 -> R.layout.simple_player_widget_compact
-                    minHeight < 160 -> R.layout.simple_player_widget_4x1
-                    else -> R.layout.simple_player_widget_4x2
-                }
+                fun buildRemoteViews(layoutResId: Int): RemoteViews {
+                    return RemoteViews(context.packageName, layoutResId).apply {
+                        setInt(R.id.widget_root, "setBackgroundResource", bgRes)
+                        setTextViewText(R.id.widget_title, title)
+                        setTextViewText(R.id.widget_artist, artist)
+                        setTextColor(R.id.widget_title, titleColor)
+                        setTextColor(R.id.widget_artist, artistColor)
 
-                val views = RemoteViews(context.packageName, layoutRes).apply {
-                    setInt(R.id.widget_root, "setBackgroundResource", bgRes)
-                    setTextViewText(R.id.widget_title, title)
-                    setTextViewText(R.id.widget_artist, artist)
-                    setTextColor(R.id.widget_title, titleColor)
-                    setTextColor(R.id.widget_artist, artistColor)
-
-                    if (thumbPath != null && thumbPath.startsWith("/")) {
-                        val bitmap = BitmapFactory.decodeFile(thumbPath)
-                        if (bitmap != null) {
-                            setImageViewBitmap(R.id.widget_thumbnail, bitmap)
+                        if (thumbPath != null && thumbPath.startsWith("/")) {
+                            val bitmap = BitmapFactory.decodeFile(thumbPath)
+                            if (bitmap != null) {
+                                setImageViewBitmap(R.id.widget_thumbnail, bitmap)
+                            } else {
+                                setImageViewResource(R.id.widget_thumbnail, android.R.drawable.ic_menu_gallery)
+                            }
                         } else {
                             setImageViewResource(R.id.widget_thumbnail, android.R.drawable.ic_menu_gallery)
                         }
-                    } else {
-                        setImageViewResource(R.id.widget_thumbnail, android.R.drawable.ic_menu_gallery)
-                    }
 
-                    setOnClickPendingIntent(R.id.widget_thumbnail, openAppPendingIntent)
-                    setOnClickPendingIntent(R.id.widget_info_container, openAppPendingIntent)
+                        setOnClickPendingIntent(R.id.widget_thumbnail, openAppPendingIntent)
+                        setOnClickPendingIntent(R.id.widget_info_container, openAppPendingIntent)
 
-                    setImageViewResource(
-                        R.id.widget_play_pause,
-                        if (isPlaying) android.R.drawable.ic_media_pause
-                        else android.R.drawable.ic_media_play
-                    )
-
-                    val playIntent = Intent(context, MediaButtonReceiver::class.java).apply {
-                        action = Intent.ACTION_MEDIA_BUTTON
-                        putExtra(Intent.EXTRA_KEY_EVENT,
-                            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
-                    }
-                    val playPendingIntent = PendingIntent.getBroadcast(
-                        context, widgetId, playIntent, pendingFlags
-                    )
-                    setOnClickPendingIntent(R.id.widget_play_pause, playPendingIntent)
-
-                    val prevIntent = Intent(context, MediaButtonReceiver::class.java).apply {
-                        action = Intent.ACTION_MEDIA_BUTTON
-                        putExtra(Intent.EXTRA_KEY_EVENT,
-                            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
-                    }
-                    val prevPendingIntent = PendingIntent.getBroadcast(
-                        context, widgetId + 2000, prevIntent, pendingFlags
-                    )
-                    setOnClickPendingIntent(R.id.widget_previous, prevPendingIntent)
-
-                    val nextIntent = Intent(context, MediaButtonReceiver::class.java).apply {
-                        action = Intent.ACTION_MEDIA_BUTTON
-                        putExtra(Intent.EXTRA_KEY_EVENT,
-                            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT))
-                    }
-                    val nextPendingIntent = PendingIntent.getBroadcast(
-                        context, widgetId + 1000, nextIntent, pendingFlags
-                    )
-                    setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        setInt(R.id.widget_play_pause, "setColorFilter", primaryColor)
-                        setInt(R.id.widget_previous, "setColorFilter", primaryColor)
-                        setInt(R.id.widget_next, "setColorFilter", primaryColor)
-                    }
-
-                    val prevNextVisibility = if (isOnline) View.GONE else View.VISIBLE
-                    setViewVisibility(R.id.widget_previous, prevNextVisibility)
-                    setViewVisibility(R.id.widget_next, prevNextVisibility)
-
-                    if (layoutRes != R.layout.simple_player_widget_compact) {
-                        setTextColor(R.id.widget_up_next, primaryColor)
-
-                        val queueItemIds = listOf(
-                            R.id.widget_queue_item_1,
-                            R.id.widget_queue_item_2,
-                            R.id.widget_queue_item_3,
-                            R.id.widget_queue_item_4,
+                        setImageViewResource(
+                            R.id.widget_play_pause,
+                            if (isPlaying) android.R.drawable.ic_media_pause
+                            else android.R.drawable.ic_media_play
                         )
-                        for (i in queueItemIds.indices) {
-                            if (i < queueItems.size) {
-                                val (songTitle, songArtist) = queueItems[i]
-                                val displayText = if (songArtist.isNotEmpty()) "$songTitle — $songArtist" else songTitle
-                                setTextViewText(queueItemIds[i], displayText)
-                                setTextColor(queueItemIds[i], queueItemColor)
-                                setViewVisibility(queueItemIds[i], View.VISIBLE)
-                                setOnClickPendingIntent(queueItemIds[i], openAppPendingIntent)
-                            } else {
-                                setViewVisibility(queueItemIds[i], View.GONE)
+
+                        val playIntent = Intent(context, MediaButtonReceiver::class.java).apply {
+                            action = Intent.ACTION_MEDIA_BUTTON
+                            putExtra(Intent.EXTRA_KEY_EVENT,
+                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+                        }
+                        val playPendingIntent = PendingIntent.getBroadcast(
+                            context, widgetId, playIntent, pendingFlags
+                        )
+                        setOnClickPendingIntent(R.id.widget_play_pause, playPendingIntent)
+
+                        val prevIntent = Intent(context, MediaButtonReceiver::class.java).apply {
+                            action = Intent.ACTION_MEDIA_BUTTON
+                            putExtra(Intent.EXTRA_KEY_EVENT,
+                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+                        }
+                        val prevPendingIntent = PendingIntent.getBroadcast(
+                            context, widgetId + 2000, prevIntent, pendingFlags
+                        )
+                        setOnClickPendingIntent(R.id.widget_previous, prevPendingIntent)
+
+                        val nextIntent = Intent(context, MediaButtonReceiver::class.java).apply {
+                            action = Intent.ACTION_MEDIA_BUTTON
+                            putExtra(Intent.EXTRA_KEY_EVENT,
+                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT))
+                        }
+                        val nextPendingIntent = PendingIntent.getBroadcast(
+                            context, widgetId + 1000, nextIntent, pendingFlags
+                        )
+                        setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            setInt(R.id.widget_play_pause, "setColorFilter", primaryColor)
+                            setInt(R.id.widget_previous, "setColorFilter", primaryColor)
+                            setInt(R.id.widget_next, "setColorFilter", primaryColor)
+                        }
+
+                        val prevNextVisibility = if (isOnline) View.GONE else View.VISIBLE
+                        setViewVisibility(R.id.widget_previous, prevNextVisibility)
+                        setViewVisibility(R.id.widget_next, prevNextVisibility)
+
+                        if (layoutResId != R.layout.simple_player_widget_compact) {
+                            setTextColor(R.id.widget_up_next, primaryColor)
+
+                            val queueItemIds = listOf(
+                                R.id.widget_queue_item_1,
+                                R.id.widget_queue_item_2,
+                                R.id.widget_queue_item_3,
+                                R.id.widget_queue_item_4,
+                            )
+                            for (i in queueItemIds.indices) {
+                                if (i < queueItems.size) {
+                                    val (songTitle, songArtist) = queueItems[i]
+                                    val displayText = if (songArtist.isNotEmpty()) "$songTitle — $songArtist" else songTitle
+                                    setTextViewText(queueItemIds[i], displayText)
+                                    setTextColor(queueItemIds[i], queueItemColor)
+                                    setViewVisibility(queueItemIds[i], View.VISIBLE)
+                                    setOnClickPendingIntent(queueItemIds[i], openAppPendingIntent)
+                                } else {
+                                    setViewVisibility(queueItemIds[i], View.GONE)
+                                }
                             }
                         }
                     }
+                }
+
+                val views = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val viewMapping = mapOf(
+                        android.util.SizeF(100f, 40f) to buildRemoteViews(R.layout.simple_player_widget_compact),
+                        android.util.SizeF(200f, 100f) to buildRemoteViews(R.layout.simple_player_widget_4x1),
+                        android.util.SizeF(200f, 160f) to buildRemoteViews(R.layout.simple_player_widget_4x2)
+                    )
+                    RemoteViews(viewMapping)
+                } else {
+                    val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                    val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+                    val currentLayoutRes = when {
+                        minHeight < 80 -> R.layout.simple_player_widget_compact
+                        minHeight < 160 -> R.layout.simple_player_widget_4x1
+                        else -> R.layout.simple_player_widget_4x2
+                    }
+                    buildRemoteViews(currentLayoutRes)
                 }
                 appWidgetManager.updateAppWidget(widgetId, views)
             } catch (_: Exception) {

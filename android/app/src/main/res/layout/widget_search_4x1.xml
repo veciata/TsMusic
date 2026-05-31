@@ -3,7 +3,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:background="@drawable/widget_background"
+    android:layout_margin="4dp">
 
     <LinearLayout
         android:id="@+id/search_4x1_container"

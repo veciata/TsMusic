@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.1] - 2026-05-31
+
+### Fixed / Düzeltildi
+- YouTube song no longer triggers local audio simultaneously — online and local players are properly isolated.  
+  YouTube şarkısı başlatıldığında yerel şarkı da çalmıyor artık — çevrimiçi ve yerel oynatıcı tamamen ayrıştırıldı.
+
+### Added / Eklendi
+- Separate system notification for online (YouTube) playback with "YouTube Music" album label and streamlined controls (play/pause/stop).  
+  Çevrimiçi (YouTube) oynatma için ayrı sistem bildirimi: "YouTube Music" albüm etiketi ve sade kontroller (oynat/durdur/duraklat).
+- Auto-download thumbnail when playing a local song; falls back to artist cover image if the song has no YouTube ID or the thumbnail fails.  
+  Yerel şarkı çalarken küçük resmi otomatik indirir; YouTube ID'si yoksa veya küçük resim alınamazsa sanatçı kapağını kullanır.
+- Artist cover thumbnails are cached and fetched once per artist.  
+  Sanatçı kapak resimleri önbelleğe alınır ve her sanatçı için yalnızca bir kez getirilir.
+
+### Changed / Değiştirildi
+- Player style cleanup: replaced "Compact" style with "Square" and "Glass" styles for a modern look.  
+  Oynatıcı stili güncellendi: "Kompakt" stil kaldırıldı, yerine "Kare" ve "Cam" stilleri eklendi.
+- Now Playing screen: removed volume slider for a cleaner layout.  
+  Şu Anda Çalan ekranı: daha sade bir düzen için ses kaydırıcısı kaldırıldı.
+- Search screen: YouTube loading indicator shows immediately on text input.  
+  Arama ekranı: metin girildiğinde YouTube yükleniyor göstergesi anında görünüyor.
+- Android home widgets: updated to use gradient backgrounds with consistent margins for a polished appearance.  
+  Android ana ekran widget'ları: gradient arka plan ve tutarlı kenar boşlukları ile görsel olarak iyileştirildi.
+
 ## [1.2.0] - 2026-05-22
 
 ### Added

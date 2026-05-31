@@ -5,131 +5,139 @@ Widget buildMinimalStyle(StyleParams params) {
   final theme = params.theme;
   final musicProvider = params.musicProvider;
   final currentSong = params.currentSong;
-  final albumArt = params.albumArt;
+  final albumArtUrl = params.albumArtUrl;
   final progressBar = params.progressBar;
-  final bottomControls = params.bottomControls;
   final togglePlay = params.togglePlay;
+  final header = params.header;
 
-  return Material(
-    color: Colors.transparent,
-    child: Stack(
-      children: [
-        // Full album art as background
-        Positioned.fill(child: albumArt),
-
-        // Gradient overlay
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.transparent,
-                Colors.black87,
-              ],
-              stops: [0.5, 1.0],
-            ),
-          ),
-        ),
-
-        // Bottom sheet with minimal controls
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: 0.95),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 16,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Drag handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(2),
+  return Scaffold(
+    backgroundColor: theme.colorScheme.surface,
+    body: SafeArea(
+      top: false, // Edge-to-edge at the top
+      child: Column(
+        children: [
+          // Massive edge-to-edge album art
+          AspectRatio(
+            aspectRatio: 1,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (albumArtUrl != null)
+                  Image.network(
+                    albumArtUrl,
+                    fit: BoxFit.cover,
+                  )
+                else
+                  Container(
+                    color: theme.colorScheme.primaryContainer,
+                    child: Icon(
+                      Icons.music_note,
+                      size: 100,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                // Gradient for header text visibility
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 120,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.6),
+                          Colors.transparent,
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Song info with accent color
+                ),
+                SafeArea(
+                  bottom: false,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: header,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Typography focus
                   Text(
                     currentSong.title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                       color: theme.colorScheme.onSurface,
                     ),
-                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     currentSong.artists.join(', '),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w500,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      letterSpacing: 1.2,
                     ),
+                    textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 16),
-
-                  // Minimal progress bar
+                  
+                  const Spacer(),
+                  
+                  // Stripped down progress bar
                   Theme(
                     data: theme.copyWith(
-                      progressIndicatorTheme: ProgressIndicatorThemeData(
-                        color: theme.colorScheme.primary,
-                        linearTrackColor:
-                            theme.colorScheme.primary.withValues(alpha: 0.2),
+                      sliderTheme: SliderThemeData(
+                        activeTrackColor: theme.colorScheme.onSurface,
+                        inactiveTrackColor: theme.colorScheme.onSurface.withOpacity(0.1),
+                        thumbColor: theme.colorScheme.onSurface,
+                        trackHeight: 2,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                       ),
                     ),
                     child: progressBar,
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Minimal playback controls (just play/pause)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          musicProvider.isPlaying
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_filled,
-                          size: 56,
-                          color: theme.colorScheme.primary,
-                        ),
-                        onPressed: togglePlay,
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Just a massive play/pause button
+                  GestureDetector(
+                    onTap: togglePlay,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: theme.colorScheme.onSurface,
                       ),
-                    ],
+                      child: Icon(
+                        musicProvider.isPlaying ? Icons.pause : Icons.play_arrow,
+                        size: 40,
+                        color: theme.colorScheme.surface,
+                      ),
+                    ),
                   ),
-
-                  const SizedBox(height: 8),
-                  bottomControls,
+                  const Spacer(),
                 ],
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

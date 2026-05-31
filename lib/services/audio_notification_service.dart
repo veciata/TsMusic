@@ -13,6 +13,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final Function(bool) onPlaybackStateChanged;
   final Function()? onSkipToNext;
   final Function()? onSkipToPrevious;
+  final Function(Song, bool)? onOnlineMediaChanged;
   Song? _currentSong;
 
   bool _isOnlineMode = false;
@@ -20,7 +21,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   VoidCallback? _onOnlinePause;
   Function()? _onOnlineStop;
   
-  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged, {this.onSkipToNext, this.onSkipToPrevious}) : super() {
+  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged, {this.onSkipToNext, this.onSkipToPrevious, this.onOnlineMediaChanged}) : super() {
     _init();
   }
 
@@ -48,23 +49,31 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void setOnlineMedia(Song song, {required bool isPlaying}) {
+    _currentSong = song;
+
+    // Update the system notification with online song info
     final duration = song.duration > 0
         ? Duration(milliseconds: song.duration)
-        : _player.state.duration;
-    final mediaItem = _createMediaItem(song, duration);
-    this.mediaItem.add(mediaItem);
-    queue.add([mediaItem]);
+        : Duration.zero;
+    final item = _createOnlineMediaItem(song, duration);
+    mediaItem.add(item);
+    queue.add([item]);
+
     _updatePlaybackState(isPlaying);
+
+    onOnlineMediaChanged?.call(song, isPlaying);
   }
 
   void _init() {
-    // Listen to player state changes and update notification
-    _player.stream.playing.listen(_updatePlaybackState);
+    _player.stream.playing.listen((isPlaying) {
+      if (!_isOnlineMode) {
+        _updatePlaybackState(isPlaying);
+      }
+    });
     _player.stream.position.listen(_updatePosition);
     _player.stream.duration.listen(_updateDuration);
     _player.stream.buffer.listen(_updateBuffer);
-    
-    // Set initial playback state
+
     _updatePlaybackState(_player.state.playing);
   }
 
@@ -144,12 +153,12 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
             MediaControl.stop,
           ]
         : [
-            MediaControl.skipToPrevious,
             isPlaying ? MediaControl.pause : MediaControl.play,
-            MediaControl.stop,
             MediaControl.skipToNext,
+            MediaControl.skipToPrevious,
+            MediaControl.stop,
           ];
-    final compactIndices = _isOnlineMode ? const [0] : const [0, 1, 3];
+    final compactIndices = const [0, 1];
 
     playbackState.add(PlaybackState(
       controls: controls,
@@ -169,17 +178,20 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _updatePosition(Duration position) {
+    if (_isOnlineMode) return;
     final state = playbackState.value;
     playbackState.add(state.copyWith(updatePosition: position));
   }
 
   void _updateDuration(Duration? duration) {
+    if (_isOnlineMode) return;
     if (duration != null && _currentSong != null) {
       mediaItem.add(_createMediaItem(_currentSong!, duration));
     }
   }
 
   void _updateBuffer(Duration buffer) {
+    if (_isOnlineMode) return;
     final state = playbackState.value;
     playbackState.add(state.copyWith(bufferedPosition: buffer));
   }
@@ -215,15 +227,30 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   }
 
   MediaItem _createMediaItem(Song song, Duration? duration) {
-    final artUri = song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty 
-        ? Uri.parse(song.albumArtUrl!) 
+    final artUri = song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
+        ? Uri.parse(song.albumArtUrl!)
         : null;
-    
+
     return MediaItem(
       id: song.id.toString(),
       title: song.title.isNotEmpty ? song.title : 'Unknown Title',
       artist: song.artists.isNotEmpty ? song.artists.join(', ') : 'Unknown Artist',
       album: song.album,
+      artUri: artUri,
+      duration: duration,
+    );
+  }
+
+  MediaItem _createOnlineMediaItem(Song song, Duration? duration) {
+    final artUri = song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
+        ? Uri.parse(song.albumArtUrl!)
+        : null;
+
+    return MediaItem(
+      id: 'yt:${song.youtubeId ?? song.id.toString()}',
+      title: song.title.isNotEmpty ? song.title : 'Unknown Title',
+      artist: song.artists.isNotEmpty ? song.artists.join(', ') : 'Unknown Artist',
+      album: 'YouTube Music',
       artUri: artUri,
       duration: duration,
     );
@@ -247,6 +274,7 @@ class AudioNotificationService {
     Function()? onSkipToNext,
     Function()? onSkipToPrevious,
     Color? notificationColor,
+    Function(Song, bool)? onOnlineMediaChanged,
   }) async {
     debugPrint('AudioNotificationService: init() called');
     try {
@@ -266,9 +294,11 @@ class AudioNotificationService {
              onPlaybackStateChanged,
              onSkipToNext: onSkipToNext,
              onSkipToPrevious: onSkipToPrevious,
+             onOnlineMediaChanged: onOnlineMediaChanged,
            ),
             config: getNotificationSettings(
               notificationColor: notificationColor,
+              fontSize: null, // Reserved for future implementation
             ),
          );
         debugPrint('AudioNotificationService: AudioService.init() returned handler=$_audioHandler');

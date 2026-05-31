@@ -14,6 +14,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/services/audio_notification_service.dart';
+import 'package:tsmusic/services/home_widget_service.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/services/thumbnail_service.dart';
 import 'package:tsmusic/services/youtube_service.dart';
@@ -77,6 +78,14 @@ class MusicProvider extends ChangeNotifier {
         audioHandler.setOnlineMode(online: false);
         if (currentSong != null) {
           _updateNotification();
+          HomeWidgetService.updatePlayerWidget(
+            currentSong: currentSong,
+            isPlaying: _player.state.playing,
+            isOnlinePlaying: false,
+            isDarkMode: false,
+            primaryColor: null,
+            queue: null,
+          );
         }
       }
     }
@@ -289,6 +298,18 @@ class MusicProvider extends ChangeNotifier {
             debugPrint('Skip to previous from notification');
             previous();
           },
+          onOnlineMediaChanged: (song, isPlaying) {
+            HomeWidgetService.updatePlayerWidget(
+              currentSong: null,
+              isPlaying: false,
+              isOnlinePlaying: true,
+              onlineTitle: song.title,
+              onlineAuthor: song.artists.isNotEmpty ? song.artists.first : '',
+              isDarkMode: false,
+              primaryColor: null,
+              queue: null,
+            );
+          },
         );
        debugPrint('_initialize: AudioNotificationService.init() returned handler=${AudioNotificationService.audioHandler}');
      } on Exception catch (e, stackTrace) {
@@ -330,14 +351,24 @@ class MusicProvider extends ChangeNotifier {
     _thumbnailService!.onThumbnailReady = (song, localPath) {
       final updated = song.copyWith(localThumbnailPath: localPath);
       _updateSongInPlace(updated);
-      _thumbnailLoadingIds.remove(song.youtubeId);
+
+      // Remove from loading tracking — could be youtubeId or artist key
+      if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
+        _thumbnailLoadingIds.remove(song.youtubeId!);
+      } else if (song.artists.isNotEmpty) {
+        _thumbnailLoadingIds.remove('artist:${song.artists.first}');
+      }
 
       _databaseHelper.updateThumbnailPath(song.id, localPath);
 
       debugPrint('Thumbnail ready for ${song.title}: $localPath');
     };
     _thumbnailService!.onThumbnailFailed = (song) {
-      _thumbnailLoadingIds.remove(song.youtubeId);
+      if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
+        _thumbnailLoadingIds.remove(song.youtubeId!);
+      } else if (song.artists.isNotEmpty) {
+        _thumbnailLoadingIds.remove('artist:${song.artists.first}');
+      }
     };
   }
 
@@ -360,15 +391,30 @@ class MusicProvider extends ChangeNotifier {
 
   bool isThumbnailLoading(Song song) {
     if (song.localThumbnailPath != null) return false;
-    if (song.youtubeId == null) return false;
-    return _thumbnailLoadingIds.contains(song.youtubeId!);
+    if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
+      return _thumbnailLoadingIds.contains(song.youtubeId!);
+    }
+    if (song.artists.isNotEmpty) {
+      return _thumbnailLoadingIds.contains('artist:${song.artists.first}');
+    }
+    return false;
   }
 
   void requestThumbnail(Song song, {int priority = 2}) {
-    if (song.youtubeId == null || song.youtubeId!.isEmpty) return;
     if (song.localThumbnailPath != null) return;
-    if (_thumbnailLoadingIds.contains(song.youtubeId!)) return;
-    _thumbnailLoadingIds.add(song.youtubeId!);
+
+    // Track by youtubeId if available, otherwise by artist key
+    if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
+      if (_thumbnailLoadingIds.contains(song.youtubeId!)) return;
+      _thumbnailLoadingIds.add(song.youtubeId!);
+    } else if (song.artists.isNotEmpty) {
+      final artistKey = 'artist:${song.artists.first}';
+      if (_thumbnailLoadingIds.contains(artistKey)) return;
+      _thumbnailLoadingIds.add(artistKey);
+    } else {
+      return;
+    }
+
     _thumbnailService?.requestThumbnail(song, priority: priority);
   }
 
@@ -389,6 +435,23 @@ class MusicProvider extends ChangeNotifier {
         }
       }
       _thumbnailService?.requestThumbnailForAll(songs);
+
+      // Also queue songs without youtubeId for artist thumbnail fallback
+      final artistSongs = _songsMap.values
+          .where((s) =>
+              (s.youtubeId == null || s.youtubeId!.isEmpty) &&
+              s.localThumbnailPath == null &&
+              s.artists.isNotEmpty)
+          .toList();
+      if (artistSongs.isNotEmpty) {
+        for (final song in artistSongs) {
+          final artistKey = 'artist:${song.artists.first}';
+          if (!_thumbnailLoadingIds.contains(artistKey)) {
+            _thumbnailLoadingIds.add(artistKey);
+          }
+        }
+        _thumbnailService?.requestThumbnailForAll(artistSongs);
+      }
     });
   }
 

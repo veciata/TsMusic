@@ -22,8 +22,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   AnimationController? _albumArtController;
   double _currentPosition = 0.0;
   bool _isDragging = false;
-  double _volume = 0.7;
-  bool _showVolumeSlider = false;
+
   StreamSubscription? _positionSubscription;
 
   @override
@@ -131,47 +130,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         onPressed: onPressed,
       );
 
-  Widget _buildVolumeControl(ThemeData theme) => AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: _showVolumeSlider ? 200 : 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: _showVolumeSlider
-            ? Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _volume == 0
-                          ? Icons.volume_off
-                          : _volume < 0.5
-                              ? Icons.volume_down
-                              : Icons.volume_up,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    onPressed: () => setState(() => _showVolumeSlider = false),
-                  ),
-                  Expanded(
-                    child: Slider(
-                      value: _volume,
-                      onChanged: (value) => setState(() => _volume = value),
-                      activeColor: theme.colorScheme.primary,
-                      inactiveColor:
-                          theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
-                    ),
-                  ),
-                ],
-              )
-            : IconButton(
-                icon: Icon(
-                  Icons.volume_up,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () => setState(() => _showVolumeSlider = true),
-              ),
-      );
+
 
   @override
   Widget build(BuildContext context) {
@@ -217,8 +176,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
     final header = _buildHeader(theme);
     final albumArt = _buildAlbumArt(theme, albumArtUrl, currentSong.title,
-        circular: playerStyle != PlayerStyle.minimal,
-        spin: playerStyle != PlayerStyle.minimal);
+        circular: playerStyle == PlayerStyle.classic,
+        spin: playerStyle == PlayerStyle.classic);
     final progressBar = _buildProgressBar(theme, duration, musicProvider);
     final playbackControls = _buildPlaybackControls(theme, musicProvider);
     final bottomControls = _buildBottomControls(theme, musicProvider);
@@ -257,10 +216,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         return buildClassicStyle(params);
       case PlayerStyle.modern:
         return buildModernStyle(params);
-      case PlayerStyle.compact:
-        return buildCompactStyle(params);
       case PlayerStyle.minimal:
         return buildMinimalStyle(params);
+      case PlayerStyle.square:
+        return buildSquareStyle(params);
+      case PlayerStyle.glass:
+        return buildGlassStyle(params);
     }
   }
 
@@ -394,9 +355,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   Widget _buildBottomControls(ThemeData theme, MusicProvider musicProvider) => Padding(
       padding: const EdgeInsets.only(bottom: 32, left: 24, right: 24),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          _buildVolumeControl(theme),
           IconButton(
             icon: const Icon(Icons.queue_music),
             onPressed: () {
