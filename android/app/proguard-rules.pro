@@ -1,5 +1,6 @@
 -keep class com.veciata.tsmusic.** { *; }
 -keep class es.antonborri.home_widget.** { *; }
--keep class com.mediakit.** { *; }
--dontwarn com.mediakit.**
+-keep class com.alexmercerind.** { *; }
+-keep class com.ryanheise.audioservice.** { *; }
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
 -dontwarn androidx.glance.**
