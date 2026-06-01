@@ -1,18 +1,30 @@
-name: Release Build
+name: Release
 
 on:
   push:
     tags:
-      - 'v*' # Sadece v1.0.1 gibi etiketlerde çalışır
-  workflow_dispatch: # Manuel çalıştırmak istersen
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Release channel'
+        required: true
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - alpha
+
+permissions:
+  contents: write
 
 jobs:
-  build-android:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -24,22 +36,41 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Prepare Versioning
+      - name: Resolve version
         id: versioning
         run: |
-          # Etiket 'v1.2.3' ise '1.2.3' yapar
-          VERSION_NAME=${GITHUB_REF#refs/tags/v}
-          
-          # Eğer manuel tetiklendiyse ve tag yoksa pubspec'ten çek
-          if [[ "$VERSION_NAME" == "$GITHUB_REF" ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # Extract from pushed tag: refs/tags/v1.2.2 -> 1.2.2
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
+          else
+            # Manual: read from pubspec.yaml
             VERSION_NAME=$(grep "^version:" pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
           fi
-          
-          # Build numarasını GitHub'ın koşu numarasından al (+6 ofsetini ekledim)
           BUILD_NUMBER=$(( ${{ github.run_number }} + 6 ))
-          
+
+          CHANNEL="${{ inputs.channel || 'stable' }}"
+          # For stable releases the tag is vX.Y.Z; for alpha it's vX.Y.Z-alpha.N
+          if [[ "$CHANNEL" == "alpha" ]]; then
+            RELEASE_TAG="v${VERSION_NAME}-alpha.${BUILD_NUMBER}"
+            IS_PRERELEASE="true"
+          else
+            RELEASE_TAG="v${VERSION_NAME}"
+            IS_PRERELEASE="false"
+          fi
+
           echo "v_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "v_num=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+
+      - name: Create tag (manual trigger only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git tag "${{ steps.versioning.outputs.release_tag }}" "${{ github.sha }}"
+          git push origin "${{ steps.versioning.outputs.release_tag }}"
 
       - name: Decode Keystore
         run: |
@@ -60,29 +91,40 @@ jobs:
           for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk; do
             if [ -f "$f" ]; then
               dir=$(dirname "$f")
-              mv "$f" "$dir/tsmusic-release.apk"
+              mv "$f" "$dir/tsmusic-${{ steps.versioning.outputs.channel }}.apk"
               break
             fi
           done
-          # Verify
-          ls build/app/outputs/flutter-apk/tsmusic-release.apk build/app/outputs/apk/release/tsmusic-release.apk 2>/dev/null || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.versioning.outputs.release_tag }}
+          name: "${{ steps.versioning.outputs.channel == 'alpha' && 'Alpha' || 'Release' }} v${{ steps.versioning.outputs.v_name }}"
+          body: |
+            ## ${{ steps.versioning.outputs.channel == 'alpha' && 'Alpha' || 'Release' }} v${{ steps.versioning.outputs.v_name }}
+
+            **Channel:** ${{ steps.versioning.outputs.channel }}
+            **Build:** ${{ steps.versioning.outputs.v_num }}
+
+            ### Changes
+            ${{ github.event.head_commit.message }}
           files: |
-            build/app/outputs/flutter-apk/tsmusic-release.apk
-            build/app/outputs/apk/release/tsmusic-release.apk
-          name: "Sürüm ${{ steps.versioning.outputs.v_name }}"
-          body: "Otomatik Build - No: ${{ steps.versioning.outputs.v_num }}"
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.versioning.outputs.v_name) }}
+            build/app/outputs/flutter-apk/tsmusic-${{ steps.versioning.outputs.channel }}.apk
+            build/app/outputs/apk/release/tsmusic-${{ steps.versioning.outputs.channel }}.apk
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.versioning.outputs.is_prerelease }}
+
+      - name: Update latest tag (stable only)
+        if: steps.versioning.outputs.channel == 'stable'
+        run: |
+          git tag -f latest "${{ github.sha }}"
+          git push origin latest --force
 
       - name: Save Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tsmusic-release-${{ steps.versioning.outputs.v_name }}
+          name: tsmusic-${{ steps.versioning.outputs.channel }}-${{ steps.versioning.outputs.v_name }}
           path: |
-            build/app/outputs/flutter-apk/tsmusic-release.apk
-            build/app/outputs/apk/release/tsmusic-release.apk
+            build/app/outputs/flutter-apk/tsmusic-${{ steps.versioning.outputs.channel }}.apk
+            build/app/outputs/apk/release/tsmusic-${{ steps.versioning.outputs.channel }}.apk

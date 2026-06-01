@@ -1,0 +1,67 @@
+name: Alpha
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: alpha-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Resolve version
+        id: versioning
+        run: |
+          BASE_VER=$(grep "^version:" pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
+          BUILD_NUM=$(( ${{ github.run_number }} + 6 ))
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          ALPHA_TAG="v${BASE_VER}-alpha.${BUILD_NUM}+${SHORT_SHA}"
+          echo "v_name=$BASE_VER" >> $GITHUB_OUTPUT
+          echo "v_num=$BUILD_NUM" >> $GITHUB_OUTPUT
+          echo "release_tag=$ALPHA_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build APK (unsigned)
+        run: |
+          flutter build apk --release --no-sound-null-safety \
+            --build-name=${{ steps.versioning.outputs.v_name }} \
+            --build-number=${{ steps.versioning.outputs.v_num }} || \
+          flutter build apk --debug \
+            --build-name=${{ steps.versioning.outputs.v_name }} \
+            --build-number=${{ steps.versioning.outputs.v_num }}
+
+      - name: Rename APK
+        run: |
+          for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk build/app/outputs/flutter-apk/app-debug.apk; do
+            if [ -f "$f" ]; then
+              dir=$(dirname "$f")
+              mv "$f" "$dir/tsmusic-alpha.apk"
+              break
+            fi
+          done
+
+      - name: Upload APK to workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsmusic-alpha-${{ steps.versioning.outputs.v_name }}-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/tsmusic-alpha.apk
+            build/app/outputs/apk/release/tsmusic-alpha.apk
+          retention-days: 14
