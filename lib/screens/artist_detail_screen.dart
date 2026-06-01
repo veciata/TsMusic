@@ -83,6 +83,29 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       return;
     }
 
+    // First try local song thumbnails / album art
+    final musicProvider = context.read<music_provider.MusicProvider>();
+    final localSongs = musicProvider.librarySongs
+        .where((s) => s.artists.any((a) => a.toLowerCase() == widget.artistName.toLowerCase()))
+        .toList();
+    for (final song in localSongs) {
+      if (song.localThumbnailPath != null) {
+        _artistImageCache.put(widget.artistName, song.localThumbnailPath!);
+        setState(() {
+          widget.artistImageUrlNotifier.value = song.localThumbnailPath;
+        });
+        return;
+      }
+      if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
+        _artistImageCache.put(widget.artistName, song.albumArtUrl!);
+        setState(() {
+          widget.artistImageUrlNotifier.value = song.albumArtUrl;
+        });
+        return;
+      }
+    }
+
+    // Fallback to YouTube search
     try {
       final results = await _youTubeService.searchAudio(widget.artistName);
       for (final song in results) {
@@ -182,17 +205,24 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
     final settingsProvider = context.read<SettingsProvider>();
-    await _youTubeService.downloadAudio(
+    final result = await _youTubeService.downloadAudio(
       videoId: audio.id,
       preferredFormat: settingsProvider.audioFormat,
       downloadLocation: settingsProvider.downloadLocation,
     );
+    if (result != null && mounted) {
+      context.read<music_provider.MusicProvider>().addDownloadedSongToLibrary(result.song);
+    }
   }
 
-  void _playAllLocalSongs(List<Song> songs) {
+  void _playAllLocalSongs(List<Song> songs, {int startIndex = 0, bool shuffle = false}) {
     final musicProvider = context.read<music_provider.MusicProvider>();
-    if (songs.isNotEmpty) {
-      musicProvider.playSong(songs.first);
+    if (songs.isEmpty) return;
+    if (shuffle) {
+      final shuffled = List<Song>.from(songs)..shuffle();
+      musicProvider.playSongsFromList(shuffled);
+    } else {
+      musicProvider.playSongsFromList(songs, startIndex: startIndex);
     }
   }
 
@@ -239,8 +269,24 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           }
         }
       }
-      _selectedLocalSongs.clear();
     }
+  }
+
+  Widget _buildArtistInitialFallback() {
+    return Container(
+      color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+      alignment: Alignment.center,
+      child: Text(
+        widget.artistName.isNotEmpty
+            ? widget.artistName[0].toUpperCase()
+            : '?',
+        style: const TextStyle(
+          fontSize: 64,
+          fontWeight: FontWeight.bold,
+          color: Colors.white54,
+        ),
+      ),
+    );
   }
 
   @override
@@ -270,12 +316,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                     return CachedNetworkImage(
                       imageUrl: url,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(color: Colors.grey),
+                      placeholder: (context, url) =>
+                          _buildArtistInitialFallback(),
                       errorWidget: (context, url, error) =>
-                          Container(color: Colors.grey),
+                          _buildArtistInitialFallback(),
                     );
                   }
-                  return Container(color: Theme.of(context).primaryColor);
+                  return _buildArtistInitialFallback();
                 },
               ),
             ),
@@ -343,6 +390,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                 ),
               ),
               const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => _playAllLocalSongs(songs, shuffle: true),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                ),
+                child: const Icon(Icons.shuffle),
+              ),
+              const SizedBox(width: 8),
               IconButton(
                 icon: Icon(_isMultiSelectMode
                     ? Icons.close
@@ -406,7 +461,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                           }
                         });
                       }
-                    : () => musicProvider.playSong(song),
+                    : () => _playAllLocalSongs(songs, startIndex: index),
               );
             },
           ),

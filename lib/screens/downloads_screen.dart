@@ -587,9 +587,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       )
           .then((result) async {
         if (result != null && mounted) {
-          await Provider.of<music_provider.MusicProvider>(context,
-                  listen: false)
-              .loadFromDatabaseOnly();
+          Provider.of<music_provider.MusicProvider>(context, listen: false)
+              .addDownloadedSongToLibrary(result.song);
           _scanLocalFiles();
           setState(() {
             _downloadProgress.remove(videoId);

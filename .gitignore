@@ -64,3 +64,5 @@ PERFORMANCE_OPTIMIZATIONS.md
 ruvector.db
 /node_modules
 /android/build/reports/problems/problems-report.html
+/.agents/skills
+/graphify-out

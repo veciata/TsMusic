@@ -8,7 +8,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:window_manager/window_manager.dart';
 import 'package:tsmusic/screens/home_screen.dart';
 import 'package:tsmusic/screens/settings_screen.dart';
 import 'package:tsmusic/screens/downloads_screen.dart';
@@ -45,7 +44,6 @@ Future<void> main() async {
 
   // Initialize home screen widget
   await HomeWidgetService.init();
-
   final youTubeService = YouTubeService();
 
   final prefs = await SharedPreferences.getInstance();
@@ -59,23 +57,6 @@ Future<void> main() async {
       lastSeenVersion: lastSeenVersion,
     ),
   );
-
-  if (Platform.isMacOS) {
-    await windowManager.ensureInitialized();
-
-    final WindowOptions windowOptions = const WindowOptions(
-      size: Size(1280, 720),
-      center: true,
-      backgroundColor: Colors.transparent,
-      skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.normal,
-    );
-
-    await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-  }
 }
 
 class MusicPlayerApp extends StatefulWidget {

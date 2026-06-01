@@ -42,7 +42,11 @@ class MusicProvider extends ChangeNotifier {
 
   void setYouTubeService(YouTubeService service) {
     _youTubeService = service;
-    service.setStopOtherPlayerCallback(stop);
+    service.setStopOtherPlayerCallback(() {
+      if (_playlist.isNotEmpty && currentSong != null) {
+        stop();
+      }
+    });
     service.addListener(_onYouTubeServiceStateChanged);
   }
 
@@ -995,6 +999,32 @@ class MusicProvider extends ChangeNotifier {
       notifyListeners();
       debugPrint('Playing from library: ${song.title}, queue size: ${_playlist.length}');
     }
+  }
+
+  /// Play specific songs by replacing the current playlist (Now Playing).
+  Future<void> playSongsFromList(List<Song> songs, {int startIndex = 0}) async {
+    if (songs.isEmpty) return;
+
+    // Stop online player first to avoid double sound
+    await _youTubeService?.stop();
+
+    _playlist.clear();
+    _playlist.addAll(songs);
+    _currentIndex = startIndex.clamp(0, _playlist.length - 1);
+
+    final song = _playlist[_currentIndex];
+    await _setAudioSource(song);
+    await _player.play();
+    await _updateNotification();
+    await _updateNowPlayingPlaylist();
+    requestThumbnail(song, priority: 0);
+
+    // Save as last played song
+    _lastPlayedSong = song;
+    _saveLastPlayedSong(song);
+
+    notifyListeners();
+    debugPrint('Playing from list: ${song.title}, queue size: ${_playlist.length}');
   }
 
   List<Song> _tempPlaylist = [];
