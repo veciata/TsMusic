@@ -20,7 +20,7 @@ import 'package:tsmusic/services/thumbnail_service.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 
 /// Main music provider class for managing music playback and library
-class MusicProvider extends ChangeNotifier {
+class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   // ===== CORE DEPENDENCIES =====
   final Player _player = Player();
 
@@ -47,6 +47,7 @@ class MusicProvider extends ChangeNotifier {
         stop();
       }
     });
+    service.setLocalSongsCallback(() => librarySongs);
     service.addListener(_onYouTubeServiceStateChanged);
   }
 
@@ -100,12 +101,15 @@ class MusicProvider extends ChangeNotifier {
     final audioHandler = AudioNotificationService.audioHandler;
     audioHandler?.setOnlineMode(online: false);
 
-    if (_playlist.isNotEmpty && _currentIndex >= 0 && _currentIndex < _playlist.length) {
-      await _setAudioSource(_playlist[_currentIndex]);
+    final activePlaylist = _getActivePlaylist();
+    if (activePlaylist.isNotEmpty && _currentIndex >= 0 && _currentIndex < activePlaylist.length) {
+      await _setAudioSource(activePlaylist[_currentIndex]);
       await _player.play();
       await _updateNotification();
-      await _updateNowPlayingPlaylist();
-      requestThumbnail(_playlist[_currentIndex], priority: 0);
+      if (!_isUsingTempPlaylist) {
+        await _updateNowPlayingPlaylist();
+      }
+      requestThumbnail(activePlaylist[_currentIndex], priority: 0);
     }
     notifyListeners();
   }
@@ -155,6 +159,16 @@ class MusicProvider extends ChangeNotifier {
   Song? _lastPlayedSong;
   static const String _lastPlayedSongKey = 'last_played_song';
 
+  // ===== LIFECYCLE / RESUME STATE =====
+  static const String _resumeIndexKey = 'resume_current_index';
+  static const String _resumePositionKey = 'resume_position_ms';
+  static const String _resumeShuffleKey = 'resume_shuffle';
+  static const String _resumeLoopModeKey = 'resume_loop_mode';
+  static const String _resumeUsingTempPlaylistKey = 'resume_using_temp_playlist';
+  static const String _resumeTempPlaylistIdsKey = 'resume_temp_playlist_ids';
+  static const String _resumePlaylistIdsKey = 'resume_playlist_ids';
+  bool _hasRestoredState = false;
+
   // Cache for songs to avoid repeated database queries
   static final Map<String, Song> _songsMap = {};
   static List<Song> get _cachedSongs => _songsMap.values.toList();
@@ -202,6 +216,24 @@ class MusicProvider extends ChangeNotifier {
   List<Song> get youtubeSongs =>
       _playlist.where((song) => song.hasTag('tsmusic')).toList();
 
+  List<Song> get onlinePlaylist {
+    final yt = _youTubeService;
+    if (yt == null) return [];
+    return yt.onlinePlaylist.map((a) => Song(
+      id: -1,
+      youtubeId: a.id,
+      title: a.title,
+      artists: a.artists.isNotEmpty ? a.artists : [a.author],
+      album: 'YouTube',
+      duration: a.duration?.inMilliseconds ?? 0,
+      albumArtUrl: a.thumbnailUrl,
+      url: a.audioUrl ?? '',
+      tags: ['youtube'],
+    )).toList();
+  }
+
+  int get onlinePlaylistIndex => _youTubeService?.onlinePlaylistIndex ?? -1;
+
   // Collection getters
   List<String> get albums {
     final albumSet = <String>{};
@@ -240,6 +272,8 @@ class MusicProvider extends ChangeNotifier {
 
   // ===== INITIALIZATION =====
   MusicProvider({Color? notificationColor}) : _notificationColor = notificationColor {
+    WidgetsBinding.instance.addObserver(this);
+
     // Listen to playlist mode changes
     _player.stream.playlistMode.listen((mode) {
       _loopMode = mode;
@@ -254,26 +288,118 @@ class MusicProvider extends ChangeNotifier {
     // Listen to playback completion
     _player.stream.completed.listen((completed) async {
       if (completed) {
-        if (_loopMode == PlaylistMode.single) {
-          await _player.seek(Duration.zero);
-          await _player.play();
-        } else if (_loopMode == PlaylistMode.loop) {
-          if (_currentIndex == _playlist.length - 1) {
-            _currentIndex = 0;
-          } else {
-            _currentIndex++;
-          }
-          await _setAudioSource(_playlist[_currentIndex]);
-          await _player.play();
-          notifyListeners();
-        } else if (_playlist.length > 1 &&
-            _currentIndex < _playlist.length - 1) {
-          await next();
-        }
+        await _onPlaybackCompleted();
       }
     });
 
     _initialize();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _savePlaybackState();
+    }
+  }
+
+  Future<void> _onPlaybackCompleted() async {
+    final activePlaylist = _getActivePlaylist();
+    if (activePlaylist.isEmpty) return;
+
+    if (_loopMode == PlaylistMode.single) {
+      await _player.seek(Duration.zero);
+      await _player.play();
+    } else if (_loopMode == PlaylistMode.loop) {
+      _currentIndex = (_currentIndex + 1) % activePlaylist.length;
+      await _setAudioSource(activePlaylist[_currentIndex]);
+      await _player.play();
+      await _updateNotification();
+      notifyListeners();
+    } else if (_currentIndex < activePlaylist.length - 1) {
+      await next();
+    }
+  }
+
+  List<Song> _getActivePlaylist() =>
+      _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+
+  /// Save current playback state for resume after app restart
+  Future<void> _savePlaybackState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final activePlaylist = _getActivePlaylist();
+
+      await prefs.setInt(_resumeIndexKey, _currentIndex);
+      await prefs.setInt(_resumePositionKey, _player.state.position.inMilliseconds);
+      await prefs.setBool(_resumeShuffleKey, _shuffleEnabled);
+      await prefs.setString(_resumeLoopModeKey, _loopMode.name);
+      await prefs.setBool(_resumeUsingTempPlaylistKey, _isUsingTempPlaylist);
+
+      // Save playlist IDs for restoring queue
+      final playlistIds = activePlaylist.map((s) => s.id).join(',');
+      await prefs.setString(_resumePlaylistIdsKey, playlistIds);
+
+      if (_isUsingTempPlaylist) {
+        final tempIds = _tempPlaylist.map((s) => s.id).join(',');
+        await prefs.setString(_resumeTempPlaylistIdsKey, tempIds);
+      } else {
+        await prefs.remove(_resumeTempPlaylistIdsKey);
+      }
+
+      if (currentSong != null) {
+        _lastPlayedSong = currentSong;
+        unawaited(_saveLastPlayedSong(currentSong!));
+      }
+    } catch (e) {
+      debugPrint('Error saving playback state: $e');
+    }
+  }
+
+  /// Restore playback state from saved preferences
+  Future<void> _restorePlaybackState() async {
+    if (_hasRestoredState) return;
+    _hasRestoredState = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      _shuffleEnabled = prefs.getBool(_resumeShuffleKey) ?? false;
+      final loopName = prefs.getString(_resumeLoopModeKey);
+      if (loopName != null) {
+        _loopMode = PlaylistMode.values.firstWhere(
+          (m) => m.name == loopName,
+          orElse: () => PlaylistMode.none,
+        );
+      }
+
+      _isUsingTempPlaylist =
+          prefs.getBool(_resumeUsingTempPlaylistKey) ?? false;
+
+      final savedIndex = prefs.getInt(_resumeIndexKey);
+      final savedPosition = prefs.getInt(_resumePositionKey) ?? 0;
+
+      if (_playlist.isNotEmpty && savedIndex != null &&
+          savedIndex >= 0 && savedIndex < _playlist.length) {
+        _currentIndex = savedIndex;
+
+        // Resume playing if there was a last played song
+        if (_lastPlayedSong != null) {
+          await _setAudioSource(_playlist[_currentIndex]);
+          await _player.seek(Duration(milliseconds: savedPosition));
+          await _player.play();
+          await _updateNotification();
+
+          final song = _playlist[_currentIndex];
+          requestThumbnail(song, priority: 0);
+          notifyListeners();
+
+          debugPrint('Resumed playback at index $_currentIndex, position ${Duration(milliseconds: savedPosition)}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error restoring playback state: $e');
+    }
   }
 
    Future<void> _initialize() async {
@@ -343,6 +469,10 @@ class MusicProvider extends ChangeNotifier {
       // Then load Now Playing playlist (fills from _songsMap if DB is empty)
       debugPrint('_initialize: Loading Now Playing playlist...');
       await _loadNowPlayingPlaylist();
+
+      // Restore playback state (position, index, shuffle, loop) and auto-resume
+      debugPrint('_initialize: Restoring playback state...');
+      await _restorePlaybackState();
      
      debugPrint('╔══════════════════════════════════════════╗');
      debugPrint('║  MusicProvider._initialize: END             ║');
@@ -946,6 +1076,10 @@ class MusicProvider extends ChangeNotifier {
     // Stop online player first to avoid double sound
     await _youTubeService?.stop();
 
+    // Clear temp playlist mode if active
+    _isUsingTempPlaylist = false;
+    _tempPlaylist.clear();
+
     var index = _playlist.indexWhere((s) => s.id == song.id);
 
     // If song not in playlist, add it
@@ -977,6 +1111,10 @@ class MusicProvider extends ChangeNotifier {
     // Stop online player first
     await _youTubeService?.stop();
 
+    // Clear temp playlist mode if active
+    _isUsingTempPlaylist = false;
+    _tempPlaylist.clear();
+
     // Load entire library as queue
     _playlist.clear();
     _playlist.addAll(_songsMap.values);
@@ -1007,6 +1145,10 @@ class MusicProvider extends ChangeNotifier {
 
     // Stop online player first to avoid double sound
     await _youTubeService?.stop();
+
+    // Clear temp playlist mode if active
+    _isUsingTempPlaylist = false;
+    _tempPlaylist.clear();
 
     _playlist.clear();
     _playlist.addAll(songs);
@@ -1041,10 +1183,10 @@ class MusicProvider extends ChangeNotifier {
 
     _tempPlaylist = List.from(songs);
     _isUsingTempPlaylist = true;
+    _currentIndex = startIndex;
     await _setAudioSource(songs[startIndex]);
     await _player.play();
     await _updateNotification();
-    await _updateNowPlayingPlaylist();
     requestThumbnail(songs[startIndex], priority: 0);
     notifyListeners();
   }
@@ -1057,6 +1199,13 @@ class MusicProvider extends ChangeNotifier {
 
   Future<void> next() async {
     if (_youTubeService?.currentAudio != null) {
+      final onlinePlaylist = _youTubeService!.onlinePlaylist;
+      final currentIdx = _youTubeService!.onlinePlaylistIndex;
+      if (onlinePlaylist.isNotEmpty && currentIdx < onlinePlaylist.length - 1) {
+        await _youTubeService!.playOnlinePlaylistAt(currentIdx + 1);
+        notifyListeners();
+        return;
+      }
       await _stopOnlineAndResumeLocal();
       return;
     }
@@ -1076,13 +1225,22 @@ class MusicProvider extends ChangeNotifier {
     await _setAudioSource(currentPlaylist[_currentIndex]);
     await _player.play();
     await _updateNotification();
-    await _updateNowPlayingPlaylist();
+    if (!_isUsingTempPlaylist) {
+      await _updateNowPlayingPlaylist();
+    }
     requestThumbnail(currentPlaylist[_currentIndex], priority: 0);
     notifyListeners();
   }
 
   Future<void> previous() async {
     if (_youTubeService?.currentAudio != null) {
+      final onlinePlaylist = _youTubeService!.onlinePlaylist;
+      final currentIdx = _youTubeService!.onlinePlaylistIndex;
+      if (onlinePlaylist.isNotEmpty && currentIdx > 0) {
+        await _youTubeService!.playOnlinePlaylistAt(currentIdx - 1);
+        notifyListeners();
+        return;
+      }
       await _stopOnlineAndResumeLocal();
       return;
     }
@@ -1094,7 +1252,9 @@ class MusicProvider extends ChangeNotifier {
     await _setAudioSource(currentPlaylist[_currentIndex]);
     await _player.play();
     await _updateNotification();
-    await _updateNowPlayingPlaylist();
+    if (!_isUsingTempPlaylist) {
+      await _updateNowPlayingPlaylist();
+    }
     requestThumbnail(currentPlaylist[_currentIndex], priority: 0);
     notifyListeners();
   }
@@ -1442,8 +1602,12 @@ class MusicProvider extends ChangeNotifier {
   /// Update Now Playing playlist in database
   Future<void> _updateNowPlayingPlaylist() async {
     try {
-      final songIds =
-          _playlist.map((song) => song.id).where((id) => id > 0).toList();
+      final songIds = <int>[];
+      for (final song in _playlist) {
+        if (song.id > 0) {
+          songIds.add(song.id);
+        }
+      }
       await _databaseHelper.updateNowPlayingPlaylist(songIds);
     } catch (e) {
       if (kDebugMode) {
@@ -1469,19 +1633,125 @@ class MusicProvider extends ChangeNotifier {
   }
 
   /// Set audio source for playback via audio service (handles notification)
-  Future<void> _setAudioSource(Song song) async {
-    final audioHandler = AudioNotificationService.audioHandler;
-    debugPrint('_setAudioSource: audioHandler=${audioHandler != null}');
-    if (audioHandler != null) {
-      final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
-      debugPrint('_setAudioSource: Setting media for ${song.title}');
-      await audioHandler.setMedia(Media(mediaPath), song: song);
-      debugPrint('_setAudioSource: Media set successfully');
-    } else {
-      // Fallback: open directly in player if service not available
-      debugPrint('_setAudioSource: Using fallback (no audioHandler)');
-      final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
-      await _player.open(Media(mediaPath));
+Future<void> _setAudioSource(Song song) async {
+  final audioHandler = AudioNotificationService.audioHandler;
+  debugPrint('_setAudioSource: audioHandler=${audioHandler != null}');
+  
+  // Check if this is a local file that exists
+  final isLocalFile = song.url.startsWith('/') || song.url.contains(':');
+  bool fileExists = false;
+  
+  if (isLocalFile) {
+    try {
+      fileExists = await File(song.url).exists();
+    } catch (e) {
+      // If we can't check, assume it doesn't exist
+      fileExists = false;
+    }
+  }
+  
+  // If local file doesn't exist, try YouTube fallback (search if no ID)
+  if (isLocalFile && !fileExists && audioHandler != null) {
+    debugPrint('_setAudioSource: Local file not found, attempting YouTube fallback');
+    
+    await audioHandler.stop();
+    String? ytId = song.youtubeId?.isNotEmpty == true ? song.youtubeId : null;
+    
+    // No YouTube ID yet — search by title/artist + duration match
+    if (ytId == null && _youTubeService != null) {
+      ytId = await _searchYouTubeForSong(song.title, song.artists, song.duration);
+      if (ytId != null) {
+        await _updateSongYouTubeId(song, ytId);
+      }
+    }
+    
+    if (ytId != null && _youTubeService != null) {
+      debugPrint('_setAudioSource: Playing YouTube: $ytId');
+      audioHandler.setOnlineMode(
+        online: true,
+        onPlay: () => unawaited(_youTubeService?.play()),
+        onPause: () => unawaited(_youTubeService?.pause()),
+        onStop: () => unawaited(_youTubeService?.stop()),
+      );
+      
+      final ytSong = Song(
+        id: -1,
+        youtubeId: ytId,
+        title: song.title,
+        artists: song.artists.isNotEmpty ? song.artists : ['Unknown Artist'],
+        album: 'YouTube',
+        duration: song.duration,
+        albumArtUrl: song.albumArtUrl,
+        url: 'yt:$ytId',
+      );
+      audioHandler.setOnlineMedia(ytSong, isPlaying: true);
+      await audioHandler.play();
+      return;
+    }
+  }
+  
+  // Proceed with normal playback (either local file that exists, or YouTube wasn't available/failed, or no audio handler)
+  if (audioHandler != null) {
+    final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
+    debugPrint('_setAudioSource: Setting media for ${song.title}');
+    await audioHandler.setMedia(Media(mediaPath), song: song);
+    debugPrint('_setAudioSource: Media set successfully');
+  } else {
+    // Fallback: open directly in player if service not available
+    debugPrint('_setAudioSource: Using fallback (no audioHandler)');
+    final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
+    await _player.open(Media(mediaPath));
+  }
+}
+
+  /// Searches YouTube for a song by title/artist and matches by duration
+  Future<String?> _searchYouTubeForSong(String title, List<String> artists, int targetDurationMs) async {
+    if (_youTubeService == null) return null;
+    
+    try {
+      String artist = artists.isNotEmpty ? artists.first : 'Unknown Artist';
+      String query = '$title $artist';
+      
+      List<YouTubeAudio> results = await _youTubeService!.searchAudio(query);
+      
+      if (results.isEmpty) return null;
+      
+      double targetDurationSec = targetDurationMs / 1000.0;
+      
+      YouTubeAudio? bestMatch;
+      double minDiff = double.infinity;
+      
+      for (var result in results) {
+        if (result.duration != null) {
+          double diff = (result.duration!.inMilliseconds / 1000.0 - targetDurationSec).abs();
+          if (diff < minDiff && diff <= 5.0) {
+            minDiff = diff;
+            bestMatch = result;
+          }
+        }
+      }
+      
+      return bestMatch?.id;
+    } catch (e) {
+      debugPrint('Error searching YouTube for song: $e');
+      return null;
+    }
+  }
+
+  /// Updates a song's YouTube ID in the database and in-memory collections
+  Future<void> _updateSongYouTubeId(Song song, String youtubeId) async {
+    try {
+      final db = await _databaseHelper.database;
+      await db.update(
+        'songs',
+        {'youtube_id': youtubeId},
+        where: 'file_path = ?',
+        whereArgs: [song.url],
+      );
+      final updated = song.copyWith(youtubeId: youtubeId);
+      _updateSongInPlace(updated);
+    } catch (e) {
+      debugPrint('Error updating YouTube ID: $e');
     }
   }
 
@@ -2251,7 +2521,11 @@ class MusicProvider extends ChangeNotifier {
         final String mainArtist = match.group(1)?.trim() ?? 'Unknown Artist';
         String rawTitle = match.group(2)?.trim() ?? fileName;
 
-        artistsList = [mainArtist];
+        artistsList = mainArtist
+            .split(RegExp(r'\s*(?:,|&|and|\+)\s*', caseSensitive: false))
+            .map((a) => a.trim())
+            .where((a) => a.isNotEmpty)
+            .toList();
 
         // Handle featured artists
         String? featuredArtists;
@@ -2418,14 +2692,15 @@ class MusicProvider extends ChangeNotifier {
   }
 
   void moveInQueue(int oldIndex, int newIndex) {
+    final activePlaylist = _getActivePlaylist();
     if (oldIndex < 0 ||
-        oldIndex >= _playlist.length ||
+        oldIndex >= activePlaylist.length ||
         newIndex < 0 ||
-        newIndex >= _playlist.length) {
+        newIndex >= activePlaylist.length) {
       return;
     }
-    final song = _playlist.removeAt(oldIndex);
-    _playlist.insert(newIndex, song);
+    final song = activePlaylist.removeAt(oldIndex);
+    activePlaylist.insert(newIndex, song);
     if (_currentIndex == oldIndex) {
       _currentIndex = newIndex;
     } else if (_currentIndex > oldIndex && _currentIndex <= newIndex) {
@@ -2433,41 +2708,99 @@ class MusicProvider extends ChangeNotifier {
     } else if (_currentIndex < oldIndex && _currentIndex >= newIndex) {
       _currentIndex++;
     }
-    _updateNowPlayingPlaylist();
+    if (!_isUsingTempPlaylist) {
+      _updateNowPlayingPlaylist();
+    }
     notifyListeners();
   }
 
-  void playAt(int index) {
-    if (index >= 0 && index < _playlist.length) {
+  Future<void> playAt(int index) async {
+    final activePlaylist = _getActivePlaylist();
+    if (index >= 0 && index < activePlaylist.length) {
       _currentIndex = index;
-      _player.seek(Duration.zero);
-      _player.play();
+      final song = activePlaylist[index];
+      await _setAudioSource(song);
+      await _player.play();
+      await _updateNotification();
+      _lastPlayedSong = song;
+      _saveLastPlayedSong(song);
+      requestThumbnail(song, priority: 0);
       notifyListeners();
     }
   }
 
   Future<void> removeFromQueue(int index) async {
-    if (index >= 0 && index < _playlist.length) {
+    final activePlaylist = _getActivePlaylist();
+    if (index < 0 || index >= activePlaylist.length) return;
+
+    final wasCurrentSong = index == _currentIndex;
+    final playlistSizeBefore = activePlaylist.length;
+
+    if (_isUsingTempPlaylist) {
+      _tempPlaylist.removeAt(index);
+    } else {
       _playlist.removeAt(index);
-      if (_currentIndex >= _playlist.length) {
-        _currentIndex = _playlist.length - 1;
-      }
-      await _updateNowPlayingPlaylist();
-      notifyListeners();
     }
+
+    if (_currentIndex >= activePlaylist.length) {
+      _currentIndex = activePlaylist.length - 1;
+    } else if (wasCurrentSong && playlistSizeBefore > 1) {
+      if (_currentIndex >= activePlaylist.length) {
+        _currentIndex = activePlaylist.length - 1;
+      }
+      if (activePlaylist.isNotEmpty) {
+        await _setAudioSource(activePlaylist[_currentIndex]);
+        await _player.play();
+        await _updateNotification();
+      }
+    }
+
+    if (!_isUsingTempPlaylist) {
+      await _updateNowPlayingPlaylist();
+    }
+    notifyListeners();
   }
 
   Future<void> clearQueue() async {
     _playlist.clear();
+    _tempPlaylist.clear();
+    _isUsingTempPlaylist = false;
     _displayedSongs.clear();
     await _updateNowPlayingPlaylist();
     notifyListeners();
   }
 
+  Future<int> addOnlineSongToPlaylist({
+    required String youtubeId,
+    required String title,
+    required List<String> artists,
+    required int duration,
+    String? thumbnailUrl,
+    required int playlistId,
+  }) async {
+    try {
+      final songId = await _databaseHelper.addYouTubeSongToDatabase(
+        youtubeId: youtubeId,
+        title: title,
+        artists: artists,
+        duration: duration,
+        thumbnailUrl: thumbnailUrl,
+      );
+      if (songId > 0) {
+        await _databaseHelper.addSongsToPlaylist(playlistId, [songId]);
+      }
+      notifyListeners();
+      return songId;
+    } catch (e) {
+      debugPrint('Error adding online song to playlist: $e');
+      rethrow;
+    }
+  }
+
   Future<void> loadPlaylistAsQueue(int playlistId) async {
     try {
       final songMaps = await _databaseHelper.getSongsInPlaylist(playlistId);
-      _playlist.clear();
+      final songs = <Song>[];
 
       for (final songData in songMaps) {
         final songId = songData['id'] as int;
@@ -2486,25 +2819,23 @@ class MusicProvider extends ChangeNotifier {
               ? DateTime.parse(songData['created_at'] as String)
               : DateTime.now(),
         );
-        // Always add to _playlist for queue, even if already in _songsMap
-        _playlist.add(song);
-        // Also update _songsMap if not exists
+        songs.add(song);
         if (!_songsMap.containsKey(song.url)) {
           _songsMap[song.url] = song;
         }
       }
 
-
-      if (_playlist.isNotEmpty) {
+      if (songs.isNotEmpty) {
+        _tempPlaylist = songs;
+        _isUsingTempPlaylist = true;
         _currentIndex = 0;
-        await _setAudioSource(_playlist[0]);
+        await _setAudioSource(songs[0]);
         await _player.play();
         await _updateNotification();
       }
 
-      await _updateNowPlayingPlaylist();
       notifyListeners();
-      debugPrint('Loaded playlist $playlistId with ${_playlist.length} songs');
+      debugPrint('Loaded playlist $playlistId with ${songs.length} songs as temp playlist');
     } catch (e) {
       debugPrint('Error loading playlist as queue: $e');
       rethrow;

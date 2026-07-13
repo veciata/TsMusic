@@ -6,11 +6,6 @@ import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/utils/format_utils.dart';
-import 'package:tsmusic/models/song.dart' as model;
-import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-import 'package:tsmusic/database/database_helper.dart';
-import 'package:tsmusic/utils/format_utils.dart';
-import 'package:tsmusic/localization/app_localizations.dart';
 
 class PlaylistDetailScreen extends StatefulWidget {
   final int playlistId;
