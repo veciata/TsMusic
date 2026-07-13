@@ -17,6 +17,7 @@ import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
 import 'package:tsmusic/widgets/song_thumbnail.dart';
+import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
@@ -212,6 +213,45 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     );
     if (result != null && mounted) {
       context.read<music_provider.MusicProvider>().addDownloadedSongToLibrary(result.song);
+    }
+  }
+
+  Future<void> _deleteLocalSong(Song song) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteSong),
+        content: Text('${l10n.confirmDelete} "${song.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await context.read<music_provider.MusicProvider>().deleteSong(song);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.songDeleted)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.error}: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -450,7 +490,44 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                 subtitle: Text(song.album ?? l10n.unknownAlbum),
                 trailing: _isMultiSelectMode
                     ? null
-                    : Text(song.formattedDuration),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(song.formattedDuration),
+                          PopupMenuButton<String>(
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'add_to_playlist':
+                                  showAddToPlaylistSheet(context, songId: song.id);
+                                case 'delete':
+                                  _deleteLocalSong(song);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'add_to_playlist',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.playlist_add),
+                                    const SizedBox(width: 8),
+                                    Text(l10n.addToPlaylist),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.delete_outline, color: Colors.red),
+                                    const SizedBox(width: 8),
+                                    Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                 onTap: _isMultiSelectMode
                     ? () {
                         setState(() {
@@ -489,6 +566,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           audio: audio,
           onPlay: _playAudio,
           onDownload: _handleDownload,
+          onAddToPlaylist: () => showAddYouTubeToPlaylistSheet(
+            context,
+            youtubeId: audio.id,
+            title: audio.title,
+            artists: audio.artists,
+            duration: audio.duration?.inMilliseconds ?? 0,
+            thumbnailUrl: audio.thumbnailUrl,
+          ),
         );
       },
     );

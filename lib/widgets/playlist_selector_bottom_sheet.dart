@@ -151,7 +151,7 @@ class _PlaylistSelectorBottomSheetState
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: theme.colorScheme.onSurface.withOpacity(0.3),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -193,7 +193,7 @@ class _PlaylistSelectorBottomSheetState
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
@@ -222,7 +222,7 @@ class _PlaylistSelectorBottomSheetState
                               height: 48,
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.secondary
-                                    .withOpacity(0.1),
+                                    .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
@@ -271,4 +271,429 @@ void showPlaylistSelector(BuildContext context) {
     backgroundColor: Colors.transparent,
     builder: (context) => const PlaylistSelectorBottomSheet(),
   );
+}
+
+void showAddToPlaylistSheet(BuildContext context, {required int songId}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _AddToPlaylistSheet(songId: songId),
+  );
+}
+
+void showAddYouTubeToPlaylistSheet(
+  BuildContext context, {
+  required String youtubeId,
+  required String title,
+  required List<String> artists,
+  required int duration,
+  String? thumbnailUrl,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _AddYouTubeToPlaylistSheet(
+      youtubeId: youtubeId,
+      title: title,
+      artists: artists,
+      duration: duration,
+      thumbnailUrl: thumbnailUrl,
+    ),
+  );
+}
+
+class _AddToPlaylistSheet extends StatefulWidget {
+  final int songId;
+  const _AddToPlaylistSheet({required this.songId});
+
+  @override
+  State<_AddToPlaylistSheet> createState() => _AddToPlaylistSheetState();
+}
+
+class _AddToPlaylistSheetState extends State<_AddToPlaylistSheet> {
+  final DatabaseHelper _db = DatabaseHelper();
+  List<Map<String, dynamic>> _playlists = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlaylists();
+  }
+
+  Future<void> _loadPlaylists() async {
+    try {
+      final playlists = await _db.getAllPlaylists();
+      if (mounted) {
+        setState(() {
+          _playlists = playlists;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Text(
+                  l10n.addToPlaylist,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    _showCreatePlaylistDialog();
+                  },
+                  tooltip: l10n.createPlaylist,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            )
+          else
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.4,
+              ),
+              child: _playlists
+                      .where((p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId)
+                      .toList()
+                      .isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        l10n.noPlaylists,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      children: _playlists
+                          .where((p) =>
+                              p['id'] != DatabaseHelper.nowPlayingPlaylistId)
+                          .map((playlist) => ListTile(
+                                leading: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.secondary
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.queue_music,
+                                    color: theme.colorScheme.secondary,
+                                  ),
+                                ),
+                                title: Text(playlist['name'] ?? 'Unnamed'),
+                                onTap: () async {
+                                  final playlistId = playlist['id'] as int;
+                                  await _db.addSongsToPlaylist(playlistId, [widget.songId]);
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Added to "${playlist['name']}"',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ))
+                          .toList(),
+                    ),
+            ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+        ],
+      ),
+    );
+  }
+
+  void _showCreatePlaylistDialog() {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.createPlaylist),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: l10n.playlistName,
+            border: const OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(context);
+                try {
+                  await _db.createPlaylist(name);
+                  await _loadPlaylists();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
+                  }
+                }
+              }
+            },
+            child: Text(l10n.create),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddYouTubeToPlaylistSheet extends StatefulWidget {
+  final String youtubeId;
+  final String title;
+  final List<String> artists;
+  final int duration;
+  final String? thumbnailUrl;
+
+  const _AddYouTubeToPlaylistSheet({
+    required this.youtubeId,
+    required this.title,
+    required this.artists,
+    required this.duration,
+    this.thumbnailUrl,
+  });
+
+  @override
+  State<_AddYouTubeToPlaylistSheet> createState() =>
+      _AddYouTubeToPlaylistSheetState();
+}
+
+class _AddYouTubeToPlaylistSheetState
+    extends State<_AddYouTubeToPlaylistSheet> {
+  final DatabaseHelper _db = DatabaseHelper();
+  List<Map<String, dynamic>> _playlists = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlaylists();
+  }
+
+  Future<void> _loadPlaylists() async {
+    try {
+      final playlists = await _db.getAllPlaylists();
+      if (mounted) {
+        setState(() {
+          _playlists = playlists;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final musicProvider = context.read<music_provider.MusicProvider>();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Text(
+                  l10n.addToPlaylist,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showCreatePlaylistDialog(),
+                  tooltip: l10n.createPlaylist,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            )
+          else if (_playlists
+              .where((p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId)
+              .isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                l10n.noPlaylists,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.4,
+              ),
+              child: ListView(
+                children: _playlists
+                    .where((p) =>
+                        p['id'] != DatabaseHelper.nowPlayingPlaylistId)
+                    .map((playlist) => ListTile(
+                          leading: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondary
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.queue_music,
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                          title: Text(playlist['name'] ?? 'Unnamed'),
+                          onTap: () async {
+                            final playlistId = playlist['id'] as int;
+                            await musicProvider.addOnlineSongToPlaylist(
+                              youtubeId: widget.youtubeId,
+                              title: widget.title,
+                              artists: widget.artists,
+                              duration: widget.duration,
+                              thumbnailUrl: widget.thumbnailUrl,
+                              playlistId: playlistId,
+                            );
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Added to "${playlist['name']}"',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ))
+                    .toList(),
+              ),
+            ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+        ],
+      ),
+    );
+  }
+
+  void _showCreatePlaylistDialog() {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.createPlaylist),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: l10n.playlistName,
+            border: const OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(context);
+                try {
+                  await _db.createPlaylist(name);
+                  await _loadPlaylists();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
+                  }
+                }
+              }
+            },
+            child: Text(l10n.create),
+          ),
+        ],
+      ),
+    );
+  }
 }

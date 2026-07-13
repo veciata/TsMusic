@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/models/audio_format.dart';
+import 'package:tsmusic/models/playback_mode.dart';
 import 'package:tsmusic/models/player_styles.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
@@ -219,6 +220,55 @@ void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvi
               ),
               onTap: () {
                 settingsProvider.setAudioFormat(format);
+                Navigator.of(context).pop();
+              },
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showPlaybackModeDialog(BuildContext context, SettingsProvider settingsProvider) {
+  final l10n = AppLocalizations.of(context);
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.defaultPlaybackMode),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: PlaybackMode.values.map((mode) {
+            final isSelected = mode == settingsProvider.defaultPlaybackMode;
+            final name = mode == PlaybackMode.online ? l10n.online : l10n.local;
+            return ListTile(
+              title: Text(
+                name,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                ),
+              ),
+              leading: Radio<PlaybackMode>(
+                value: mode,
+                groupValue: settingsProvider.defaultPlaybackMode,
+                onChanged: (PlaybackMode? newMode) {
+                  if (newMode != null) {
+                    settingsProvider.setDefaultPlaybackMode(newMode);
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              onTap: () {
+                settingsProvider.setDefaultPlaybackMode(mode);
                 Navigator.of(context).pop();
               },
             );
@@ -524,6 +574,21 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 onTap: () => _showPlayerStyleDialog(context, themeProvider),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                title: Text(l10n.defaultPlaybackMode),
+                leading: const Icon(Icons.swap_horiz),
+                trailing: Text(
+                  settingsProvider.getPlaybackModeName(
+                    settingsProvider.defaultPlaybackMode,
+                    l10n,
+                  ),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                onTap: () => _showPlaybackModeDialog(context, settingsProvider),
               ),
               const Divider(height: 1),
               Padding(

@@ -18,7 +18,7 @@ class NowPlayingScreen extends StatefulWidget {
 }
 
 class _NowPlayingScreenState extends State<NowPlayingScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   AnimationController? _albumArtController;
   double _currentPosition = 0.0;
   bool _isDragging = false;
@@ -130,8 +130,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         onPressed: onPressed,
       );
 
-
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -139,6 +137,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final themeProvider = context.watch<ThemeProvider>();
     final currentSong = musicProvider.currentSong;
     final playerStyle = themeProvider.playerStyle;
+    final l10n = AppLocalizations.of(context);
 
     if (currentSong == null) {
       return Scaffold(
@@ -153,14 +152,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                'No Song Playing',
+                l10n.notPlaying,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
-                'Select a song to start playing',
+                l10n.selectSongToPlay,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.7),
                 ),
@@ -174,7 +173,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final duration = musicProvider.duration.inSeconds;
     final albumArtUrl = currentSong.albumArtUrl;
 
-    final header = _buildHeader(theme);
+    final header = _buildHeader(theme, l10n);
     final albumArt = _buildAlbumArt(theme, albumArtUrl, currentSong.title,
         circular: playerStyle == PlayerStyle.classic,
         spin: playerStyle == PlayerStyle.classic);
@@ -211,44 +210,57 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       bottomControls: bottomControls,
     );
 
+    Widget playerWidget;
     switch (playerStyle) {
       case PlayerStyle.classic:
-        return buildClassicStyle(params);
+        playerWidget = buildClassicStyle(params);
       case PlayerStyle.modern:
-        return buildModernStyle(params);
+        playerWidget = buildModernStyle(params);
       case PlayerStyle.minimal:
-        return buildMinimalStyle(params);
+        playerWidget = buildMinimalStyle(params);
       case PlayerStyle.square:
-        return buildSquareStyle(params);
+        playerWidget = buildSquareStyle(params);
       case PlayerStyle.glass:
-        return buildGlassStyle(params);
+        playerWidget = buildGlassStyle(params);
     }
+
+return Scaffold(
+       appBar: AppBar(
+         leading: IconButton(
+           icon: const Icon(Icons.arrow_downward),
+           onPressed: () => Navigator.pop(context),
+         ),
+         title: Text(l10n.nowPlaying),
+         centerTitle: true,
+         actions: [
+           Consumer<ThemeProvider>(
+             builder: (context, themeProvider, _) {
+               return IconButton(
+                 icon: const Icon(Icons.palette),
+                 onPressed: () => _showStyleSelector(context, themeProvider, l10n),
+               );
+             },
+           ),
+         ],
+       ),
+       body: playerWidget,
+     );
   }
 
-  Widget _buildHeader(ThemeData theme) => Padding(
+  Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_downward),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const SizedBox(width: 48),
           const Spacer(),
           Text(
-            'Now Playing',
+            l10n.nowPlaying,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const Spacer(),
-          Consumer<ThemeProvider>(
-            builder: (context, themeProvider, _) {
-              return IconButton(
-                icon: const Icon(Icons.palette),
-                onPressed: () => _showStyleSelector(context, themeProvider),
-              );
-            },
-          ),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -368,8 +380,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       ),
     );
 
-  void _showStyleSelector(BuildContext context, ThemeProvider themeProvider) {
-    final l10n = AppLocalizations.of(context);
+  void _showStyleSelector(BuildContext context, ThemeProvider themeProvider, AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Padding(

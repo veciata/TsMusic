@@ -2,20 +2,25 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/audio_format.dart';
+import 'package:tsmusic/models/playback_mode.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 
 class SettingsProvider with ChangeNotifier {
   static const String _audioFormatKey = 'audioFormat';
   static const String _languageKey = 'language';
   static const String _downloadLocationKey = 'downloadLocation';
   static const String _firstLaunchKey = 'first_launch';
+  static const String _defaultPlaybackModeKey = 'defaultPlaybackMode';
 
   AudioFormat _audioFormat = AudioFormat.auto;
   Locale _locale = const Locale('en', 'US');
   String _downloadLocation = 'internal';
+  PlaybackMode _defaultPlaybackMode = PlaybackMode.local;
 
   AudioFormat get audioFormat => _audioFormat;
   Locale get locale => _locale;
   String get downloadLocation => _downloadLocation;
+  PlaybackMode get defaultPlaybackMode => _defaultPlaybackMode;
 
   SettingsProvider() {
     _loadSettings();
@@ -62,6 +67,15 @@ class SettingsProvider with ChangeNotifier {
       _audioFormat = AudioFormat.values.firstWhere(
         (e) => e.toString() == 'AudioFormat.$audioFormatString',
         orElse: () => AudioFormat.auto,
+      );
+    }
+
+    // Load default playback mode
+    final playbackModeString = prefs.getString(_defaultPlaybackModeKey);
+    if (playbackModeString != null) {
+      _defaultPlaybackMode = PlaybackMode.values.firstWhere(
+        (e) => e.name == playbackModeString,
+        orElse: () => PlaybackMode.local,
       );
     }
 
@@ -133,6 +147,19 @@ class SettingsProvider with ChangeNotifier {
       return 'Music folder';
     }
     return 'Internal Storage (App folder)';
+  }
+
+  Future<void> setDefaultPlaybackMode(PlaybackMode mode) async {
+    if (_defaultPlaybackMode != mode) {
+      _defaultPlaybackMode = mode;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_defaultPlaybackModeKey, mode.name);
+      notifyListeners();
+    }
+  }
+
+  String getPlaybackModeName(PlaybackMode mode, AppLocalizations l10n) {
+    return mode == PlaybackMode.online ? l10n.online : l10n.local;
   }
 
   String getLanguageName(Locale locale) {

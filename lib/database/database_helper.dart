@@ -1228,4 +1228,52 @@ class DatabaseHelper {
       localThumbnailPath: map['thumbnail_path'] as String?,
     );
   }
+
+  /// Saves a YouTube song (not downloaded) to the songs table for playlist linking.
+  /// Returns the song's database ID. If the song already exists (by youtube_id),
+  /// returns the existing ID.
+  Future<int> addYouTubeSongToDatabase({
+    required String youtubeId,
+    required String title,
+    required List<String> artists,
+    required int duration,
+    String? thumbnailUrl,
+  }) async {
+    final db = await database;
+    final existing = await db.query(
+      tableSongs,
+      where: 'youtube_id = ?',
+      whereArgs: [youtubeId],
+    );
+    if (existing.isNotEmpty) {
+      return existing.first['id'] as int;
+    }
+
+    late final int songId;
+    await db.transaction((txn) async {
+      songId = await txn.insert(
+        tableSongs,
+        {
+          'youtube_id': youtubeId,
+          'title': title,
+          'file_path': 'yt:$youtubeId',
+          'duration': duration,
+          'thumbnail_path': thumbnailUrl,
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      for (final artist in artists.where((a) => a.isNotEmpty)) {
+        final artistId = await _getOrCreateArtist(txn, artist);
+        await txn.insert(
+          tableSongArtist,
+          {'song_id': songId, 'artist_id': artistId},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    });
+
+    return songId;
+  }
 }

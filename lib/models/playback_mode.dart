@@ -1,0 +1,4 @@
+enum PlaybackMode {
+  local,
+  online,
+}

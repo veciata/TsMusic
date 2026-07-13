@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kIsWeb, ChangeNotifier;
@@ -111,6 +112,9 @@ class YouTubeService with ChangeNotifier {
   final Map<String, DownloadProgress> _activeDownloads = {};
   YouTubeAudio? _currentAudio;
 
+  final List<YouTubeAudio> _onlinePlaylist = [];
+  int _onlinePlaylistIndex = -1;
+
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
   
@@ -119,6 +123,23 @@ class YouTubeService with ChangeNotifier {
   late final LRUCache<String, String> _audioUrlCache; // Cache audio stream URLs
 
   Function()? _stopOtherPlayer;
+  List<ts.Song> Function()? _getLocalSongs;
+
+  // Auto-suggest state
+  bool _autoSuggestEnabled = false;
+  List<YouTubeAudio> _nextSuggestions = [];
+
+  bool get autoSuggestEnabled => _autoSuggestEnabled;
+  set autoSuggestEnabled(bool value) {
+    _autoSuggestEnabled = value;
+    notifyListeners();
+  }
+
+  List<YouTubeAudio> get nextSuggestions => List.unmodifiable(_nextSuggestions);
+
+  void setLocalSongsCallback(List<ts.Song> Function() callback) {
+    _getLocalSongs = callback;
+  }
 
   // Getters
   List<DownloadProgress> get activeDownloads =>
@@ -126,6 +147,10 @@ class YouTubeService with ChangeNotifier {
   YouTubeAudio? get currentAudio => _currentAudio;
   bool get isPlaying => _player.state.playing;
   Player get player => _player;
+
+  // Online playlist
+  List<YouTubeAudio> get onlinePlaylist => List.unmodifiable(_onlinePlaylist);
+  int get onlinePlaylistIndex => _onlinePlaylistIndex;
 
   static YouTubeService? get instance => _instance;
 
@@ -146,27 +171,178 @@ class YouTubeService with ChangeNotifier {
   }
 
   void _init() {
-    // Initialize audio player
     _player.stream.playing.listen((playing) {
       notifyListeners();
     });
+    _player.stream.completed.listen((completed) async {
+      if (completed && _onlinePlaylist.isNotEmpty) {
+        final nextIndex = _onlinePlaylistIndex + 1;
+        if (nextIndex < _onlinePlaylist.length) {
+          await playOnlinePlaylistAt(nextIndex);
+        } else if (_autoSuggestEnabled) {
+          // Queue exhausted and auto-suggest on: suggest next
+          _updateSuggestions();
+        }
+      }
+      if (completed) {
+        _updateSuggestions();
+      }
+    });
   }
 
-  // Play audio from YouTube
+  Future<void> _updateSuggestions() async {
+    try {
+      final suggestion = await _suggestNextSong();
+      _nextSuggestions = [suggestion];
+      notifyListeners();
+    } catch (_) {
+      _nextSuggestions = [];
+      notifyListeners();
+    }
+  }
+
+  void playSuggestion(YouTubeAudio audio) {
+    addToOnlinePlaylist(audio);
+    if (!isPlaying) {
+      playOnlinePlaylistAt(_onlinePlaylist.length - 1);
+    }
+  }
+
+  // ===== ONLINE PLAYLIST MANAGEMENT =====
+  void addToOnlinePlaylist(YouTubeAudio audio) {
+    _onlinePlaylist.add(audio);
+    notifyListeners();
+  }
+
+  void removeFromOnlinePlaylist(int index) {
+    if (index < 0 || index >= _onlinePlaylist.length) return;
+    _onlinePlaylist.removeAt(index);
+    if (_onlinePlaylistIndex >= _onlinePlaylist.length) {
+      _onlinePlaylistIndex = _onlinePlaylist.length - 1;
+    }
+    if (_onlinePlaylist.isEmpty) {
+      _onlinePlaylistIndex = -1;
+    }
+    notifyListeners();
+  }
+
+  void clearOnlinePlaylist() {
+    _onlinePlaylist.clear();
+    _onlinePlaylistIndex = -1;
+    notifyListeners();
+  }
+
+  Future<int> fetchPlaylistAndAdd(String playlistUrl) async {
+    try {
+      final playlistId = PlaylistId(playlistUrl);
+      final videos = await _yt.playlists.getVideos(playlistId).toList();
+      for (final video in videos) {
+        final audio = YouTubeAudio.fromVideo(video);
+        _onlinePlaylist.add(audio);
+      }
+      notifyListeners();
+      return videos.length;
+    } catch (e) {
+      debugPrint('Error fetching playlist: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> playOnlinePlaylistAt(int index) async {
+    if (index < 0 || index >= _onlinePlaylist.length) return;
+    _onlinePlaylistIndex = index;
+    await playAudio(_onlinePlaylist[index]);
+  }
+
+  ts.Song? _findLocalMatch(YouTubeAudio audio) {
+    final localSongs = _getLocalSongs?.call() ?? [];
+    if (localSongs.isEmpty) return null;
+
+    // First try matching by youtubeId
+    final byYtId = localSongs.cast<ts.Song?>().firstWhere(
+      (s) => s!.youtubeId == audio.id,
+      orElse: () => null,
+    );
+    if (byYtId != null) return byYtId;
+
+    // Fallback: match by title + first artist
+    final title = audio.title.toLowerCase().trim();
+    final artist = audio.artists.isNotEmpty
+        ? audio.artists.first.toLowerCase().trim()
+        : '';
+    for (final s in localSongs) {
+      final stitle = s.title.toLowerCase().trim();
+      final sartist = s.artists.isNotEmpty
+          ? s.artists.first.toLowerCase().trim()
+          : '';
+      if (stitle == title && sartist == artist) {
+        return s;
+      }
+    }
+    return null;
+  }
+
+  Future<YouTubeAudio> _suggestNextSong() async {
+    final localSongs = _getLocalSongs?.call() ?? [];
+    if (localSongs.isNotEmpty) {
+      final random = Random();
+      final song = localSongs[random.nextInt(localSongs.length)];
+      return YouTubeAudio(
+        id: song.youtubeId ?? song.title,
+        title: song.title,
+        author: song.artist,
+        artists: song.artists,
+        duration: song.durationObject,
+        thumbnailUrl: song.albumArtUrl,
+      );
+    }
+    // Fallback: pick from online playlist history
+    if (_onlinePlaylist.length > 1) {
+      return _onlinePlaylist[0];
+    }
+    throw Exception('No songs available for suggestion');
+  }
+
+  // Play audio from YouTube (or local file if matching song exists)
   Future<void> playAudio(YouTubeAudio audio) async {
     try {
-      // Stop local player first to avoid double sound — MUST be before
-      // any notifyListeners() call, otherwise the online mode flag set
-      // by _onYouTubeServiceStateChanged causes the stop to route through
-      // _stopOnlineAndResumeLocal which re-starts the local song.
       _stopOtherPlayer?.call();
 
       _currentAudio = audio;
+
+      // Track in online playlist
+      final existingIndex = _onlinePlaylist.indexWhere((a) => a.id == audio.id);
+      if (existingIndex >= 0) {
+        _onlinePlaylistIndex = existingIndex;
+      } else {
+        _onlinePlaylist.add(audio);
+        _onlinePlaylistIndex = _onlinePlaylist.length - 1;
+      }
+
       isLoading.value = true;
       notifyListeners();
 
-      // Clear any previous errors
       await _player.stop();
+
+      // Check for local match first
+      final localMatch = _findLocalMatch(audio);
+      if (localMatch != null && File(localMatch.url).existsSync()) {
+        debugPrint('🎵 Playing local file: ${localMatch.url}');
+        await _player.open(Media(localMatch.url));
+        await _player.play();
+        _currentAudio = YouTubeAudio(
+          id: audio.id,
+          title: audio.title,
+          author: audio.author,
+          artists: audio.artists,
+          duration: audio.duration,
+          thumbnailUrl: audio.thumbnailUrl,
+          audioUrl: localMatch.url,
+        );
+        notifyListeners();
+        isLoading.value = false;
+        return;
+      }
 
       final String? audioUrl = await _getAudioStream(audio.id);
 
@@ -280,6 +456,7 @@ class YouTubeService with ChangeNotifier {
   Future<void> stop() async {
     await _player.stop();
     _currentAudio = null;
+    _onlinePlaylistIndex = -1;
     notifyListeners();
   }
 

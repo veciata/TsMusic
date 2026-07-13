@@ -45,6 +45,7 @@ class AppLocalizations {
   String get music => throw UnimplementedError();
   String get artists => throw UnimplementedError();
   String get playlists => throw UnimplementedError();
+  String get local => throw UnimplementedError();
   String get localSongs => throw UnimplementedError();
   String get online => throw UnimplementedError();
   String get downloaded => throw UnimplementedError();
@@ -143,6 +144,9 @@ class AppLocalizations {
   String get queue => throw UnimplementedError();
   String get clearQueue => throw UnimplementedError();
   String get queueCleared => throw UnimplementedError();
+
+  // Playback
+  String get defaultPlaybackMode => throw UnimplementedError();
 
   // Downloads
   String get downloading => throw UnimplementedError();

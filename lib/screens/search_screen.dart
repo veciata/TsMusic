@@ -1,15 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:path/path.dart' as path;
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/models/song.dart' as model;
 import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
+import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
-
 
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
@@ -25,15 +28,15 @@ class _SearchScreenState extends State<SearchScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   late final YouTubeService _youTubeService;
   late final YouTubePlayerProvider _youtubePlayer;
+  final ScrollController _scrollController = ScrollController();
+  final ScrollController _searchScrollController = ScrollController();
   List<YouTubeAudio> _youtubeResults = [];
   bool _isSearchingYouTube = false;
   bool _isOffline = false;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-
+  bool _hasFetchedYouTube = false;
   bool _hasMoreYouTubeResults = true;
-  Timer? _debounceTimer;
-  final ScrollController _scrollController = ScrollController();
-  final ScrollController _searchScrollController = ScrollController();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -47,19 +50,14 @@ class _SearchScreenState extends State<SearchScreen> {
     final initialQuery = widget.initialQuery;
     if (initialQuery != null && initialQuery.isNotEmpty) {
       _searchController.text = initialQuery;
-      _searchYouTube(initialQuery);
+      _debouncedSearch(initialQuery);
     }
-    
-    // Check initial connectivity status
+
     _checkConnectivity();
-    
-    // Subscribe to connectivity changes
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       _checkConnectivity();
     });
   }
-
-
 
   @override
   void dispose() {
@@ -69,8 +67,8 @@ class _SearchScreenState extends State<SearchScreen> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchScrollController.dispose();
-    _debounceTimer?.cancel();
     _connectivitySubscription?.cancel();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -83,14 +81,19 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      // Handle connectivity check errors (common on web)
       if (mounted) {
         setState(() {
-          // Assume online if we can't determine connectivity
           _isOffline = false;
         });
       }
     }
+  }
+
+  void _debouncedSearch(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      _searchYouTube(query);
+    });
   }
 
   Future<void> _playAudio(YouTubeAudio audio) async {
@@ -113,7 +116,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _handleDownload(YouTubeAudio audio) async {
     if (!mounted) return;
-    
+
     final isDownloading =
         _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
     if (isDownloading) {
@@ -131,8 +134,6 @@ class _SearchScreenState extends State<SearchScreen> {
         downloadLocation: settingsProvider.downloadLocation,
       );
       if (result != null && mounted) {
-        // Add the downloaded song directly to the library so the icon updates
-        // immediately without a full database reload.
         Provider.of<music_provider.MusicProvider>(context, listen: false)
             .addDownloadedSongToLibrary(result.song);
 
@@ -180,7 +181,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
-    // Don't search YouTube if offline
     if (_isOffline) {
       if (mounted) {
         setState(() {
@@ -189,13 +189,14 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       return;
     }
-    
+
     if (query.isEmpty) {
       if (mounted) {
         setState(() {
           _youtubeResults.clear();
           _isSearchingYouTube = false;
           _hasMoreYouTubeResults = true;
+          _hasFetchedYouTube = false;
         });
       }
       return;
@@ -206,7 +207,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (mounted) setState(() => _isSearchingYouTube = true);
 
     try {
-      final List<YouTubeAudio> response = loadMore 
+      final List<YouTubeAudio> response = loadMore
           ? await _youTubeService.searchAudioNextPage(query)
           : await _youTubeService.searchAudio(query);
 
@@ -218,6 +219,7 @@ class _SearchScreenState extends State<SearchScreen> {
             _youtubeResults = response;
           }
           _hasMoreYouTubeResults = response.isNotEmpty;
+          _hasFetchedYouTube = true;
         });
       }
     } catch (_) {
@@ -237,94 +239,63 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  
-  
+  Widget _buildMixedResults(List<model.Song> localSongs,
+      music_provider.MusicProvider provider,
+      model.Song? currentSong, bool isPlaying) {
+    final query = _searchController.text.toLowerCase();
 
-
-  Widget _buildSearchResults(List<model.Song> localSongs, music_provider.MusicProvider provider,
-      model.Song? currentSong, bool isPlaying,) {
-    if (_searchController.text.isEmpty) {
-      return const Center(
-        child: Text('Search for songs...'),
+    if (query.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search, size: 64,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+            const SizedBox(height: 16),
+            Text(
+              'Search for songs...',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    final query = _searchController.text.toLowerCase();
-    final filteredLocalSongs = localSongs.where((song) => song.title.toLowerCase().contains(query) ||
-          song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
-          (song.album?.toLowerCase().contains(query) ?? false)).toList();
+    final filteredLocalSongs = localSongs.where((song) =>
+        song.title.toLowerCase().contains(query) ||
+        song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
+        (song.album?.toLowerCase().contains(query) ?? false)).toList();
 
-    final isLoadingYouTube = _isSearchingYouTube;
-    final hasYouTubeResults = _youtubeResults.isNotEmpty;
+    final hasLocalResults = filteredLocalSongs.isNotEmpty;
+    final hasOnlineResults = _youtubeResults.isNotEmpty;
 
     return ListView(
       controller: _scrollController,
       children: [
-        // Local songs section
-        if (filteredLocalSongs.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        if (hasLocalResults) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Local Music',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              'Local Results (${filteredLocalSongs.length})',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          ...filteredLocalSongs.map((song) {
-            final isCurrent = provider.currentSong?.id == song.id;
-            final isSongPlaying = provider.isPlaying && isCurrent;
-            
-            return ListTile(
-              leading: const Icon(Icons.music_note),
-              title: Text(song.title),
-              subtitle: Text(song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist'),
-              trailing: IconButton(
-                icon: Icon(isCurrent && isSongPlaying ? Icons.pause : Icons.play_arrow),
-                onPressed: () {
-                  if (isCurrent) {
-                    if (isSongPlaying) {
-                      provider.pause();
-                    } else {
-                      provider.play();
-                    }
-                  } else {
-                    provider.playSong(song);
-                  }
-                },
-              ),
-              onTap: () {
-                debugPrint('🔍 SearchScreen onTap: ${song.title} (URL: ${song.url})');
-                if (isCurrent) {
-                  if (isSongPlaying) {
-                    debugPrint('🔍 SearchScreen: Pausing current song');
-                    provider.pause();
-                  } else {
-                    debugPrint('🔍 SearchScreen: Resuming current song');
-                    provider.play();
-                  }
-                } else {
-                  debugPrint('🔍 SearchScreen: Playing new song');
-                  provider.playSong(song);
-                }
-              },
-            );
-          }),
-          const Divider(height: 1),
+          ...filteredLocalSongs.map((song) => _buildLocalResultItem(
+              song, provider, currentSong, isPlaying)),
         ],
-        
-        // YouTube results section
-        if (isLoadingYouTube) ...[
-          const Center(child: CircularProgressIndicator()),
-        ] else if (hasYouTubeResults) ...[
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        if (!_isOffline && _hasFetchedYouTube && hasOnlineResults) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Online Results',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              'Online Results (${_youtubeResults.length})',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -332,27 +303,277 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_hasMoreYouTubeResults && !_isSearchingYouTube)
             const Padding(
               padding: EdgeInsets.all(16.0),
-              child: Center(
-                child: CircularProgressIndicator(),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+        ],
+        if (!hasLocalResults && !hasOnlineResults && !_isSearchingYouTube && _hasFetchedYouTube)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.search_off, size: 64,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No results found',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ),
+                ],
               ),
             ),
-        ] else if (_searchController.text.isNotEmpty && filteredLocalSongs.isEmpty) ...[
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('No results found'),
+          ),
+        if (_isSearchingYouTube)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (!_hasFetchedYouTube && !_isSearchingYouTube && query.isNotEmpty && !_isOffline)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: ElevatedButton.icon(
+                onPressed: () => _searchYouTube(query),
+                icon: const Icon(Icons.cloud),
+                label: const Text('Search Online'),
+              ),
             ),
           ),
-        ],
       ],
     );
   }
 
-  Widget _buildYouTubeResultItem(YouTubeAudio audio) => YouTubePlaybackWidget(
+  Widget _buildLocalResultItem(model.Song song,
+      music_provider.MusicProvider provider,
+      model.Song? currentSong, bool isPlaying) {
+    final isCurrent = provider.currentSong?.id == song.id;
+    final isSongPlaying = provider.isPlaying && isCurrent;
+    final l10n = AppLocalizations.of(context);
+
+    return ListTile(
+      leading: Icon(
+        isCurrent && isSongPlaying ? Icons.play_arrow : Icons.music_note,
+        color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+      ),
+      title: Text(
+        song.title,
+        style: TextStyle(
+          color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+        ),
+      ),
+      subtitle: Text(
+        song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist',
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(isCurrent && isSongPlaying ? Icons.pause : Icons.play_arrow),
+            onPressed: () {
+              if (isCurrent) {
+                if (isSongPlaying) {
+                  provider.pause();
+                } else {
+                  provider.play();
+                }
+              } else {
+                provider.playSong(song);
+              }
+            },
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) => _handleSongAction(value, song, provider),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'add_to_playlist',
+                child: Row(
+                  children: [
+                    const Icon(Icons.playlist_add),
+                    const SizedBox(width: 8),
+                    Text(l10n.addToPlaylist),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'move',
+                child: Row(
+                  children: [
+                    const Icon(Icons.drive_file_move_outline),
+                    const SizedBox(width: 8),
+                    Text(l10n.moveTo),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      onTap: () {
+        if (isCurrent) {
+          if (isSongPlaying) {
+            provider.pause();
+          } else {
+            provider.play();
+          }
+        } else {
+          provider.playSong(song);
+        }
+      },
+    );
+  }
+
+  Future<void> _handleSongAction(
+    String action,
+    model.Song song,
+    music_provider.MusicProvider provider,
+  ) async {
+    switch (action) {
+      case 'add_to_playlist':
+        showAddToPlaylistSheet(context, songId: song.id);
+      case 'move':
+        await _showMoveDialog(song);
+      case 'delete':
+        await _showDeleteConfirmation(song, provider);
+    }
+  }
+
+  Future<void> _showMoveDialog(model.Song song) async {
+    final l10n = AppLocalizations.of(context);
+    final locations = [
+      {
+        'label': l10n.internalStorage,
+        'path': '/storage/emulated/0/Music/tsmusic',
+      },
+      {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
+      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music/tsmusic'},
+    ];
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.moveTo),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: locations
+              .map(
+                (loc) => ListTile(
+                  title: Text(loc['label']!),
+                  onTap: () => Navigator.pop(context, loc['path']),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      try {
+        final targetDir = Directory(selected);
+        if (!await targetDir.exists()) {
+          await targetDir.create(recursive: true);
+        }
+
+        final file = File(song.url);
+        final newPath = path.join(selected, path.basename(song.url));
+        try {
+          await file.rename(newPath);
+        } on FileSystemException {
+          await file.copy(newPath);
+          await file.delete();
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.move}: $selected')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.errorMovingFile}: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showDeleteConfirmation(
+    model.Song song,
+    music_provider.MusicProvider provider,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteSong),
+        content: Text('${l10n.confirmDelete} "${song.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await provider.deleteSong(song);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.songDeleted)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.error}: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildYouTubeResultItem(YouTubeAudio audio) {
+    final musicProvider = context.read<music_provider.MusicProvider>();
+    return YouTubePlaybackWidget(
       audio: audio,
       onPlay: _playAudio,
       onDownload: _handleDownload,
+      onAddToPlaylist: () => showAddYouTubeToPlaylistSheet(
+        context,
+        youtubeId: audio.id,
+        title: audio.title,
+        artists: audio.artists,
+        duration: audio.duration?.inMilliseconds ?? 0,
+        thumbnailUrl: audio.thumbnailUrl,
+      ),
+      onDelete: () async {
+        final song = musicProvider.songs
+            .where((s) => s.youtubeId == audio.id && s.tags.contains('tsmusic'))
+            .firstOrNull;
+        if (song != null) {
+          await _showDeleteConfirmation(song, musicProvider);
+        }
+      },
     );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -363,7 +584,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        // Stop YouTube player when leaving search screen
         await _youtubePlayer.stop();
         return true;
       },
@@ -377,28 +597,17 @@ class _SearchScreenState extends State<SearchScreen> {
               hintText: 'Search songs...',
               border: InputBorder.none,
             ),
-onChanged: (value) {
-  _debounceTimer?.cancel();
-  if (value.isNotEmpty) {
-    setState(() {
-      _isSearchingYouTube = true;
-      _youtubeResults.clear(); // Clear results immediately for better UX
-    });
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _searchYouTube(value);
-    });
-  } else {
-    setState(() {
-      _youtubeResults.clear();
-      _isSearchingYouTube = false;
-    });
-  }
-},
+            onChanged: (value) {
+              _hasFetchedYouTube = false;
+              if (value.isNotEmpty && !_isOffline) {
+                _debouncedSearch(value);
+              }
+              setState(() {});
+            },
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              // Stop YouTube player when going back
               _youtubePlayer.stop();
               Navigator.of(context).pop();
             },
@@ -407,11 +616,10 @@ onChanged: (value) {
         body: Column(
           children: [
             Expanded(
-              child: _buildSearchResults(localSongs, musicProvider, currentSong, isPlaying),
+              child: _buildMixedResults(
+                  localSongs, musicProvider, currentSong, isPlaying),
             ),
-            // Always show mini player at bottom
             const MiniPlayerWidget(),
-            // Show offline status if applicable
             if (_isOffline)
               Container(
                 padding: const EdgeInsets.all(8.0),

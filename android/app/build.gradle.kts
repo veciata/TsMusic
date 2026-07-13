@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android") version "2.2.20"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -17,8 +18,6 @@ android {
 
     defaultConfig {
         applicationId = "com.veciata.tsmusic"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion  // Minimum SDK 21 (Android 5.0) for audio_service compatibility
         targetSdk = 34  // Target SDK 34 (Android 14) to avoid obsolete warnings
         versionCode = flutter.versionCode

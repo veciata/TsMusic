@@ -50,6 +50,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlists => 'Playlists';
 
   @override
+  String get local => 'Local';
+
+  @override
   String get localSongs => 'Local Songs';
 
   @override
@@ -277,6 +280,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noOnlineSongsFound => 'No online songs found for this artist';
+
+  @override
+  String get defaultPlaybackMode => 'Default Playback Mode';
 
   @override
   String get queue => 'Queue';

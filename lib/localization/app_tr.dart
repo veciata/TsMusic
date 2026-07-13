@@ -47,6 +47,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get playlists => 'Oynatma Listeleri';
 
   @override
+  String get local => 'Yerel';
+
+  @override
   String get localSongs => 'Yerel Şarkılar';
 
   @override
@@ -274,6 +277,9 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get noOnlineSongsFound => 'Bu sanatçı için çevrimiçi şarkı bulunamadı';
+
+  @override
+  String get defaultPlaybackMode => 'Varsayılan Oynatma Modu';
 
   @override
   String get queue => 'Kuyruk';

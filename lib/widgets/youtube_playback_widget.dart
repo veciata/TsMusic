@@ -8,18 +8,20 @@ import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/main.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
 
-/// Reusable YouTube audio playback widget
-/// Used in search and artist screens to display YouTube results with playback status
 class YouTubePlaybackWidget extends StatelessWidget {
   final YouTubeAudio audio;
   final Future<void> Function(YouTubeAudio) onPlay;
   final Future<void> Function(YouTubeAudio) onDownload;
+  final VoidCallback? onAddToPlaylist;
+  final VoidCallback? onDelete;
 
   const YouTubePlaybackWidget({
     super.key,
     required this.audio,
     required this.onPlay,
     required this.onDownload,
+    this.onAddToPlaylist,
+    this.onDelete,
   });
 
   @override
@@ -95,48 +97,80 @@ class YouTubePlaybackWidget extends StatelessWidget {
                 icon: const Icon(Icons.play_arrow),
                 onPressed: () => onPlay(audio),
               ),
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: downloadProgress != null
-                  ? GestureDetector(
-                      onTap: () {
-                        mainNavKey.currentState?.goToDownloads();
-                      },
-                      child: Stack(
-                        alignment: Alignment.center,
+            if (downloadProgress != null)
+              GestureDetector(
+                onTap: () => mainNavKey.currentState?.goToDownloads(),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          value: downloadProgress.progress > 0
+                              ? downloadProgress.progress
+                              : null,
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const Icon(Icons.download, size: 12),
+                    ],
+                  ),
+                ),
+              )
+            else
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'download':
+                      onDownload(audio);
+                    case 'add_to_playlist':
+                      onAddToPlaylist?.call();
+                    case 'delete':
+                      onDelete?.call();
+                  }
+                },
+                itemBuilder: (context) => [
+                  if (!isDownloaded)
+                    const PopupMenuItem(
+                      value: 'download',
+                      child: Row(
                         children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              value: downloadProgress.progress > 0
-                                  ? downloadProgress.progress
-                                  : null,
-                              strokeWidth: 2,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const Icon(Icons.download, size: 12),
+                          Icon(Icons.download),
+                          SizedBox(width: 8),
+                          Text('Download'),
                         ],
                       ),
-                    )
-                  : IconButton(
-                      icon: Icon(
-                        isDownloaded
-                            ? Icons.check_circle
-                            : Icons.download,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () async {
-                        if (isDownloaded) {
-                          return;
-                        }
-                        await onDownload(audio);
-                      },
                     ),
-            ),
+                  if (onAddToPlaylist != null)
+                    const PopupMenuItem(
+                      value: 'add_to_playlist',
+                      child: Row(
+                        children: [
+                          Icon(Icons.playlist_add),
+                          SizedBox(width: 8),
+                          Text('Add to Playlist'),
+                        ],
+                      ),
+                    ),
+                  if (isDownloaded && onDelete != null)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
