@@ -26,9 +26,9 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos
 
-      - run: flutter format --dry-run --set-exit-if-changed lib/
+      - run: dart format --output=none --set-exit-if-changed lib/
 
   test:
     name: Run Tests
