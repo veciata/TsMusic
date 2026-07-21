@@ -62,8 +62,8 @@ jobs:
       - name: Decode keystore
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-        run: |
-          echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.jks
+          run: |
+            echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/upload-keystore.jks
 
       - name: Extract version from pubspec.yaml
         id: version
@@ -74,14 +74,14 @@ jobs:
 
       - name: Build AAB
         env:
-          KEYSTORE_PATH: android/app/upload-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build appbundle --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
       - name: Build APK
         env:
-          KEYSTORE_PATH: android/app/upload-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build apk --release --split-per-abi --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
