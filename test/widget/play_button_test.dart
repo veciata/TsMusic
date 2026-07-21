@@ -108,7 +108,7 @@ void main() {
         ),
       );
 
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
