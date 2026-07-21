@@ -41,9 +41,9 @@ class _PlaylistSelectorBottomSheetState
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading playlists: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading playlists: $e')));
       }
     }
   }
@@ -74,15 +74,15 @@ class _PlaylistSelectorBottomSheetState
         await _db.deletePlaylist(playlistId);
         await _loadPlaylists();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.playlistDeleted)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.playlistDeleted)));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $e')));
         }
       }
     }
@@ -123,9 +123,9 @@ class _PlaylistSelectorBottomSheetState
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 }
               }
@@ -142,7 +142,8 @@ class _PlaylistSelectorBottomSheetState
     final item = widget.item;
 
     if (item?.youtubeId != null) {
-      final playlistTypeStr = playlist['playlist_type'] as String? ?? 'local_only';
+      final playlistTypeStr =
+          playlist['playlist_type'] as String? ?? 'local_only';
       final playlistType = playlistTypeStr == 'remote_compatible'
           ? PlaylistType.remoteCompatible
           : PlaylistType.localOnly;
@@ -152,7 +153,10 @@ class _PlaylistSelectorBottomSheetState
         playlistType,
       );
       if (warning != null && mounted) {
-        final proceed = await PlaylistBoundary.showWarningDialog(context, warning);
+        final proceed = await PlaylistBoundary.showWarningDialog(
+          context,
+          warning,
+        );
         if (!proceed) return;
       }
     }
@@ -162,8 +166,7 @@ class _PlaylistSelectorBottomSheetState
         if (item.songId != null) {
           await _db.addSongsToPlaylist(playlistId, [item.songId!]);
         } else if (item.youtubeId != null) {
-          final musicProvider =
-              context.read<music_provider.MusicProvider>();
+          final musicProvider = context.read<music_provider.MusicProvider>();
           await musicProvider.addOnlineSongToPlaylist(
             youtubeId: item.youtubeId!,
             title: item.title ?? 'Unknown',
@@ -183,9 +186,9 @@ class _PlaylistSelectorBottomSheetState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -196,8 +199,7 @@ class _PlaylistSelectorBottomSheetState
 
     try {
       if (item.songId != null) {
-        final musicProvider =
-            context.read<music_provider.MusicProvider>();
+        final musicProvider = context.read<music_provider.MusicProvider>();
         final song = musicProvider.librarySongs
             .where((s) => s.id == item.songId)
             .firstOrNull;
@@ -205,8 +207,7 @@ class _PlaylistSelectorBottomSheetState
           musicProvider.addSongToPlaylist(song);
         }
       } else if (item.youtubeId != null) {
-        final musicProvider =
-            context.read<music_provider.MusicProvider>();
+        final musicProvider = context.read<music_provider.MusicProvider>();
         final songId = await musicProvider.addOnlineSongToPlaylist(
           youtubeId: item.youtubeId!,
           title: item.title ?? 'Unknown',
@@ -227,15 +228,15 @@ class _PlaylistSelectorBottomSheetState
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Added to Now Playing')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Added to Now Playing')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -308,7 +309,9 @@ class _PlaylistSelectorBottomSheetState
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
-                        isAddMode ? Icons.playlist_add : Icons.play_circle_filled,
+                        isAddMode
+                            ? Icons.playlist_add
+                            : Icons.play_circle_filled,
                         color: theme.colorScheme.primary,
                       ),
                     ),
@@ -317,66 +320,77 @@ class _PlaylistSelectorBottomSheetState
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                        '${musicProvider.queue.length} ${l10n.songs.toLowerCase()}'),
+                      '${musicProvider.queue.length} ${l10n.songs.toLowerCase()}',
+                    ),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: isAddMode ? _addToNowPlaying : () => Navigator.pop(context),
+                    onTap: isAddMode
+                        ? _addToNowPlaying
+                        : () => Navigator.pop(context),
                   ),
                   const Divider(height: 1, indent: 72),
                   ..._playlists
                       .where(
-                          (p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId)
-                      .map((playlist) => ListTile(
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.secondary
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                        (p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId,
+                      )
+                      .map(
+                        (playlist) => ListTile(
+                          leading: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondary.withValues(
+                                alpha: 0.1,
                               ),
-                              child: Icon(
-                                Icons.queue_music,
-                                color: theme.colorScheme.secondary,
-                              ),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            title: Text(playlist['name'] ?? 'Unnamed'),
-                            subtitle: playlist['description'] != null
-                                ? Text(
-                                    playlist['description']!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  )
-                                : null,
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              if (isAddMode) {
-                                _addToPlaylist(playlist);
-                              } else {
-                                final playlistId = playlist['id'] as int;
-                                musicProvider.loadPlaylistAsQueue(playlistId);
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                }
+                            child: Icon(
+                              Icons.queue_music,
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                          title: Text(playlist['name'] ?? 'Unnamed'),
+                          subtitle: playlist['description'] != null
+                              ? Text(
+                                  playlist['description']!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            if (isAddMode) {
+                              _addToPlaylist(playlist);
+                            } else {
+                              final playlistId = playlist['id'] as int;
+                              musicProvider.loadPlaylistAsQueue(playlistId);
+                              if (mounted) {
+                                Navigator.pop(context);
                               }
-                            },
-                            onLongPress: () {
-                              _deletePlaylist(
-                                playlist['id'] as int,
-                                playlist['name'] ?? 'Unnamed',
-                              );
-                            },
-                          )),
-                  if (isAddMode && _playlists
-                      .where((p) =>
-                          p['id'] != DatabaseHelper.nowPlayingPlaylistId)
-                      .isEmpty)
+                            }
+                          },
+                          onLongPress: () {
+                            _deletePlaylist(
+                              playlist['id'] as int,
+                              playlist['name'] ?? 'Unnamed',
+                            );
+                          },
+                        ),
+                      ),
+                  if (isAddMode &&
+                      _playlists
+                          .where(
+                            (p) =>
+                                p['id'] != DatabaseHelper.nowPlayingPlaylistId,
+                          )
+                          .isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(32),
                       child: Text(
                         l10n.noPlaylists,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                       ),
                     ),
@@ -399,7 +413,10 @@ void showPlaylistSelector(BuildContext context) {
   );
 }
 
-void showAddToPlaylistSheet(BuildContext context, {required PlaylistItem item}) {
+void showAddToPlaylistSheet(
+  BuildContext context, {
+  required PlaylistItem item,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,

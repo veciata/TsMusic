@@ -87,18 +87,18 @@ class DatabaseHelper {
       final tagsData = await getTagsForSong(songId);
       final tags = tagsData.map((row) => row['name'] as String).toList();
 
-    songs.add(
-      Song(
-        id: songId,
-        title: map['title'] as String,
-        url: map['file_path'] as String,
-        duration: map['duration'] as int,
-        artists: artists,
-        tags: tags,
-        dateAdded: DateTime.parse(map['created_at'] as String),
-        localThumbnailPath: map['thumbnail_path'] as String?,
-      ),
-    );
+      songs.add(
+        Song(
+          id: songId,
+          title: map['title'] as String,
+          url: map['file_path'] as String,
+          duration: map['duration'] as int,
+          artists: artists,
+          tags: tags,
+          dateAdded: DateTime.parse(map['created_at'] as String),
+          localThumbnailPath: map['thumbnail_path'] as String?,
+        ),
+      );
     }
     return songs;
   }
@@ -124,8 +124,9 @@ class DatabaseHelper {
   Future<void> _verifyDatabaseSchema(Database db) async {
     try {
       // Get all existing tables
-      final tables = await db
-          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table'",
+      );
       final existingTables = tables.map((t) => t['name'] as String).toSet();
 
       // List of required tables
@@ -144,12 +145,14 @@ class DatabaseHelper {
       ];
 
       // Check if all required tables exist
-      final missingTables =
-          requiredTables.where((t) => !existingTables.contains(t)).toList();
+      final missingTables = requiredTables
+          .where((t) => !existingTables.contains(t))
+          .toList();
 
       if (missingTables.isNotEmpty) {
         debugPrint(
-            'Missing tables detected: $missingTables - Recreating database');
+          'Missing tables detected: $missingTables - Recreating database',
+        );
         // Close and delete the database
         await db.close();
         final path = join(await getDatabasesPath(), 'music_player.db');
@@ -239,18 +242,14 @@ class DatabaseHelper {
       ''');
 
       // Create the Now Playing playlist
-      await db.insert(
-        tablePlaylists,
-        {
-          columnId: nowPlayingPlaylistId,
-          'name': 'Now Playing',
-          'description':
-              'Currently playing queue. This playlist is managed automatically.',
-          'cover_art_url': null,
-          columnCreatedAt: DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+      await db.insert(tablePlaylists, {
+        columnId: nowPlayingPlaylistId,
+        'name': 'Now Playing',
+        'description':
+            'Currently playing queue. This playlist is managed automatically.',
+        'cover_art_url': null,
+        columnCreatedAt: DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     if (oldVersion < 3) {
       // Version 3: Add tags and song_tags tables
@@ -275,14 +274,18 @@ class DatabaseHelper {
     }
     if (oldVersion < 6) {
       try {
-        await db.execute('ALTER TABLE $tablePlaylists ADD COLUMN playlist_type TEXT NOT NULL DEFAULT \'local_only\'');
+        await db.execute(
+          'ALTER TABLE $tablePlaylists ADD COLUMN playlist_type TEXT NOT NULL DEFAULT \'local_only\'',
+        );
         await db.update(
           tablePlaylists,
           {'playlist_type': 'remote_compatible'},
           where: '$columnId = ?',
           whereArgs: [nowPlayingPlaylistId],
         );
-        debugPrint('Successfully added playlist_type column to playlists table');
+        debugPrint(
+          'Successfully added playlist_type column to playlists table',
+        );
       } catch (e) {
         debugPrint('Note: playlist_type column may already exist: $e');
       }
@@ -299,7 +302,9 @@ class DatabaseHelper {
     if (oldVersion < 5) {
       // Version 5: Add thumbnail_path column to songs table
       try {
-        await db.execute('ALTER TABLE $tableSongs ADD COLUMN thumbnail_path TEXT');
+        await db.execute(
+          'ALTER TABLE $tableSongs ADD COLUMN thumbnail_path TEXT',
+        );
         debugPrint('Successfully added thumbnail_path column to songs table');
       } catch (e) {
         debugPrint('Note: thumbnail_path column may already exist: $e');
@@ -331,19 +336,15 @@ class DatabaseHelper {
     ''');
 
     // Create the Now Playing playlist
-    await db.insert(
-      tablePlaylists,
-      {
-        columnId: nowPlayingPlaylistId,
-        'name': 'Now Playing',
-        'description':
-            'Currently playing queue. This playlist is managed automatically.',
-        'cover_art_url': null,
-        'playlist_type': 'remote_compatible',
-        columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    await db.insert(tablePlaylists, {
+      columnId: nowPlayingPlaylistId,
+      'name': 'Now Playing',
+      'description':
+          'Currently playing queue. This playlist is managed automatically.',
+      'cover_art_url': null,
+      'playlist_type': 'remote_compatible',
+      columnCreatedAt: DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
     // Create genres table
     await db.execute('''
@@ -499,7 +500,8 @@ class DatabaseHelper {
     if (existingId != -1) {
       if (kDebugMode) {
         debugPrint(
-            'Song already exists (ID: $existingId): ${song['file_path']}');
+          'Song already exists (ID: $existingId): ${song['file_path']}',
+        );
       }
       return -1; // Indicate that no new row was inserted
     }
@@ -550,50 +552,34 @@ class DatabaseHelper {
   // Junction table methods
   Future<int> addArtistToGenre(int artistId, int genreId) async {
     final db = await database;
-    return await db.insert(
-      tableArtistGenre,
-      {
-        'artist_id': artistId,
-        'genre_id': genreId,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await db.insert(tableArtistGenre, {
+      'artist_id': artistId,
+      'genre_id': genreId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<int> addArtistToSong(int songId, int artistId) async {
     final db = await database;
-    return await db.insert(
-      tableSongArtist,
-      {
-        'song_id': songId,
-        'artist_id': artistId,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await db.insert(tableSongArtist, {
+      'song_id': songId,
+      'artist_id': artistId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<int> addGenreToSong(int songId, int genreId) async {
     final db = await database;
-    return await db.insert(
-      tableSongGenre,
-      {
-        'song_id': songId,
-        'genre_id': genreId,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await db.insert(tableSongGenre, {
+      'song_id': songId,
+      'genre_id': genreId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<int> addTagToSong(int songId, int tagId) async {
     final db = await database;
-    return await db.insert(
-      tableSongTags,
-      {
-        'song_id': songId,
-        'tag_id': tagId,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await db.insert(tableSongTags, {
+      'song_id': songId,
+      'tag_id': tagId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   // Get related items
@@ -710,9 +696,7 @@ class DatabaseHelper {
         tableSongs,
         columns: [columnId],
         where: 'file_path = ?',
-        whereArgs: [
-          filePath,
-        ],
+        whereArgs: [filePath],
         limit: 1,
       );
       if (rows.isEmpty) return; // song not found in DB
@@ -729,49 +713,40 @@ class DatabaseHelper {
       }
 
       // Reset and set song-artist relations
-      await txn
-          .delete(tableSongArtist, where: 'song_id = ?', whereArgs: [songId]);
+      await txn.delete(
+        tableSongArtist,
+        where: 'song_id = ?',
+        whereArgs: [songId],
+      );
 
       // Add all artists (main and featured)
       for (final artist in artists) {
         final artistId = await _getOrCreateArtist(txn, artist);
-        await txn.insert(
-          tableSongArtist,
-          {
-            'song_id': songId,
-            'artist_id': artistId,
-            'created_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(tableSongArtist, {
+          'song_id': songId,
+          'artist_id': artistId,
+          'created_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
       // Optionally link album as a genre for simplicity
       if (album != null && album.isNotEmpty) {
         final genreId = await _getOrCreateGenre(txn, album);
-        await txn.insert(
-          tableSongGenre,
-          {
-            'song_id': songId,
-            'genre_id': genreId,
-            'created_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(tableSongGenre, {
+          'song_id': songId,
+          'genre_id': genreId,
+          'created_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
       // Also link detected genre name if provided (preferred)
       if (genreName != null && genreName.isNotEmpty) {
         final gId = await _getOrCreateGenre(txn, genreName);
-        await txn.insert(
-          tableSongGenre,
-          {
-            'song_id': songId,
-            'genre_id': gId,
-            'created_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(tableSongGenre, {
+          'song_id': songId,
+          'genre_id': gId,
+          'created_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     });
   }
@@ -796,13 +771,10 @@ class DatabaseHelper {
     }
 
     // Create new artist if not found
-    return await txn.insert(
-      tableArtists,
-      {
-        columnName: trimmedName,
-        columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-    );
+    return await txn.insert(tableArtists, {
+      columnName: trimmedName,
+      columnCreatedAt: DateTime.now().toIso8601String(),
+    });
   }
 
   /// Gets an existing genre ID or creates a new one if it doesn't exist
@@ -823,13 +795,10 @@ class DatabaseHelper {
     }
 
     // Create new genre if not found
-    return await txn.insert(
-      tableGenres,
-      {
-        columnName: genreName,
-        columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-    );
+    return await txn.insert(tableGenres, {
+      columnName: genreName,
+      columnCreatedAt: DateTime.now().toIso8601String(),
+    });
   }
 
   /// Gets an existing tag ID or creates a new one if it doesn't exist
@@ -850,13 +819,10 @@ class DatabaseHelper {
     }
 
     // Create new tag if not found
-    return await txn.insert(
-      tableTags,
-      {
-        columnName: tagName,
-        columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-    );
+    return await txn.insert(tableTags, {
+      columnName: tagName,
+      columnCreatedAt: DateTime.now().toIso8601String(),
+    });
   }
 
   // Close the database when done
@@ -866,39 +832,38 @@ class DatabaseHelper {
   Future<void> _ensureNowPlayingPlaylist() async {
     final db = await database;
     // Try to insert the Now Playing playlist if it doesn't exist
-    await db.insert(
-      tablePlaylists,
-      {
-        columnId: nowPlayingPlaylistId,
-        'name': 'Now Playing',
-        'description':
-            'Currently playing queue. This playlist is managed automatically.',
-        'cover_art_url': null,
-        columnCreatedAt: DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    await db.insert(tablePlaylists, {
+      columnId: nowPlayingPlaylistId,
+      'name': 'Now Playing',
+      'description':
+          'Currently playing queue. This playlist is managed automatically.',
+      'cover_art_url': null,
+      columnCreatedAt: DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
-  Future<int> createPlaylist(String name,
-      {String? description, String? coverArtUrl}) async {
+  Future<int> createPlaylist(
+    String name, {
+    String? description,
+    String? coverArtUrl,
+  }) async {
     final db = await database;
     // Ensure Now Playing playlist exists
     await _ensureNowPlayingPlaylist();
 
-    return await db.insert(
-      tablePlaylists,
-      {
-        'name': name,
-        'description': description,
-        'cover_art_url': coverArtUrl,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    return await db.insert(tablePlaylists, {
+      'name': name,
+      'description': description,
+      'cover_art_url': coverArtUrl,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<int> updatePlaylist(int playlistId,
-      {String? name, String? description, String? coverArtUrl}) async {
+  Future<int> updatePlaylist(
+    int playlistId, {
+    String? name,
+    String? description,
+    String? coverArtUrl,
+  }) async {
     final db = await database;
     final data = <String, dynamic>{};
     if (name != null) data['name'] = name;
@@ -938,14 +903,17 @@ class DatabaseHelper {
       await _ensureNowPlayingPlaylist();
 
       // Log all tables in the database
-      final tables = await db
-          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table'",
+      );
       debugPrint(
-          'Tables in database: ${tables.map((e) => e['name']).toList()}');
+        'Tables in database: ${tables.map((e) => e['name']).toList()}',
+      );
 
       // Check if playlists table exists
-      final playlistsTableExists =
-          tables.any((table) => table['name'] == tablePlaylists);
+      final playlistsTableExists = tables.any(
+        (table) => table['name'] == tablePlaylists,
+      );
       if (!playlistsTableExists) {
         debugPrint('ERROR: $tablePlaylists table does not exist!');
         // Try to create the table if it doesn't exist
@@ -1012,15 +980,11 @@ class DatabaseHelper {
       // Insert each song with an incremented position
       for (final songId in songIds) {
         try {
-          await txn.insert(
-            tablePlaylistSongs,
-            {
-              'playlist_id': playlistId,
-              'song_id': songId,
-              'position': ++position,
-            },
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
+          await txn.insert(tablePlaylistSongs, {
+            'playlist_id': playlistId,
+            'song_id': songId,
+            'position': ++position,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
           count++;
         } catch (e) {
           // Skip duplicates or invalid song IDs
@@ -1077,14 +1041,11 @@ class DatabaseHelper {
 
       // Then add all new songs with their positions
       for (int i = 0; i < songIds.length; i++) {
-        await txn.insert(
-          tablePlaylistSongs,
-          {
-            'playlist_id': nowPlayingPlaylistId,
-            'song_id': songIds[i],
-            'position': i + 1,
-          },
-        );
+        await txn.insert(tablePlaylistSongs, {
+          'playlist_id': nowPlayingPlaylistId,
+          'song_id': songIds[i],
+          'position': i + 1,
+        });
       }
     });
   }
@@ -1101,7 +1062,9 @@ class DatabaseHelper {
   }
 
   Future<int> reorderPlaylistSongs(
-      int playlistId, Map<int, int> newPositions) async {
+    int playlistId,
+    Map<int, int> newPositions,
+  ) async {
     if (newPositions.isEmpty) return 0;
 
     final db = await database;
@@ -1146,11 +1109,7 @@ class DatabaseHelper {
   /// playlist_songs) are removed automatically via ON DELETE CASCADE.
   Future<void> deleteSong(int songId) async {
     final db = await database;
-    await db.delete(
-      tableSongs,
-      where: '$columnId = ?',
-      whereArgs: [songId],
-    );
+    await db.delete(tableSongs, where: '$columnId = ?', whereArgs: [songId]);
     debugPrint('🗑️ Deleted song $songId from database');
   }
 
@@ -1195,19 +1154,17 @@ class DatabaseHelper {
 
         for (final artistName in artistsList) {
           final artistId = await _getOrCreateArtist(txn, artistName);
-          await txn.insert(
-            tableSongArtist,
-            {'song_id': songId, 'artist_id': artistId},
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
+          await txn.insert(tableSongArtist, {
+            'song_id': songId,
+            'artist_id': artistId,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
         }
 
         final tagId = await _getOrCreateTag(txn, 'tsmusic');
-        await txn.insert(
-          tableSongTags,
-          {'song_id': songId, 'tag_id': tagId},
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(tableSongTags, {
+          'song_id': songId,
+          'tag_id': tagId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     });
 
@@ -1267,26 +1224,21 @@ class DatabaseHelper {
 
     late final int songId;
     await db.transaction((txn) async {
-      songId = await txn.insert(
-        tableSongs,
-        {
-          'youtube_id': youtubeId,
-          'title': title,
-          'file_path': 'yt:$youtubeId',
-          'duration': duration,
-          'thumbnail_path': thumbnailUrl,
-          'created_at': DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      songId = await txn.insert(tableSongs, {
+        'youtube_id': youtubeId,
+        'title': title,
+        'file_path': 'yt:$youtubeId',
+        'duration': duration,
+        'thumbnail_path': thumbnailUrl,
+        'created_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       for (final artist in artists.where((a) => a.isNotEmpty)) {
         final artistId = await _getOrCreateArtist(txn, artist);
-        await txn.insert(
-          tableSongArtist,
-          {'song_id': songId, 'artist_id': artistId},
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(tableSongArtist, {
+          'song_id': songId,
+          'artist_id': artistId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     });
 

@@ -12,30 +12,32 @@ class PermissionHelper {
 
       // Request the appropriate permission based on Android version
       final permission = await _getStoragePermission();
-      
+
       // First check if we should show a rationale
       if (await permission.shouldShowRequestRationale) {
         // Show a dialog explaining why we need the permission
-        final shouldRequest = await showDialog<bool>(
-          context: navigatorKey.currentContext!,
-          builder: (context) => AlertDialog(
-            title: const Text('Permission Required'),
-            content: const Text(
-              'To play your music, we need access to your audio files. '
-              'Please grant the storage permission to continue.'
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+        final shouldRequest =
+            await showDialog<bool>(
+              context: navigatorKey.currentContext!,
+              builder: (context) => AlertDialog(
+                title: const Text('Permission Required'),
+                content: const Text(
+                  'To play your music, we need access to your audio files. '
+                  'Please grant the storage permission to continue.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Continue'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Continue'),
-              ),
-            ],
-          ),
-        ) ?? false;
+            ) ??
+            false;
 
         if (!shouldRequest) {
           return false;
@@ -44,7 +46,7 @@ class PermissionHelper {
 
       // Request the permission
       final status = await permission.request();
-      
+
       if (status.isPermanentlyDenied) {
         // The user opted to never see the permission request dialog again
         if (navigatorKey.currentContext != null) {
@@ -54,7 +56,7 @@ class PermissionHelper {
               title: const Text('Permission Required'),
               content: const Text(
                 'Storage permission is required to access your music files. '
-                'Please enable it in the app settings.'
+                'Please enable it in the app settings.',
               ),
               actions: [
                 TextButton(
@@ -75,7 +77,7 @@ class PermissionHelper {
         }
         return false;
       }
-      
+
       // On Android 13+, we also need notification permission for media controls
       if (await _isAndroid13OrHigher() && status.isGranted) {
         final notificationStatus = await Permission.notification.status;
@@ -83,22 +85,22 @@ class PermissionHelper {
           await Permission.notification.request();
         }
       }
-      
+
       return status.isGranted;
     } catch (e) {
       debugPrint('Error requesting storage permission: $e');
       return false;
     }
   }
-  
+
   // Global key for navigation
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  
+
   // Initialize the navigator key with a navigator
   static void initializeNavigatorKey(GlobalKey<NavigatorState> key) {
     navigatorKey = key;
   }
-  
+
   // Check if device is Android 13 or higher
   static Future<bool> isAndroid13OrHigher() async {
     try {
@@ -117,20 +119,20 @@ class PermissionHelper {
       if (!await _shouldRequestPermission()) {
         return true; // No need to check, consider it granted
       }
-      
+
       final permission = await _getStoragePermission();
       final status = await permission.status;
-      
+
       // If permission is denied but we can request it, return false
       if (status.isDenied) {
         return false;
       }
-      
+
       // If permission is restricted, check if we can request it
       if (status.isRestricted) {
         return false;
       }
-      
+
       return status.isGranted;
     } catch (e) {
       debugPrint('Error checking storage permission: $e');
@@ -150,24 +152,32 @@ class PermissionHelper {
   }
 
   /// Show a dialog explaining why the permission is needed
-  static Future<bool> showPermissionRationale(BuildContext context, {String? message}) async => await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Permission Required'),
-        content: Text(message ?? 'Storage permission is required to access your music files.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+  static Future<bool> showPermissionRationale(
+    BuildContext context, {
+    String? message,
+  }) async =>
+      await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Permission Required'),
+          content: Text(
+            message ??
+                'Storage permission is required to access your music files.',
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
-    ) ?? false;
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Open Settings'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 
   /// Check if running on Android 11+ (API 30+)
   static Future<bool> _isAndroid11OrHigher() async {
@@ -190,11 +200,11 @@ class PermissionHelper {
       }
 
       final status = await Permission.manageExternalStorage.status;
-      
+
       if (status.isGranted) {
         return true;
       }
-      
+
       if (status.isPermanentlyDenied) {
         // User denied permanently, need to go to settings
         if (navigatorKey.currentContext != null) {
@@ -205,7 +215,7 @@ class PermissionHelper {
               content: const Text(
                 'To manage music files in Downloads and Music folders, '
                 'this app needs "All Files Access" permission. '
-                'Please enable it in app settings.'
+                'Please enable it in app settings.',
               ),
               actions: [
                 TextButton(
@@ -219,14 +229,14 @@ class PermissionHelper {
               ],
             ),
           );
-          
+
           if (openSettings == true) {
             await openAppSettings();
           }
         }
         return false;
       }
-      
+
       // Request the permission
       final result = await Permission.manageExternalStorage.request();
       return result.isGranted;
@@ -249,9 +259,9 @@ class PermissionHelper {
   static Future<bool> requestFileManagementPermission() async {
     try {
       if (!await _isAndroid()) return true;
-      
+
       final sdkInt = await _getSdkInt();
-      
+
       // On Android 11+ (API 30+), request manage external storage
       if (sdkInt >= 30) {
         var status = await Permission.manageExternalStorage.status;
@@ -260,7 +270,7 @@ class PermissionHelper {
         }
         return status.isGranted;
       }
-      
+
       // On older versions, storage permission covers file operations
       return true;
     } catch (e) {
@@ -273,15 +283,15 @@ class PermissionHelper {
   static Future<bool> hasFileManagementPermission() async {
     try {
       if (!await _isAndroid()) return true;
-      
+
       final sdkInt = await _getSdkInt();
-      
+
       // On Android 11+ (API 30+), check manage external storage
       if (sdkInt >= 30) {
         final status = await Permission.manageExternalStorage.status;
         return status.isGranted;
       }
-      
+
       // On older versions, storage permission covers file operations
       return true;
     } catch (e) {
@@ -306,7 +316,7 @@ class PermissionHelper {
     if (!await _isAndroid()) {
       return false; // Not Android, no need to request
     }
-    
+
     if (await _isAndroid13OrHigher()) {
       // On Android 13+, we need to request audio permission
       final audioStatus = await Permission.audio.status;
@@ -326,7 +336,7 @@ class PermissionHelper {
     if (!(await _isAndroid())) {
       return false;
     }
-    
+
     try {
       final deviceInfo = DeviceInfoPlugin();
       final androidInfo = await deviceInfo.androidInfo;

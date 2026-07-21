@@ -23,33 +23,37 @@ class SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Column(children: children),
-          ),
-          const SizedBox(height: 8),
-        ],
-      );
+          ],
+        ),
+      ),
+      Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        child: Column(children: children),
+      ),
+      const SizedBox(height: 8),
+    ],
+  );
 }
 
 class ColorSelector extends StatelessWidget {
@@ -66,29 +70,29 @@ class ColorSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 40,
-          height: 40,
-          margin: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected ? Colors.white : Colors.transparent,
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
+    onTap: onTap,
+    child: Container(
+      width: 40,
+      height: 40,
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isSelected ? Colors.white : Colors.transparent,
+          width: 2,
         ),
-      );
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
+    ),
+  );
 }
 
 void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
@@ -108,7 +112,9 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
                 themeProvider.getPlayerStyleName(style),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
               ),
               leading: Radio<PlayerStyle>(
@@ -139,7 +145,10 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   );
 }
 
-void _showDownloadLocationDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showDownloadLocationDialog(
+  BuildContext context,
+  SettingsProvider settingsProvider,
+) {
   final l10n = AppLocalizations.of(context);
   final locations = ['internal', 'downloads', 'music'];
   showDialog(
@@ -157,7 +166,9 @@ void _showDownloadLocationDialog(BuildContext context, SettingsProvider settings
                 settingsProvider.getDownloadLocationName(location),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
               ),
               leading: Radio<String>(
@@ -188,7 +199,10 @@ void _showDownloadLocationDialog(BuildContext context, SettingsProvider settings
   );
 }
 
-void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showAudioFormatDialog(
+  BuildContext context,
+  SettingsProvider settingsProvider,
+) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
@@ -205,7 +219,9 @@ void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvi
                 settingsProvider.getAudioFormatName(format),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
               ),
               leading: Radio<AudioFormat>(
@@ -236,7 +252,10 @@ void _showAudioFormatDialog(BuildContext context, SettingsProvider settingsProvi
   );
 }
 
-void _showPlaybackModeDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showPlaybackModeDialog(
+  BuildContext context,
+  SettingsProvider settingsProvider,
+) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
@@ -254,7 +273,9 @@ void _showPlaybackModeDialog(BuildContext context, SettingsProvider settingsProv
                 name,
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
               ),
               leading: Radio<PlaybackMode>(
@@ -285,7 +306,10 @@ void _showPlaybackModeDialog(BuildContext context, SettingsProvider settingsProv
   );
 }
 
-void _showLanguageDialog(BuildContext context, SettingsProvider settingsProvider) {
+void _showLanguageDialog(
+  BuildContext context,
+  SettingsProvider settingsProvider,
+) {
   final l10n = AppLocalizations.of(context);
   showDialog(
     context: context,
@@ -302,7 +326,9 @@ void _showLanguageDialog(BuildContext context, SettingsProvider settingsProvider
                 settingsProvider.getLanguageName(locale),
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
               ),
               leading: Radio<Locale>(
@@ -429,8 +455,7 @@ void _showChangelogDialog(BuildContext context, AppLocalizations l10n) {
                     children: [
                       const Text('• ', style: TextStyle(fontSize: 14)),
                       Expanded(
-                        child: Text(line,
-                            style: const TextStyle(fontSize: 14)),
+                        child: Text(line, style: const TextStyle(fontSize: 14)),
                       ),
                     ],
                   ),
@@ -482,14 +507,16 @@ void _showThemeModeDialog(BuildContext context, ThemeProvider themeProvider) {
               mode == ThemeMode.light
                   ? Icons.light_mode
                   : mode == ThemeMode.dark
-                      ? Icons.dark_mode
-                      : Icons.settings_brightness,
+                  ? Icons.dark_mode
+                  : Icons.settings_brightness,
             ),
             title: Text(
               _getThemeModeName(l10n, mode),
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
               ),
             ),
             trailing: isSelected ? const Icon(Icons.check) : null,
@@ -520,9 +547,7 @@ class SettingsScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.settings),
-      ),
+      appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
         children: [
           // Appearance Section
@@ -536,8 +561,8 @@ class SettingsScreen extends StatelessWidget {
                   themeProvider.themeMode == ThemeMode.light
                       ? Icons.light_mode
                       : themeProvider.themeMode == ThemeMode.dark
-                          ? Icons.dark_mode
-                          : Icons.settings_brightness,
+                      ? Icons.dark_mode
+                      : Icons.settings_brightness,
                 ),
                 trailing: Text(
                   _getThemeModeName(l10n, themeProvider.themeMode),
@@ -564,7 +589,9 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(l10n.playerStyle),
                 leading: const Icon(Icons.style),
                 subtitle: Text(
-                  themeProvider.getPlayerStyleDescription(themeProvider.playerStyle),
+                  themeProvider.getPlayerStyleDescription(
+                    themeProvider.playerStyle,
+                  ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 trailing: Text(
@@ -592,7 +619,10 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(height: 1),
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8.0,
+                  horizontal: 16.0,
+                ),
                 child: Text(l10n.accentColor),
               ),
               Padding(
@@ -600,12 +630,14 @@ class SettingsScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: themeProvider.availableColors
-                      .map((color) => ColorSelector(
-                            color: color,
-                            isSelected:
-                                themeProvider.primaryColor.value == color.value,
-                            onTap: () => themeProvider.setPrimaryColor(color),
-                          ))
+                      .map(
+                        (color) => ColorSelector(
+                          color: color,
+                          isSelected:
+                              themeProvider.primaryColor.value == color.value,
+                          onTap: () => themeProvider.setPrimaryColor(color),
+                        ),
+                      )
                       .toList(),
                 ),
               ),
@@ -619,7 +651,8 @@ class SettingsScreen extends StatelessWidget {
               SwitchListTile(
                 title: const Text('Auto-download YouTube songs on play'),
                 subtitle: const Text(
-                    'Download YouTube songs when they start playing'),
+                  'Download YouTube songs when they start playing',
+                ),
                 value: settingsProvider.autoDownloadOnPlay,
                 onChanged: (value) =>
                     settingsProvider.setAutoDownloadOnPlay(value),
@@ -630,7 +663,9 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(l10n.audioDownloadFormat),
                 leading: const Icon(Icons.audiotrack),
                 trailing: Text(
-                  settingsProvider.getAudioFormatName(settingsProvider.audioFormat),
+                  settingsProvider.getAudioFormatName(
+                    settingsProvider.audioFormat,
+                  ),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -643,7 +678,8 @@ class SettingsScreen extends StatelessWidget {
                 leading: const Icon(Icons.folder),
                 trailing: Text(
                   settingsProvider.getDownloadLocationName(
-                      settingsProvider.downloadLocation),
+                    settingsProvider.downloadLocation,
+                  ),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -702,10 +738,13 @@ class SettingsScreen extends StatelessWidget {
                         TextButton(
                           onPressed: () async {
                             final uri = Uri.parse(
-                                'https://github.com/veciata/TsMusic/issues');
+                              'https://github.com/veciata/TsMusic/issues',
+                            );
                             if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri,
-                                  mode: LaunchMode.externalApplication);
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
                             }
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);

@@ -33,8 +33,8 @@ class ThumbnailService {
   void Function(Song song)? onThumbnailFailed;
 
   ThumbnailService({http.Client? httpClient, YoutubeExplode? yt})
-      : _httpClient = httpClient ?? http.Client(),
-        _yt = yt ?? YoutubeExplode() {
+    : _httpClient = httpClient ?? http.Client(),
+      _yt = yt ?? YoutubeExplode() {
     _instance = this;
     _initDir();
   }
@@ -55,7 +55,9 @@ class ThumbnailService {
 
   Future<String?> _getExistingPath(String youtubeId) async {
     if (_thumbnailsDir == null) return null;
-    final file = File(path.join(_thumbnailsDir!.path, '${youtubeId}_thumb.jpg'));
+    final file = File(
+      path.join(_thumbnailsDir!.path, '${youtubeId}_thumb.jpg'),
+    );
     if (await file.exists()) return file.path;
     return null;
   }
@@ -64,7 +66,8 @@ class ThumbnailService {
     if (_thumbnailsDir == null) return null;
     final safeName = _safeArtistName(artistName);
     final file = File(
-        path.join(_thumbnailsDir!.path, 'artist_${safeName}_thumb.jpg'));
+      path.join(_thumbnailsDir!.path, 'artist_${safeName}_thumb.jpg'),
+    );
     if (await file.exists()) return file.path;
     return null;
   }
@@ -99,7 +102,8 @@ class ThumbnailService {
       if (song.localThumbnailPath != null) continue;
       if (song.youtubeId != null &&
           song.youtubeId!.isNotEmpty &&
-          _inProgress.contains(song.youtubeId!)) continue;
+          _inProgress.contains(song.youtubeId!))
+        continue;
       if (song.youtubeId == null || song.youtubeId!.isEmpty) {
         if (song.artists.isNotEmpty) {
           final key = 'artist:${song.artists.first}';
@@ -155,7 +159,8 @@ class ThumbnailService {
       final response = await _httpClient.get(Uri.parse(thumbUrl));
       if (response.statusCode == 200 && _thumbnailsDir != null) {
         final file = File(
-            path.join(_thumbnailsDir!.path, '${videoId}_thumb.jpg'));
+          path.join(_thumbnailsDir!.path, '${videoId}_thumb.jpg'),
+        );
         await file.writeAsBytes(response.bodyBytes);
         onThumbnailReady?.call(item.song, file.path);
       } else {
@@ -241,7 +246,8 @@ class ThumbnailService {
       if (response.statusCode == 200 && _thumbnailsDir != null) {
         final safeName = _safeArtistName(artist);
         final file = File(
-            path.join(_thumbnailsDir!.path, 'artist_${safeName}_thumb.jpg'));
+          path.join(_thumbnailsDir!.path, 'artist_${safeName}_thumb.jpg'),
+        );
         await file.writeAsBytes(response.bodyBytes);
         onThumbnailReady?.call(originalSong, file.path);
       } else {

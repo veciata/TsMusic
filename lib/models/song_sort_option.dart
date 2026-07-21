@@ -1,7 +1,1 @@
-enum SongSortOption {
-  title,
-  artist,
-  album,
-  duration,
-  dateAdded,
-}
+enum SongSortOption { title, artist, album, duration, dateAdded }

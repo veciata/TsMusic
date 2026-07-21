@@ -29,7 +29,7 @@ class StreamedFileListingService {
     '.aac',
     '.ogg',
     '.opus',
-    '.m4b'
+    '.m4b',
   ];
   static const int minFileSize = 512; // bytes
 
@@ -99,7 +99,7 @@ class StreamedFileListingService {
             // Check if audio file
             if (audioExtensions.contains(ext)) {
               final stat = await entity.stat();
-              
+
               // Check minimum file size
               if (stat.size >= minFileSize) {
                 batchFiles.add(entity);

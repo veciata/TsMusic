@@ -8,10 +8,7 @@ class _MetadataExtractionRequest {
   final String filePath;
   final SendPort sendPort;
 
-  _MetadataExtractionRequest({
-    required this.filePath,
-    required this.sendPort,
-  });
+  _MetadataExtractionRequest({required this.filePath, required this.sendPort});
 }
 
 /// Result from isolate metadata extraction
@@ -47,10 +44,7 @@ class IsolateMetadataExtractionService {
     if (_isolate != null) return;
 
     _receivePort = ReceivePort();
-    _isolate = await Isolate.spawn(
-      _isolateEntryPoint,
-      _receivePort!.sendPort,
-    );
+    _isolate = await Isolate.spawn(_isolateEntryPoint, _receivePort!.sendPort);
   }
 
   /// Extract metadata in background isolate
@@ -58,10 +52,12 @@ class IsolateMetadataExtractionService {
     if (_sendPort == null) await initialize();
 
     final responsePort = ReceivePort();
-    _sendPort!.send(_MetadataExtractionRequest(
-      filePath: filePath,
-      sendPort: responsePort.sendPort,
-    ));
+    _sendPort!.send(
+      _MetadataExtractionRequest(
+        filePath: filePath,
+        sendPort: responsePort.sendPort,
+      ),
+    );
 
     try {
       final result = await responsePort.first.timeout(
@@ -118,7 +114,7 @@ class IsolateMetadataExtractionService {
           // Extract metadata using media_kit
           final player = Player();
           final media = Media(message.filePath);
-          
+
           // Get metadata from the media
           String? title;
           String? artist;
@@ -129,9 +125,9 @@ class IsolateMetadataExtractionService {
             // Load the media to extract duration
             await player.open(media);
             await Future.delayed(const Duration(milliseconds: 500));
-            
+
             duration = player.state.duration;
-            
+
             // Note: Basic metadata extraction only
             // For full metadata (title, artist, album), use metadata_enrichment_service
             // or ffmpeg-based extraction
@@ -141,12 +137,14 @@ class IsolateMetadataExtractionService {
             await player.dispose();
           }
 
-          message.sendPort.send(_MetadataExtractionResult(
-            title: title,
-            artist: artist,
-            album: album,
-            duration: duration,
-          ));
+          message.sendPort.send(
+            _MetadataExtractionResult(
+              title: title,
+              artist: artist,
+              album: album,
+              duration: duration,
+            ),
+          );
         } catch (e) {
           debugPrint('Error in isolate metadata extraction: $e');
           message.sendPort.send(_MetadataExtractionResult());

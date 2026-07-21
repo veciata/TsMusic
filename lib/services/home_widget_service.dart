@@ -4,23 +4,29 @@ import 'package:home_widget/home_widget.dart';
 import 'package:tsmusic/models/song.dart';
 
 class HomeWidgetService {
-  static const String _playerWidgetClass = 'com.veciata.tsmusic.SimplePlayerWidgetProvider';
-  static const String _searchWidgetClass = 'com.veciata.tsmusic.SearchWidgetProvider';
+  static const String _playerWidgetClass =
+      'com.veciata.tsmusic.SimplePlayerWidgetProvider';
+  static const String _searchWidgetClass =
+      'com.veciata.tsmusic.SearchWidgetProvider';
 
   static Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId('group.com.veciata.tsmusic');
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
-  static Future<void> updateSearchWidget({bool isDarkMode = false, Color? primaryColor}) async {
+  static Future<void> updateSearchWidget({
+    bool isDarkMode = false,
+    Color? primaryColor,
+  }) async {
     try {
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
-      await HomeWidget.saveWidgetData<int>('widget_primary_color', primaryColor?.value ?? 0xFF1DB954);
+      await HomeWidget.saveWidgetData<int>(
+        'widget_primary_color',
+        primaryColor?.value ?? 0xFF1DB954,
+      );
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   static Future<void> updatePlayerWidget({
@@ -47,7 +53,8 @@ class HomeWidgetService {
         artist = currentSong.artists.isNotEmpty
             ? currentSong.artists.join(' & ')
             : '';
-        thumbnailPath = currentSong.localThumbnailPath ?? currentSong.albumArtUrl;
+        thumbnailPath =
+            currentSong.localThumbnailPath ?? currentSong.albumArtUrl;
       } else {
         title = 'TS Music';
         artist = 'Not playing';
@@ -57,20 +64,33 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<String>('widget_title', title);
       await HomeWidget.saveWidgetData<String>('widget_artist', artist);
       await HomeWidget.saveWidgetData<bool>(
-          'widget_is_playing', isPlaying || isOnlinePlaying);
-      await HomeWidget.saveWidgetData<bool>('widget_is_online', isOnlinePlaying);
+        'widget_is_playing',
+        isPlaying || isOnlinePlaying,
+      );
+      await HomeWidget.saveWidgetData<bool>(
+        'widget_is_online',
+        isOnlinePlaying,
+      );
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
-      await HomeWidget.saveWidgetData<String?>('widget_thumbnail', thumbnailPath);
-      await HomeWidget.saveWidgetData<int>('widget_primary_color', primaryColor?.value ?? 0xFF1DB954);
+      await HomeWidget.saveWidgetData<String?>(
+        'widget_thumbnail',
+        thumbnailPath,
+      );
+      await HomeWidget.saveWidgetData<int>(
+        'widget_primary_color',
+        primaryColor?.value ?? 0xFF1DB954,
+      );
 
-      final queueItems = (queue ?? []).take(10).map((s) => {
-        'title': s.title,
-        'artists': s.artists.join(', '),
-      }).toList();
-      await HomeWidget.saveWidgetData<String>('widget_queue', jsonEncode(queueItems));
+      final queueItems = (queue ?? [])
+          .take(10)
+          .map((s) => {'title': s.title, 'artists': s.artists.join(', ')})
+          .toList();
+      await HomeWidget.saveWidgetData<String>(
+        'widget_queue',
+        jsonEncode(queueItems),
+      );
 
       await HomeWidget.updateWidget(qualifiedAndroidName: _playerWidgetClass);
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 }

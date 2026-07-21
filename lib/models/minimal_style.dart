@@ -23,10 +23,7 @@ Widget buildMinimalStyle(StyleParams params) {
               fit: StackFit.expand,
               children: [
                 if (albumArtUrl != null)
-                  Image.network(
-                    albumArtUrl,
-                    fit: BoxFit.cover,
-                  )
+                  Image.network(albumArtUrl, fit: BoxFit.cover)
                 else
                   Container(
                     color: theme.colorScheme.primaryContainer,
@@ -57,18 +54,18 @@ Widget buildMinimalStyle(StyleParams params) {
                 ),
                 SafeArea(
                   bottom: false,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: header,
-                  ),
+                  child: Align(alignment: Alignment.topCenter, child: header),
                 ),
               ],
             ),
           ),
-          
+
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 32.0,
+                vertical: 24.0,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -95,25 +92,28 @@ Widget buildMinimalStyle(StyleParams params) {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  
+
                   const Spacer(),
-                  
+
                   // Stripped down progress bar
                   Theme(
                     data: theme.copyWith(
                       sliderTheme: SliderThemeData(
                         activeTrackColor: theme.colorScheme.onSurface,
-                        inactiveTrackColor: theme.colorScheme.onSurface.withOpacity(0.1),
+                        inactiveTrackColor: theme.colorScheme.onSurface
+                            .withOpacity(0.1),
                         thumbColor: theme.colorScheme.onSurface,
                         trackHeight: 2,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
                       ),
                     ),
                     child: progressBar,
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Just a massive play/pause button
                   GestureDetector(
                     onTap: togglePlay,
@@ -125,7 +125,9 @@ Widget buildMinimalStyle(StyleParams params) {
                         color: theme.colorScheme.onSurface,
                       ),
                       child: Icon(
-                        musicProvider.isPlaying ? Icons.pause : Icons.play_arrow,
+                        musicProvider.isPlaying
+                            ? Icons.pause
+                            : Icons.play_arrow,
                         size: 40,
                         color: theme.colorScheme.surface,
                       ),

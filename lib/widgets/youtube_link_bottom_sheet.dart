@@ -24,20 +24,19 @@ void showYouTubeLinkBottomSheet(
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Theme.of(ctx)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.3),
+              color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              link.isPlaylist ? 'YouTube Playlist Detected' : 'YouTube Video Detected',
-              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              link.isPlaylist
+                  ? 'YouTube Playlist Detected'
+                  : 'YouTube Video Detected',
+              style: Theme.of(
+                ctx,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           const Divider(height: 1),

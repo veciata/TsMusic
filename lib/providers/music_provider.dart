@@ -105,7 +105,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     audioHandler?.setOnlineMode(online: false);
 
     final activePlaylist = _getActivePlaylist();
-    if (activePlaylist.isNotEmpty && _currentIndex >= 0 && _currentIndex < activePlaylist.length) {
+    if (activePlaylist.isNotEmpty &&
+        _currentIndex >= 0 &&
+        _currentIndex < activePlaylist.length) {
       await _setAudioSource(activePlaylist[_currentIndex]);
       await _player.play();
       await _updateNotification();
@@ -117,7 +119,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  
   // ===== CONSTANTS =====
   static const List<String> audioExtensions = [
     '.mp3',
@@ -127,7 +128,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     '.aac',
     '.ogg',
     '.opus',
-    '.m4b'
+    '.m4b',
   ];
   static const String _songsKey = 'cached_songs';
   static const int nowPlayingPlaylistId = 1;
@@ -167,7 +168,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   static const String _resumePositionKey = 'resume_position_ms';
   static const String _resumeShuffleKey = 'resume_shuffle';
   static const String _resumeLoopModeKey = 'resume_loop_mode';
-  static const String _resumeUsingTempPlaylistKey = 'resume_using_temp_playlist';
+  static const String _resumeUsingTempPlaylistKey =
+      'resume_using_temp_playlist';
   static const String _resumeTempPlaylistIdsKey = 'resume_temp_playlist_ids';
   static const String _resumePlaylistIdsKey = 'resume_playlist_ids';
   bool _hasRestoredState = false;
@@ -193,8 +195,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   Duration get position => _player.state.position;
   Duration get duration => _player.state.duration;
   Song? get currentSong {
-    final List<Song> activePlaylist =
-        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    final List<Song> activePlaylist = _isUsingTempPlaylist
+        ? _tempPlaylist
+        : _playlist;
     return activePlaylist.isNotEmpty &&
             _currentIndex >= 0 &&
             _currentIndex < activePlaylist.length
@@ -203,8 +206,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   int? get currentIndex {
-    final List<Song> activePlaylist =
-        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    final List<Song> activePlaylist = _isUsingTempPlaylist
+        ? _tempPlaylist
+        : _playlist;
     return (activePlaylist.isNotEmpty &&
             _currentIndex >= 0 &&
             _currentIndex < activePlaylist.length)
@@ -222,18 +226,22 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   List<Song> get onlinePlaylist {
     final yt = _youTubeService;
     if (yt == null) return [];
-    return yt.onlinePlaylist.map((a) => Song(
-      id: -1,
-      youtubeId: a.id,
-      title: a.title,
-      artists: a.artists.isNotEmpty ? a.artists : [a.author],
-      album: 'YouTube',
-      duration: a.duration?.inMilliseconds ?? 0,
-      albumArtUrl: a.thumbnailUrl,
-      url: a.audioUrl ?? '',
-      tags: ['youtube'],
-      storageType: StorageType.remote,
-    )).toList();
+    return yt.onlinePlaylist
+        .map(
+          (a) => Song(
+            id: -1,
+            youtubeId: a.id,
+            title: a.title,
+            artists: a.artists.isNotEmpty ? a.artists : [a.author],
+            album: 'YouTube',
+            duration: a.duration?.inMilliseconds ?? 0,
+            albumArtUrl: a.thumbnailUrl,
+            url: a.audioUrl ?? '',
+            tags: ['youtube'],
+            storageType: StorageType.remote,
+          ),
+        )
+        .toList();
   }
 
   int get onlinePlaylistIndex => _youTubeService?.onlinePlaylistIndex ?? -1;
@@ -275,7 +283,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   final Color? _notificationColor;
 
   // ===== INITIALIZATION =====
-  MusicProvider({Color? notificationColor}) : _notificationColor = notificationColor {
+  MusicProvider({Color? notificationColor})
+    : _notificationColor = notificationColor {
     WidgetsBinding.instance.addObserver(this);
 
     // Listen to playlist mode changes
@@ -337,7 +346,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       final activePlaylist = _getActivePlaylist();
 
       await prefs.setInt(_resumeIndexKey, _currentIndex);
-      await prefs.setInt(_resumePositionKey, _player.state.position.inMilliseconds);
+      await prefs.setInt(
+        _resumePositionKey,
+        _player.state.position.inMilliseconds,
+      );
       await prefs.setBool(_resumeShuffleKey, _shuffleEnabled);
       await prefs.setString(_resumeLoopModeKey, _loopMode.name);
       await prefs.setBool(_resumeUsingTempPlaylistKey, _isUsingTempPlaylist);
@@ -385,8 +397,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       final savedIndex = prefs.getInt(_resumeIndexKey);
       final savedPosition = prefs.getInt(_resumePositionKey) ?? 0;
 
-      if (_playlist.isNotEmpty && savedIndex != null &&
-          savedIndex >= 0 && savedIndex < _playlist.length) {
+      if (_playlist.isNotEmpty &&
+          savedIndex != null &&
+          savedIndex >= 0 &&
+          savedIndex < _playlist.length) {
         _currentIndex = savedIndex;
 
         // Load audio source and seek to saved position, but do NOT auto-play
@@ -398,7 +412,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           requestThumbnail(song, priority: 0);
           notifyListeners();
 
-          debugPrint('Restored playback position at index $_currentIndex, position ${Duration(milliseconds: savedPosition)} (paused)');
+          debugPrint(
+            'Restored playback position at index $_currentIndex, position ${Duration(milliseconds: savedPosition)} (paused)',
+          );
         }
       }
     } catch (e) {
@@ -406,82 +422,86 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-   Future<void> _initialize() async {
-     debugPrint('╔══════════════════════════════════════════╗');
-     debugPrint('║  MusicProvider._initialize: START           ║');
-     debugPrint('╚══════════════════════════════════════════╝');
-     
-     // Initialize audio notification service
-     debugPrint('_initialize: About to init AudioNotificationService...');
-     try {
-       debugPrint('_initialize: Calling AudioNotificationService.init()...');
-         await AudioNotificationService.init(
-          player: _player,
-          notificationColor: _notificationColor,
-          onCurrentSongChanged: (song) {
-            debugPrint('Notification song changed: ${song?.title}');
-          },
-          onPlaybackStateChanged: (isPlaying) {
-            debugPrint('Notification playback state: $isPlaying');
-          },
-          onSkipToNext: () {
-            debugPrint('Skip to next from notification');
-            next();
-          },
-          onSkipToPrevious: () {
-            debugPrint('Skip to previous from notification');
-            previous();
-          },
-          onOnlineMediaChanged: (song, isPlaying) {
-            HomeWidgetService.updatePlayerWidget(
-              currentSong: null,
-              isPlaying: false,
-              isOnlinePlaying: true,
-              onlineTitle: song.title,
-              onlineAuthor: song.artists.isNotEmpty ? song.artists.first : '',
-              isDarkMode: false,
-              primaryColor: null,
-              queue: null,
-            );
-          },
-        );
-       debugPrint('_initialize: AudioNotificationService.init() returned handler=${AudioNotificationService.audioHandler}');
-     } on Exception catch (e, stackTrace) {
-       debugPrint('╔══════════════════════════════════════════╗');
-       debugPrint('║  _initialize: EXCEPTION CAUGHT             ║');
-       debugPrint('║  Error: $e');
-       debugPrint('╚══════════════════════════════════════════╝');
-       debugPrint('Stack: $stackTrace');
-     }
-     
-      // Initialize thumbnail service with lazy loading
-      _initThumbnailService();
+  Future<void> _initialize() async {
+    debugPrint('╔══════════════════════════════════════════╗');
+    debugPrint('║  MusicProvider._initialize: START           ║');
+    debugPrint('╚══════════════════════════════════════════╝');
 
-      // Load last played song for resume functionality
-      debugPrint('_initialize: Loading last played song...');
-      _lastPlayedSong = await _loadLastPlayedSong();
-      if (_lastPlayedSong != null) {
-        debugPrint('_initialize: Last played song loaded: ${_lastPlayedSong!.title}');
-      }
+    // Initialize audio notification service
+    debugPrint('_initialize: About to init AudioNotificationService...');
+    try {
+      debugPrint('_initialize: Calling AudioNotificationService.init()...');
+      await AudioNotificationService.init(
+        player: _player,
+        notificationColor: _notificationColor,
+        onCurrentSongChanged: (song) {
+          debugPrint('Notification song changed: ${song?.title}');
+        },
+        onPlaybackStateChanged: (isPlaying) {
+          debugPrint('Notification playback state: $isPlaying');
+        },
+        onSkipToNext: () {
+          debugPrint('Skip to next from notification');
+          next();
+        },
+        onSkipToPrevious: () {
+          debugPrint('Skip to previous from notification');
+          previous();
+        },
+        onOnlineMediaChanged: (song, isPlaying) {
+          HomeWidgetService.updatePlayerWidget(
+            currentSong: null,
+            isPlaying: false,
+            isOnlinePlaying: true,
+            onlineTitle: song.title,
+            onlineAuthor: song.artists.isNotEmpty ? song.artists.first : '',
+            isDarkMode: false,
+            primaryColor: null,
+            queue: null,
+          );
+        },
+      );
+      debugPrint(
+        '_initialize: AudioNotificationService.init() returned handler=${AudioNotificationService.audioHandler}',
+      );
+    } on Exception catch (e, stackTrace) {
+      debugPrint('╔══════════════════════════════════════════╗');
+      debugPrint('║  _initialize: EXCEPTION CAUGHT             ║');
+      debugPrint('║  Error: $e');
+      debugPrint('╚══════════════════════════════════════════╝');
+      debugPrint('Stack: $stackTrace');
+    }
 
-      // Load the music library first to populate _songsMap
-      debugPrint('_initialize: Loading local music...');
-      await loadLocalMusic().catchError((e) {
-        debugPrint('Error during initialization: $e');
-      });
+    // Initialize thumbnail service with lazy loading
+    _initThumbnailService();
 
-      // Then load Now Playing playlist (fills from _songsMap if DB is empty)
-      debugPrint('_initialize: Loading Now Playing playlist...');
-      await _loadNowPlayingPlaylist();
+    // Load last played song for resume functionality
+    debugPrint('_initialize: Loading last played song...');
+    _lastPlayedSong = await _loadLastPlayedSong();
+    if (_lastPlayedSong != null) {
+      debugPrint(
+        '_initialize: Last played song loaded: ${_lastPlayedSong!.title}',
+      );
+    }
 
-      // Restore playback state (position, index, shuffle, loop) and auto-resume
-      debugPrint('_initialize: Restoring playback state...');
-      await _restorePlaybackState();
-     
-     debugPrint('╔══════════════════════════════════════════╗');
-     debugPrint('║  MusicProvider._initialize: END             ║');
-     debugPrint('╚══════════════════════════════════════════╝');
-   }
+    // Load the music library first to populate _songsMap
+    debugPrint('_initialize: Loading local music...');
+    await loadLocalMusic().catchError((e) {
+      debugPrint('Error during initialization: $e');
+    });
+
+    // Then load Now Playing playlist (fills from _songsMap if DB is empty)
+    debugPrint('_initialize: Loading Now Playing playlist...');
+    await _loadNowPlayingPlaylist();
+
+    // Restore playback state (position, index, shuffle, loop) and auto-resume
+    debugPrint('_initialize: Restoring playback state...');
+    await _restorePlaybackState();
+
+    debugPrint('╔══════════════════════════════════════════╗');
+    debugPrint('║  MusicProvider._initialize: END             ║');
+    debugPrint('╚══════════════════════════════════════════╝');
+  }
 
   // ===== THUMBNAIL SERVICE =====
   void _initThumbnailService() {
@@ -562,10 +582,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     Future.delayed(const Duration(seconds: 3), () {
       final songs = _songsMap.values
-          .where((s) =>
-              s.youtubeId != null &&
-              s.youtubeId!.isNotEmpty &&
-              s.localThumbnailPath == null)
+          .where(
+            (s) =>
+                s.youtubeId != null &&
+                s.youtubeId!.isNotEmpty &&
+                s.localThumbnailPath == null,
+          )
           .toList();
       for (final song in songs) {
         if (!_thumbnailLoadingIds.contains(song.youtubeId!)) {
@@ -576,10 +598,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       // Also queue songs without youtubeId for artist thumbnail fallback
       final artistSongs = _songsMap.values
-          .where((s) =>
-              (s.youtubeId == null || s.youtubeId!.isEmpty) &&
-              s.localThumbnailPath == null &&
-              s.artists.isNotEmpty)
+          .where(
+            (s) =>
+                (s.youtubeId == null || s.youtubeId!.isEmpty) &&
+                s.localThumbnailPath == null &&
+                s.artists.isNotEmpty,
+          )
           .toList();
       if (artistSongs.isNotEmpty) {
         for (final song in artistSongs) {
@@ -600,7 +624,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await playSong(_lastPlayedSong!);
       return;
     }
-    
+
     if (_playlist.isEmpty) return;
     try {
       _isLoading = true;
@@ -659,10 +683,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           url: 'test://notification',
           duration: 180000, // 3 minutes
         );
-        
+
         // Use the proper method to set current song
         await setPlaylistAndPlay([testSong], 0);
-        
+
         // Update notification via audio service
         await audioHandler.play();
       } else {
@@ -709,16 +733,20 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   void _applySorting() {
     switch (_currentSortOption) {
       case SongSortOption.title:
-        _displayedSongs.sort((a, b) => _sortAscending
-            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        _displayedSongs.sort(
+          (a, b) => _sortAscending
+              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
         break;
       case SongSortOption.artist:
         _displayedSongs.sort((a, b) {
-          final artistA =
-              a.artists.isNotEmpty ? a.artists.first.toLowerCase() : '';
-          final artistB =
-              b.artists.isNotEmpty ? b.artists.first.toLowerCase() : '';
+          final artistA = a.artists.isNotEmpty
+              ? a.artists.first.toLowerCase()
+              : '';
+          final artistB = b.artists.isNotEmpty
+              ? b.artists.first.toLowerCase()
+              : '';
           return _sortAscending
               ? artistA.compareTo(artistB)
               : artistB.compareTo(artistA);
@@ -742,9 +770,11 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         break;
       case SongSortOption.duration:
         // Sort by duration
-        _displayedSongs.sort((a, b) => _sortAscending
-            ? a.duration.compareTo(b.duration)
-            : b.duration.compareTo(a.duration));
+        _displayedSongs.sort(
+          (a, b) => _sortAscending
+              ? a.duration.compareTo(b.duration)
+              : b.duration.compareTo(a.duration),
+        );
         break;
     }
   }
@@ -782,7 +812,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _loadNowPlayingPlaylist();
 
       debugPrint(
-          'MusicProvider: refreshSongs() completed - ${_songsMap.length} songs in library');
+        'MusicProvider: refreshSongs() completed - ${_songsMap.length} songs in library',
+      );
     } catch (e) {
       debugPrint('Error refreshing songs: $e');
     }
@@ -816,7 +847,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       notifyListeners();
       debugPrint(
-          '🗑️ MusicProvider: removed song "${song.title}" from memory and DB');
+        '🗑️ MusicProvider: removed song "${song.title}" from memory and DB',
+      );
     } catch (e) {
       debugPrint('Error deleting song: $e');
       rethrow;
@@ -832,10 +864,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       _displayedSongs.add(song);
       notifyListeners();
       debugPrint(
-          '✅ MusicProvider: added downloaded song "${song.title}" to library');
+        '✅ MusicProvider: added downloaded song "${song.title}" to library',
+      );
     } else {
       debugPrint(
-          'ℹ️ MusicProvider: song "${song.title}" already in library, skipping add');
+        'ℹ️ MusicProvider: song "${song.title}" already in library, skipping add',
+      );
     }
   }
 
@@ -851,7 +885,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       _lastError = null;
     } catch (e) {
       debugPrint(
-          'MusicProvider: Error loading music (attempt ${_retryCount + 1}/$_maxRetries): $e');
+        'MusicProvider: Error loading music (attempt ${_retryCount + 1}/$_maxRetries): $e',
+      );
       _lastError = e.toString();
 
       if (_retryCount < _maxRetries) {
@@ -862,8 +897,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
             'Error: $_lastError\n\nRetrying in ${delaySeconds}s... (attempt $_retryCount/$_maxRetries)';
         notifyListeners();
 
-        debugPrint(
-            'MusicProvider: Auto-retrying in $delaySeconds seconds...');
+        debugPrint('MusicProvider: Auto-retrying in $delaySeconds seconds...');
         await Future.delayed(Duration(seconds: delaySeconds));
 
         // Recursive retry
@@ -1139,7 +1173,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _updateNowPlayingPlaylist();
       requestThumbnail(song, priority: 0);
       notifyListeners();
-      debugPrint('Playing from library: ${song.title}, queue size: ${_playlist.length}');
+      debugPrint(
+        'Playing from library: ${song.title}, queue size: ${_playlist.length}',
+      );
     }
   }
 
@@ -1170,7 +1206,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     _saveLastPlayedSong(song);
 
     notifyListeners();
-    debugPrint('Playing from list: ${song.title}, queue size: ${_playlist.length}');
+    debugPrint(
+      'Playing from list: ${song.title}, queue size: ${_playlist.length}',
+    );
   }
 
   List<Song> _tempPlaylist = [];
@@ -1213,8 +1251,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _stopOnlineAndResumeLocal();
       return;
     }
-    final List<Song> currentPlaylist =
-        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    final List<Song> currentPlaylist = _isUsingTempPlaylist
+        ? _tempPlaylist
+        : _playlist;
     if (currentPlaylist.isEmpty) return;
     if (_shuffleEnabled) {
       int nextIndex = _currentIndex;
@@ -1248,8 +1287,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _stopOnlineAndResumeLocal();
       return;
     }
-    final List<Song> currentPlaylist =
-        _isUsingTempPlaylist ? _tempPlaylist : _playlist;
+    final List<Song> currentPlaylist = _isUsingTempPlaylist
+        ? _tempPlaylist
+        : _playlist;
     if (currentPlaylist.isEmpty) return;
     _currentIndex = (_currentIndex - 1) % currentPlaylist.length;
     if (_currentIndex < 0) _currentIndex = currentPlaylist.length - 1;
@@ -1263,23 +1303,23 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-   Future<void> togglePlayPause() async {
-     final audioHandler = AudioNotificationService.audioHandler;
-     if (audioHandler != null) {
-       if (_player.state.playing) {
-         await audioHandler.pause();
-       } else {
-         await audioHandler.play();
-       }
-     } else {
-       if (_player.state.playing) {
-         await _player.pause();
-       } else {
-         await _player.play();
-       }
-     }
-     notifyListeners();
-   }
+  Future<void> togglePlayPause() async {
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      if (_player.state.playing) {
+        await audioHandler.pause();
+      } else {
+        await audioHandler.play();
+      }
+    } else {
+      if (_player.state.playing) {
+        await _player.pause();
+      } else {
+        await _player.play();
+      }
+    }
+    notifyListeners();
+  }
 
   // ===== COLLECTION METHODS =====
   String? getArtistImageUrl(String artistName) {
@@ -1307,10 +1347,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   List<Song> getSongsByAlbum(String albumName, {String? artistName}) =>
       _songsMap.values
-          .where((song) =>
-              song.album == albumName &&
-              (artistName == null ||
-                  song.artists.any((artist) => artist == artistName)))
+          .where(
+            (song) =>
+                song.album == albumName &&
+                (artistName == null ||
+                    song.artists.any((artist) => artist == artistName)),
+          )
           .toList();
 
   List<String> getAlbumsByArtist(String artistName) {
@@ -1326,8 +1368,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // ===== SORTING AND FILTERING =====
-  Future<void> sortSongs(
-      {required SongSortOption sortBy, bool ascending = true}) async {
+  Future<void> sortSongs({
+    required SongSortOption sortBy,
+    bool ascending = true,
+  }) async {
     try {
       _currentSortOption = sortBy;
       _sortAscending = ascending;
@@ -1374,14 +1418,11 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
           // Re-add all songs in the new order
           for (int i = 0; i < _playlist.length; i++) {
-            await txn.insert(
-              'playlist_songs',
-              {
-                'playlist_id': nowPlayingPlaylistId,
-                'song_id': _playlist[i].id,
-                'position': i,
-              },
-            );
+            await txn.insert('playlist_songs', {
+              'playlist_id': nowPlayingPlaylistId,
+              'song_id': _playlist[i].id,
+              'position': i,
+            });
           }
         });
       } catch (e) {
@@ -1411,8 +1452,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         for (final songData in results) {
           final songId = songData['id'] as int;
           final artistsData = await _databaseHelper.getArtistsForSong(songId);
-          final artists =
-              artistsData.map((row) => row['name'] as String).toList();
+          final artists = artistsData
+              .map((row) => row['name'] as String)
+              .toList();
 
           searchedSongs.add(
             Song(
@@ -1433,11 +1475,14 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         // Fallback to in-memory search if no results from database
         final lowerQuery = query.toLowerCase();
         _displayedSongs = _playlist
-            .where((song) =>
-                song.title.toLowerCase().contains(lowerQuery) ||
-                song.artists.any(
-                    (artist) => artist.toLowerCase().contains(lowerQuery)) ||
-                (song.album?.toLowerCase().contains(lowerQuery) ?? false))
+            .where(
+              (song) =>
+                  song.title.toLowerCase().contains(lowerQuery) ||
+                  song.artists.any(
+                    (artist) => artist.toLowerCase().contains(lowerQuery),
+                  ) ||
+                  (song.album?.toLowerCase().contains(lowerQuery) ?? false),
+            )
             .toList();
       }
     } catch (e) {
@@ -1445,11 +1490,14 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       // Fallback to in-memory search on error
       final lowerQuery = query.toLowerCase();
       _displayedSongs = _playlist
-          .where((song) =>
-              song.title.toLowerCase().contains(lowerQuery) ||
-              song.artists
-                  .any((artist) => artist.toLowerCase().contains(lowerQuery)) ||
-              (song.album?.toLowerCase().contains(lowerQuery) ?? false))
+          .where(
+            (song) =>
+                song.title.toLowerCase().contains(lowerQuery) ||
+                song.artists.any(
+                  (artist) => artist.toLowerCase().contains(lowerQuery),
+                ) ||
+                (song.album?.toLowerCase().contains(lowerQuery) ?? false),
+          )
           .toList();
     }
 
@@ -1460,7 +1508,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Load songs from database with optimized queries
   Future<void> _loadSongsFromDatabase() async {
     debugPrint(
-        '🔍 _loadSongsFromDatabase called, _songsMap.isNotEmpty=${_songsMap.isNotEmpty}, _songsMap.length=${_songsMap.length}');
+      '🔍 _loadSongsFromDatabase called, _songsMap.isNotEmpty=${_songsMap.isNotEmpty}, _songsMap.length=${_songsMap.length}',
+    );
 
     if (_songsMap.isNotEmpty) {
       _displayedSongs = _cachedSongs;
@@ -1474,12 +1523,14 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       // First, just count total songs in database
       final countResult = await db.rawQuery(
-          'SELECT COUNT(*) as count FROM ${DatabaseHelper.tableSongs}');
+        'SELECT COUNT(*) as count FROM ${DatabaseHelper.tableSongs}',
+      );
       final totalCount = Sqflite.firstIntValue(countResult) ?? 0;
       debugPrint('📊 Total songs in database table: $totalCount');
 
       // Get all songs with their artists and genres in a single query
-      final songsQuery = '''
+      final songsQuery =
+          '''
         SELECT
           s.*,
           (SELECT GROUP_CONCAT(name, ',') FROM artists a
@@ -1502,26 +1553,29 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         try {
           // Parse artists
           final artistNamesString = songData['artist_names'] as String?;
-          final artistNames = artistNamesString != null &&
-                  artistNamesString.isNotEmpty
+          final artistNames =
+              artistNamesString != null && artistNamesString.isNotEmpty
               ? artistNamesString
-                  .split(',')
-                  .where((name) => name.isNotEmpty && name != 'Unknown Artist')
-                  .toSet()
-                  .toList()
+                    .split(',')
+                    .where(
+                      (name) => name.isNotEmpty && name != 'Unknown Artist',
+                    )
+                    .toSet()
+                    .toList()
               : <String>[];
 
-          final artists =
-              artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
+          final artists = artistNames.isNotEmpty
+              ? artistNames
+              : ['Unknown Artist'];
 
           // Parse genres/tags
           final tagsString = songData['genre_names'] as String?;
           final tags = tagsString != null && tagsString.isNotEmpty
               ? tagsString
-                  .split(',')
-                  .where((tag) => tag.isNotEmpty)
-                  .toSet()
-                  .toList()
+                    .split(',')
+                    .where((tag) => tag.isNotEmpty)
+                    .toSet()
+                    .toList()
               : <String>[];
 
           final song = Song(
@@ -1561,16 +1615,18 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Load Now Playing playlist from database
   Future<void> _loadNowPlayingPlaylist() async {
     try {
-      final songMaps =
-          await _databaseHelper.getSongsInPlaylist(nowPlayingPlaylistId);
+      final songMaps = await _databaseHelper.getSongsInPlaylist(
+        nowPlayingPlaylistId,
+      );
       // Clear current playlist to restore from DB
       _playlist.clear();
 
       for (final songData in songMaps) {
         final songId = songData['id'] as int;
         final artistsData = await _databaseHelper.getArtistsForSong(songId);
-        final artists =
-            artistsData.map((row) => row['name'] as String).toList();
+        final artists = artistsData
+            .map((row) => row['name'] as String)
+            .toList();
 
         final song = Song(
           id: songId,
@@ -1637,105 +1693,121 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Set audio source for playback via audio service (handles notification)
-Future<void> _setAudioSource(Song song) async {
-  final audioHandler = AudioNotificationService.audioHandler;
-  debugPrint('_setAudioSource: audioHandler=${audioHandler != null}');
-  
-  // Check if this is a local file that exists
-  final isLocalFile = song.url.startsWith('/') || song.url.contains(':');
-  bool fileExists = false;
-  
-  if (isLocalFile) {
-    try {
-      fileExists = await File(song.url).exists();
-    } catch (e) {
-      // If we can't check, assume it doesn't exist
-      fileExists = false;
-    }
-  }
-  
-  // If local file doesn't exist, try YouTube fallback (search if no ID)
-  if (isLocalFile && !fileExists && audioHandler != null) {
-    debugPrint('_setAudioSource: Local file not found, attempting YouTube fallback');
-    
-    await audioHandler.stop();
-    String? ytId = song.youtubeId?.isNotEmpty == true ? song.youtubeId : null;
-    
-    // No YouTube ID yet — search by title/artist + duration match
-    if (ytId == null && _youTubeService != null) {
-      ytId = await _searchYouTubeForSong(song.title, song.artists, song.duration);
-      if (ytId != null) {
-        await _updateSongYouTubeId(song, ytId);
+  Future<void> _setAudioSource(Song song) async {
+    final audioHandler = AudioNotificationService.audioHandler;
+    debugPrint('_setAudioSource: audioHandler=${audioHandler != null}');
+
+    // Check if this is a local file that exists
+    final isLocalFile = song.url.startsWith('/') || song.url.contains(':');
+    bool fileExists = false;
+
+    if (isLocalFile) {
+      try {
+        fileExists = await File(song.url).exists();
+      } catch (e) {
+        // If we can't check, assume it doesn't exist
+        fileExists = false;
       }
     }
-    
-    if (ytId != null && _youTubeService != null) {
-      debugPrint('_setAudioSource: Playing YouTube: $ytId');
-      audioHandler.setOnlineMode(
-        online: true,
-        onPlay: () => unawaited(_youTubeService?.play()),
-        onPause: () => unawaited(_youTubeService?.pause()),
-        onStop: () => unawaited(_youTubeService?.stop()),
+
+    // If local file doesn't exist, try YouTube fallback (search if no ID)
+    if (isLocalFile && !fileExists && audioHandler != null) {
+      debugPrint(
+        '_setAudioSource: Local file not found, attempting YouTube fallback',
       );
-      
-      final ytSong = Song(
-        id: -1,
-        youtubeId: ytId,
-        title: song.title,
-        artists: song.artists.isNotEmpty ? song.artists : ['Unknown Artist'],
-        album: 'YouTube',
-        duration: song.duration,
-        albumArtUrl: song.albumArtUrl,
-        url: 'yt:$ytId',
-        storageType: StorageType.remote,
-      );
-      audioHandler.setOnlineMedia(ytSong, isPlaying: true);
-      await audioHandler.play();
-      return;
+
+      await audioHandler.stop();
+      String? ytId = song.youtubeId?.isNotEmpty == true ? song.youtubeId : null;
+
+      // No YouTube ID yet — search by title/artist + duration match
+      if (ytId == null && _youTubeService != null) {
+        ytId = await _searchYouTubeForSong(
+          song.title,
+          song.artists,
+          song.duration,
+        );
+        if (ytId != null) {
+          await _updateSongYouTubeId(song, ytId);
+        }
+      }
+
+      if (ytId != null && _youTubeService != null) {
+        debugPrint('_setAudioSource: Playing YouTube: $ytId');
+        audioHandler.setOnlineMode(
+          online: true,
+          onPlay: () => unawaited(_youTubeService?.play()),
+          onPause: () => unawaited(_youTubeService?.pause()),
+          onStop: () => unawaited(_youTubeService?.stop()),
+        );
+
+        final ytSong = Song(
+          id: -1,
+          youtubeId: ytId,
+          title: song.title,
+          artists: song.artists.isNotEmpty ? song.artists : ['Unknown Artist'],
+          album: 'YouTube',
+          duration: song.duration,
+          albumArtUrl: song.albumArtUrl,
+          url: 'yt:$ytId',
+          storageType: StorageType.remote,
+        );
+        audioHandler.setOnlineMedia(ytSong, isPlaying: true);
+        await audioHandler.play();
+        return;
+      }
+    }
+
+    // Proceed with normal playback (either local file that exists, or YouTube wasn't available/failed, or no audio handler)
+    if (audioHandler != null) {
+      final mediaPath = song.url.startsWith('/')
+          ? 'file://${song.url}'
+          : song.url;
+      debugPrint('_setAudioSource: Setting media for ${song.title}');
+      await audioHandler.setMedia(Media(mediaPath), song: song);
+      debugPrint('_setAudioSource: Media set successfully');
+    } else {
+      // Fallback: open directly in player if service not available
+      debugPrint('_setAudioSource: Using fallback (no audioHandler)');
+      final mediaPath = song.url.startsWith('/')
+          ? 'file://${song.url}'
+          : song.url;
+      await _player.open(Media(mediaPath));
     }
   }
-  
-  // Proceed with normal playback (either local file that exists, or YouTube wasn't available/failed, or no audio handler)
-  if (audioHandler != null) {
-    final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
-    debugPrint('_setAudioSource: Setting media for ${song.title}');
-    await audioHandler.setMedia(Media(mediaPath), song: song);
-    debugPrint('_setAudioSource: Media set successfully');
-  } else {
-    // Fallback: open directly in player if service not available
-    debugPrint('_setAudioSource: Using fallback (no audioHandler)');
-    final mediaPath = song.url.startsWith('/') ? 'file://${song.url}' : song.url;
-    await _player.open(Media(mediaPath));
-  }
-}
 
   /// Searches YouTube for a song by title/artist and matches by duration
-  Future<String?> _searchYouTubeForSong(String title, List<String> artists, int targetDurationMs) async {
+  Future<String?> _searchYouTubeForSong(
+    String title,
+    List<String> artists,
+    int targetDurationMs,
+  ) async {
     if (_youTubeService == null) return null;
-    
+
     try {
       String artist = artists.isNotEmpty ? artists.first : 'Unknown Artist';
       String query = '$title $artist';
-      
+
       List<YouTubeAudio> results = await _youTubeService!.searchAudio(query);
-      
+
       if (results.isEmpty) return null;
-      
+
       double targetDurationSec = targetDurationMs / 1000.0;
-      
+
       YouTubeAudio? bestMatch;
       double minDiff = double.infinity;
-      
+
       for (var result in results) {
         if (result.duration != null) {
-          double diff = (result.duration!.inMilliseconds / 1000.0 - targetDurationSec).abs();
+          double diff =
+              (result.duration!.inMilliseconds / 1000.0 - targetDurationSec)
+                  .abs();
           if (diff < minDiff && diff <= 5.0) {
             minDiff = diff;
             bestMatch = result;
           }
         }
       }
-      
+
       return bestMatch?.id;
     } catch (e) {
       debugPrint('Error searching YouTube for song: $e');
@@ -1804,7 +1876,9 @@ Future<void> _setAudioSource(Song song) async {
   Future<void> _saveSongsToStorage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-        _songsKey, jsonEncode(_playlist.map((s) => s.toJson()).toList()));
+      _songsKey,
+      jsonEncode(_playlist.map((s) => s.toJson()).toList()),
+    );
   }
 
   /// Clear cache when forcing rescan
@@ -1845,7 +1919,8 @@ Future<void> _setAudioSource(Song song) async {
 
       if (missingSongs.isNotEmpty) {
         debugPrint(
-            '📊 ENSURING ${missingSongs.length} CACHED SONGS ARE IN DATABASE');
+          '📊 ENSURING ${missingSongs.length} CACHED SONGS ARE IN DATABASE',
+        );
 
         // Save missing songs to database
         await db.transaction((txn) async {
@@ -1891,13 +1966,15 @@ Future<void> _setAudioSource(Song song) async {
               }
             } catch (e) {
               debugPrint(
-                  'Error saving cached song ${song.title} to database: $e');
+                'Error saving cached song ${song.title} to database: $e',
+              );
             }
           }
         });
 
         debugPrint(
-            '✅ ENSURED ${missingSongs.length} CACHED SONGS ARE IN DATABASE');
+          '✅ ENSURED ${missingSongs.length} CACHED SONGS ARE IN DATABASE',
+        );
       }
     } catch (e) {
       debugPrint('Error ensuring cached songs in database: $e');
@@ -1965,7 +2042,8 @@ Future<void> _setAudioSource(Song song) async {
       final musicDirectories = await _getAllMusicDirectories();
 
       debugPrint(
-          '🔍 SCANNING ${musicDirectories.length} DIRECTORIES FOR MUSIC FILES');
+        '🔍 SCANNING ${musicDirectories.length} DIRECTORIES FOR MUSIC FILES',
+      );
       debugPrint('Directories to scan:');
       for (final dir in musicDirectories) {
         debugPrint('  📁 $dir');
@@ -1989,15 +2067,17 @@ Future<void> _setAudioSource(Song song) async {
         if (alternativeFiles.isNotEmpty) {
           musicFiles.addAll(alternativeFiles);
           debugPrint(
-              '✅ FOUND ${alternativeFiles.length} FILES IN ALTERNATIVE LOCATIONS');
+            '✅ FOUND ${alternativeFiles.length} FILES IN ALTERNATIVE LOCATIONS',
+          );
         }
       }
 
       if (musicFiles.isEmpty) {
         // Only set error if there are no songs in database either
         final db = await _databaseHelper.database;
-        final countResult =
-            await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+        final countResult = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM songs',
+        );
         final count = countResult.first['count'] as int? ?? 0;
 
         if (count == 0) {
@@ -2021,8 +2101,9 @@ Future<void> _setAudioSource(Song song) async {
         _loadingNotifier.value = false;
         // Only show error if both scanning found nothing AND database is empty
         final db = await _databaseHelper.database;
-        final countResult =
-            await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+        final countResult = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM songs',
+        );
         final count = countResult.first['count'] as int? ?? 0;
 
         if (_songsMap.isEmpty && count == 0) {
@@ -2031,7 +2112,8 @@ Future<void> _setAudioSource(Song song) async {
         } else {
           _error = null;
           debugPrint(
-              '✅ SUCCESSFULLY ADDED ${_songsMap.length} SONGS TO DATABASE');
+            '✅ SUCCESSFULLY ADDED ${_songsMap.length} SONGS TO DATABASE',
+          );
         }
       }
 
@@ -2041,8 +2123,9 @@ Future<void> _setAudioSource(Song song) async {
       if (!background) {
         // Only show error if database is also empty
         final db = await _databaseHelper.database;
-        final countResult =
-            await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+        final countResult = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM songs',
+        );
         final count = countResult.first['count'] as int? ?? 0;
 
         if (count == 0) {
@@ -2076,7 +2159,8 @@ Future<void> _setAudioSource(Song song) async {
 
       if (songsToRemove.isNotEmpty) {
         debugPrint(
-            'Removing ${songsToRemove.length} deleted songs from database');
+          'Removing ${songsToRemove.length} deleted songs from database',
+        );
         await db.delete(
           'songs',
           where: 'id IN (${List.filled(songsToRemove.length, '?').join(',')})',
@@ -2109,8 +2193,10 @@ Future<void> _setAudioSource(Song song) async {
           // Map of video ID -> list of files
           final Map<String, List<File>> videoIdFiles = {};
 
-          await for (final entity
-              in dir.list(recursive: true, followLinks: false)) {
+          await for (final entity in dir.list(
+            recursive: true,
+            followLinks: false,
+          )) {
             if (entity is File) {
               final ext = path.extension(entity.path).toLowerCase();
               if (audioExtensions.contains(ext)) {
@@ -2214,8 +2300,10 @@ Future<void> _setAudioSource(Song song) async {
     musicDirectories.addAll(standardPaths);
 
     // Remove duplicates and filter out null/empty paths
-    final uniquePaths =
-        musicDirectories.where((path) => path.isNotEmpty).toSet().toList();
+    final uniquePaths = musicDirectories
+        .where((path) => path.isNotEmpty)
+        .toSet()
+        .toList();
 
     debugPrint('🔍 Final music directories to scan: $uniquePaths');
 
@@ -2224,7 +2312,8 @@ Future<void> _setAudioSource(Song song) async {
 
   /// Scan all directories in parallel for maximum speed
   Future<Map<String, dynamic>> _scanAllDirectoriesParallel(
-      List<String> directories) async {
+    List<String> directories,
+  ) async {
     final List<File> allMusicFiles = [];
     final Set<String> processedPaths = {};
     int totalFilesFound = 0;
@@ -2257,15 +2346,14 @@ Future<void> _setAudioSource(Song song) async {
       }
     }
 
-    return {
-      'files': allMusicFiles,
-      'totalFiles': totalFilesFound,
-    };
+    return {'files': allMusicFiles, 'totalFiles': totalFilesFound};
   }
 
   /// Scan a single directory for music files
   Future<Map<String, dynamic>?> _scanSingleDirectory(
-      String dirPath, Set<String> processedPaths) async {
+    String dirPath,
+    Set<String> processedPaths,
+  ) async {
     try {
       final dir = Directory(dirPath);
       if (!await dir.exists()) return null;
@@ -2273,8 +2361,10 @@ Future<void> _setAudioSource(Song song) async {
       final List<File> musicFiles = [];
       int fileCount = 0;
 
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity in dir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is File && !processedPaths.contains(entity.path)) {
           final ext = path.extension(entity.path).toLowerCase();
           if (audioExtensions.contains(ext)) {
@@ -2298,10 +2388,7 @@ Future<void> _setAudioSource(Song song) async {
         debugPrint('  📁 $dirPath: $fileCount files');
       }
 
-      return {
-        'files': musicFiles,
-        'count': fileCount,
-      };
+      return {'files': musicFiles, 'count': fileCount};
     } catch (e) {
       debugPrint('  ❌ Error scanning $dirPath: $e');
       return null;
@@ -2313,19 +2400,16 @@ Future<void> _setAudioSource(Song song) async {
     final List<File> alternativeFiles = [];
 
     // Try some additional locations
-    final alternativePaths = [
-      '/storage',
-      '/mnt',
-      '/data',
-      '/system',
-    ];
+    final alternativePaths = ['/storage', '/mnt', '/data', '/system'];
 
     for (final basePath in alternativePaths) {
       try {
         final dir = Directory(basePath);
         if (await dir.exists()) {
-          await for (final entity
-              in dir.list(recursive: true, followLinks: false)) {
+          await for (final entity in dir.list(
+            recursive: true,
+            followLinks: false,
+          )) {
             if (entity is File) {
               final ext = path.extension(entity.path).toLowerCase();
               if (audioExtensions.contains(ext)) {
@@ -2352,7 +2436,9 @@ Future<void> _setAudioSource(Song song) async {
 
   /// Process all music files and add them to database in a single transaction
   Future<void> _processAndAddAllSongs(
-      List<File> musicFiles, bool background) async {
+    List<File> musicFiles,
+    bool background,
+  ) async {
     debugPrint('🔄 PROCESSING ${musicFiles.length} MUSIC FILES...');
 
     // Clear only library cache, preserve playback queue
@@ -2453,7 +2539,9 @@ Future<void> _setAudioSource(Song song) async {
 
   /// Helper method to get or create artist (case-insensitive)
   Future<int> _getOrCreateArtist(
-      DatabaseExecutor txn, String artistName) async {
+    DatabaseExecutor txn,
+    String artistName,
+  ) async {
     final trimmedName = artistName.trim();
     if (trimmedName.isEmpty) {
       return 0;
@@ -2469,10 +2557,10 @@ Future<void> _setAudioSource(Song song) async {
       return existingArtist.first[DatabaseHelper.columnId] as int;
     }
 
-    return await txn.insert(
-      DatabaseHelper.tableArtists,
-      {'name': trimmedName, 'created_at': DateTime.now().toIso8601String()},
-    );
+    return await txn.insert(DatabaseHelper.tableArtists, {
+      'name': trimmedName,
+      'created_at': DateTime.now().toIso8601String(),
+    });
   }
 
   /// Helper method to get or create genre
@@ -2487,10 +2575,10 @@ Future<void> _setAudioSource(Song song) async {
       return existingGenre.first[DatabaseHelper.columnId] as int;
     }
 
-    return await txn.insert(
-      DatabaseHelper.tableGenres,
-      {'name': genreName, 'created_at': DateTime.now().toIso8601String()},
-    );
+    return await txn.insert(DatabaseHelper.tableGenres, {
+      'name': genreName,
+      'created_at': DateTime.now().toIso8601String(),
+    });
   }
 
   /// Process a single music file and extract metadata
@@ -2501,16 +2589,23 @@ Future<void> _setAudioSource(Song song) async {
       // Clean up filename
       String cleanFileName(String fileName) => fileName
           .replaceAll(
-              RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false),
-              '')
+            RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false),
+            '',
+          )
           .replaceAll(
-              RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
-                  caseSensitive: false),
-              '')
+            RegExp(
+              r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
+              caseSensitive: false,
+            ),
+            '',
+          )
           .replaceAll(
-              RegExp(r'\b(official|music|video|lyrics|hd|clear|audio)\b',
-                  caseSensitive: false),
-              '')
+            RegExp(
+              r'\b(official|music|video|lyrics|hd|clear|audio)\b',
+              caseSensitive: false,
+            ),
+            '',
+          )
           .replaceAll(RegExp(r'\s{2,}'), ' ')
           .trim();
 
@@ -2535,8 +2630,9 @@ Future<void> _setAudioSource(Song song) async {
         // Handle featured artists
         String? featuredArtists;
         final featPattern = RegExp(
-            r'^(.*?)\s*(?:ft\.?|feat\.?|featuring)\s+(.+)$',
-            caseSensitive: false);
+          r'^(.*?)\s*(?:ft\.?|feat\.?|featuring)\s+(.+)$',
+          caseSensitive: false,
+        );
         final featMatch = featPattern.firstMatch(rawTitle);
 
         if (featMatch != null) {
@@ -2556,16 +2652,23 @@ Future<void> _setAudioSource(Song song) async {
 
         title = rawTitle
             .replaceAll(
-                RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false),
-                '')
+              RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}', caseSensitive: false),
+              '',
+            )
             .replaceAll(
-                RegExp(r'(?:ft\.?|feat\.?|featuring)\s+.+$',
-                    caseSensitive: false),
-                '')
+              RegExp(
+                r'(?:ft\.?|feat\.?|featuring)\s+.+$',
+                caseSensitive: false,
+              ),
+              '',
+            )
             .replaceAll(
-                RegExp(r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
-                    caseSensitive: false),
-                '')
+              RegExp(
+                r'\d+kbps|\d+\s*kbps|\d+\s*bit|\d+\s*k\s*bps',
+                caseSensitive: false,
+              ),
+              '',
+            )
             .replaceAll(RegExp(r'\s{2,}'), ' ')
             .trim();
       }
@@ -2580,13 +2683,15 @@ Future<void> _setAudioSource(Song song) async {
       }
 
       // Create new song
-      final isTSMusic = file.path.toLowerCase().contains('music/tsmusic') ||
+      final isTSMusic =
+          file.path.toLowerCase().contains('music/tsmusic') ||
           file.path.toLowerCase().contains('tsmusic');
 
       final song = Song(
         id: file.path.hashCode,
-        title:
-            title.isNotEmpty ? title : path.basenameWithoutExtension(file.path),
+        title: title.isNotEmpty
+            ? title
+            : path.basenameWithoutExtension(file.path),
         artists: artistsList,
         album: 'Unknown Album',
         url: file.path,
@@ -2613,7 +2718,8 @@ Future<void> _setAudioSource(Song song) async {
       final fileSize = await file.length();
       if (fileSize < 1024) {
         debugPrint(
-            'File too small to be valid audio: $filePath ($fileSize bytes)');
+          'File too small to be valid audio: $filePath ($fileSize bytes)',
+        );
         return Duration.zero;
       }
 
@@ -2642,12 +2748,14 @@ Future<void> _setAudioSource(Song song) async {
       // Reasonable duration check: between 10 seconds and 30 minutes
       if (estimatedMs < 10000 || estimatedMs > 1800000) {
         debugPrint(
-            'Suspicious duration estimate for $filePath: ${Duration(milliseconds: estimatedMs.round())}, using default 3 minutes');
+          'Suspicious duration estimate for $filePath: ${Duration(milliseconds: estimatedMs.round())}, using default 3 minutes',
+        );
         return const Duration(minutes: 3);
       }
 
       debugPrint(
-          'Estimated duration for $filePath: ${Duration(milliseconds: estimatedMs.round())} (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+        'Estimated duration for $filePath: ${Duration(milliseconds: estimatedMs.round())} (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)',
+      );
       return Duration(milliseconds: estimatedMs.round());
     } catch (e) {
       debugPrint('Error getting duration for $filePath: $e');
@@ -2806,12 +2914,10 @@ Future<void> _setAudioSource(Song song) async {
     return url.startsWith('yt:');
   }
 
-  Future<int> addMixedSongToPlaylist(
-      PlaylistItem item, int playlistId) async {
+  Future<int> addMixedSongToPlaylist(PlaylistItem item, int playlistId) async {
     try {
       if (item.songId != null) {
-        await _databaseHelper.addSongsToPlaylist(
-            playlistId, [item.songId!]);
+        await _databaseHelper.addSongsToPlaylist(playlistId, [item.songId!]);
         notifyListeners();
         return item.songId!;
       } else if (item.youtubeId != null) {
@@ -2839,8 +2945,9 @@ Future<void> _setAudioSource(Song song) async {
       for (final songData in songMaps) {
         final songId = songData['id'] as int;
         final artistsData = await _databaseHelper.getArtistsForSong(songId);
-        final artists =
-            artistsData.map((row) => row['name'] as String).toList();
+        final artists = artistsData
+            .map((row) => row['name'] as String)
+            .toList();
 
         final song = Song(
           id: songId,
@@ -2869,7 +2976,9 @@ Future<void> _setAudioSource(Song song) async {
       }
 
       notifyListeners();
-      debugPrint('Loaded playlist $playlistId with ${songs.length} songs as temp playlist');
+      debugPrint(
+        'Loaded playlist $playlistId with ${songs.length} songs as temp playlist',
+      );
     } catch (e) {
       debugPrint('Error loading playlist as queue: $e');
       rethrow;

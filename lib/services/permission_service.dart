@@ -10,9 +10,11 @@ class PermissionService {
     final deviceInfo = await DeviceInfoPlugin().androidInfo;
     PermissionStatus status;
 
-    if (deviceInfo.version.sdkInt >= 33) { // Android 13+
+    if (deviceInfo.version.sdkInt >= 33) {
+      // Android 13+
       status = await Permission.audio.status;
-    } else { // Android 12 and below
+    } else {
+      // Android 12 and below
       status = await Permission.storage.status;
     }
 
@@ -25,10 +27,11 @@ class PermissionService {
     final deviceInfo = await DeviceInfoPlugin().androidInfo;
     final sdkInt = deviceInfo.version.sdkInt;
 
-    if (sdkInt >= 33) { // Android 13+
+    if (sdkInt >= 33) {
+      // Android 13+
       // Request audio permission for reading music
       final audioStatus = await Permission.audio.request();
-      
+
       // Request notification permission for media controls
       if (audioStatus.isGranted) {
         final notificationStatus = await Permission.notification.status;
@@ -36,12 +39,13 @@ class PermissionService {
           await Permission.notification.request();
         }
       }
-      
+
       return audioStatus.isGranted;
-    } else if (sdkInt >= 30) { // Android 11-12
+    } else if (sdkInt >= 30) {
+      // Android 11-12
       // Request storage permission
       final status = await Permission.storage.request();
-      
+
       // Request manage external storage for full file access
       if (status.isGranted) {
         final manageStatus = await Permission.manageExternalStorage.status;
@@ -49,9 +53,10 @@ class PermissionService {
           await Permission.manageExternalStorage.request();
         }
       }
-      
+
       return status.isGranted;
-    } else { // Android 10 and below
+    } else {
+      // Android 10 and below
       final status = await Permission.storage.request();
       return status.isGranted;
     }
@@ -64,13 +69,16 @@ class PermissionService {
     final deviceInfo = await DeviceInfoPlugin().androidInfo;
     final sdkInt = deviceInfo.version.sdkInt;
 
-    if (sdkInt >= 33) { // Android 13+
+    if (sdkInt >= 33) {
+      // Android 13+
       final audioStatus = await Permission.audio.status;
       return audioStatus.isGranted;
-    } else if (sdkInt >= 30) { // Android 11-12
+    } else if (sdkInt >= 30) {
+      // Android 11-12
       final storageStatus = await Permission.storage.status;
       return storageStatus.isGranted;
-    } else { // Android 10 and below
+    } else {
+      // Android 10 and below
       final storageStatus = await Permission.storage.status;
       return storageStatus.isGranted;
     }

@@ -62,7 +62,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _fetchArtistImageIfNeeded();
 
     _checkConnectivity();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       _checkConnectivity();
     });
   }
@@ -88,7 +90,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     // First try local song thumbnails / album art
     final musicProvider = context.read<music_provider.MusicProvider>();
     final localSongs = musicProvider.librarySongs
-        .where((s) => s.artists.any((a) => a.toLowerCase() == widget.artistName.toLowerCase()))
+        .where(
+          (s) => s.artists.any(
+            (a) => a.toLowerCase() == widget.artistName.toLowerCase(),
+          ),
+        )
         .toList();
     for (final song in localSongs) {
       if (song.localThumbnailPath != null) {
@@ -169,7 +175,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
     setState(() => _isLoading = true);
     try {
-      final nextPage = await _youTubeService.searchAudioNextPage(widget.artistName);
+      final nextPage = await _youTubeService.searchAudioNextPage(
+        widget.artistName,
+      );
       if (nextPage.isEmpty) {
         setState(() => _hasMore = false);
       } else {
@@ -198,9 +206,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       await _youtubePlayer.playAudio(audio);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error playing audio: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error playing audio: $e')));
       }
     }
   }
@@ -213,7 +221,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       downloadLocation: settingsProvider.downloadLocation,
     );
     if (result != null && mounted) {
-      context.read<music_provider.MusicProvider>().addDownloadedSongToLibrary(result.song);
+      context.read<music_provider.MusicProvider>().addDownloadedSongToLibrary(
+        result.song,
+      );
     }
   }
 
@@ -242,21 +252,25 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       try {
         await context.read<music_provider.MusicProvider>().deleteSong(song);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.songDeleted)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.songDeleted)));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.error}: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${l10n.error}: $e')));
         }
       }
     }
   }
 
-  void _playAllLocalSongs(List<Song> songs, {int startIndex = 0, bool shuffle = false}) {
+  void _playAllLocalSongs(
+    List<Song> songs, {
+    int startIndex = 0,
+    bool shuffle = false,
+  }) {
     final musicProvider = context.read<music_provider.MusicProvider>();
     if (songs.isEmpty) return;
     if (shuffle) {
@@ -289,15 +303,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
     if (confirmed == true) {
       setState(() => _isMultiSelectMode = false);
-      final musicProvider =
-          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProvider = Provider.of<music_provider.MusicProvider>(
+        context,
+        listen: false,
+      );
       for (final songId in _selectedLocalSongs.toList()) {
-        final song = musicProvider.librarySongs
-            .cast<Song?>()
-            .firstWhere(
-                (s) => s?.id == songId,
-                orElse: () => null,
-            );
+        final song = musicProvider.librarySongs.cast<Song?>().firstWhere(
+          (s) => s?.id == songId,
+          orElse: () => null,
+        );
         if (song != null) {
           try {
             final file = File(song.url);
@@ -318,9 +332,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
       alignment: Alignment.center,
       child: Text(
-        widget.artistName.isNotEmpty
-            ? widget.artistName[0].toUpperCase()
-            : '?',
+        widget.artistName.isNotEmpty ? widget.artistName[0].toUpperCase() : '?',
         style: const TextStyle(
           fontSize: 64,
           fontWeight: FontWeight.bold,
@@ -382,10 +394,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         ],
         body: TabBarView(
           controller: _tabController,
-          children: [
-            _buildLocalSongsTab(),
-            _buildYouTubeTab(),
-          ],
+          children: [_buildLocalSongsTab(), _buildYouTubeTab()],
         ),
       ),
       bottomNavigationBar: const MiniPlayerWidget(),
@@ -406,8 +415,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     final l10n = AppLocalizations.of(context);
 
     final songs = musicProvider.librarySongs
-        .where((song) => song.artists.any(
-            (artist) => artist.toLowerCase() == widget.artistName.toLowerCase()))
+        .where(
+          (song) => song.artists.any(
+            (artist) => artist.toLowerCase() == widget.artistName.toLowerCase(),
+          ),
+        )
         .toList();
 
     if (songs.isEmpty) {
@@ -440,9 +452,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: Icon(_isMultiSelectMode
-                    ? Icons.close
-                    : Icons.check_box_outlined),
+                icon: Icon(
+                  _isMultiSelectMode ? Icons.close : Icons.check_box_outlined,
+                ),
                 onPressed: () {
                   setState(() {
                     _isMultiSelectMode = !_isMultiSelectMode;
@@ -464,7 +476,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
               final isCurrentSong = musicProvider.currentSong?.id == song.id;
               final isSelected = _selectedLocalSongs.contains(song.id);
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                context.read<music_provider.MusicProvider>().requestThumbnail(song, priority: 1);
+                context.read<music_provider.MusicProvider>().requestThumbnail(
+                  song,
+                  priority: 1,
+                );
               });
               return ListTile(
                 leading: _isMultiSelectMode
@@ -484,9 +499,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                 title: SlidingText(
                   song.title,
                   style: TextStyle(
-                      fontWeight: isCurrentSong
-                          ? FontWeight.bold
-                          : FontWeight.normal),
+                    fontWeight: isCurrentSong
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
                 ),
                 subtitle: Text(song.album ?? l10n.unknownAlbum),
                 trailing: _isMultiSelectMode
@@ -499,7 +515,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                             onSelected: (value) {
                               switch (value) {
                                 case 'add_to_playlist':
-                                  showAddToPlaylistSheet(context, item: PlaylistItem(songId: song.id));
+                                  showAddToPlaylistSheet(
+                                    context,
+                                    item: PlaylistItem(songId: song.id),
+                                  );
                                 case 'delete':
                                   _deleteLocalSong(song);
                               }
@@ -519,9 +538,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.delete_outline, color: Colors.red),
+                                    const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                    ),
                                     const SizedBox(width: 8),
-                                    Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+                                    Text(
+                                      l10n.delete,
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -581,9 +606,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   Widget _buildLoadingIndicator() => const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Center(child: CircularProgressIndicator()),
-      );
+    padding: EdgeInsets.all(16.0),
+    child: Center(child: CircularProgressIndicator()),
+  );
 }
 
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
@@ -599,10 +624,13 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) => Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: tabBar,
-    );
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => Container(
+    color: Theme.of(context).scaffoldBackgroundColor,
+    child: tabBar,
+  );
 
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;

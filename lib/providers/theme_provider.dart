@@ -40,7 +40,8 @@ class ThemeProvider with ChangeNotifier {
   }
 
   void _updateDarkMode() {
-    _isDarkMode = _themeMode == ThemeMode.dark ||
+    _isDarkMode =
+        _themeMode == ThemeMode.dark ||
         (_themeMode == ThemeMode.system &&
             WidgetsBinding.instance.window.platformBrightness ==
                 Brightness.dark);

@@ -155,7 +155,8 @@ class MusicPlayerApp extends StatefulWidget {
   State<MusicPlayerApp> createState() => _MusicPlayerAppState();
 }
 
-class _MusicPlayerAppState extends State<MusicPlayerApp> with WidgetsBindingObserver {
+class _MusicPlayerAppState extends State<MusicPlayerApp>
+    with WidgetsBindingObserver {
   late bool _introCompleted;
   final ClipboardService _clipboardService = ClipboardService();
 
@@ -198,7 +199,11 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> with WidgetsBindingObse
     if (link.isPlaylist) {
       mainNavKey.currentState?.goToDownloads();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Playlist download not yet supported. Open the video to download.')),
+        const SnackBar(
+          content: Text(
+            'Playlist download not yet supported. Open the video to download.',
+          ),
+        ),
       );
     } else if (link.videoId != null) {
       ytService.downloadAudio(
@@ -258,23 +263,23 @@ class _MusicPlayerAppState extends State<MusicPlayerApp> with WidgetsBindingObse
 
         return Consumer<SettingsProvider>(
           builder: (context, settingsProvider, _) => MaterialApp(
-              title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
-              debugShowCheckedModeBanner: false,
-              theme: lightTheme.copyWith(textTheme: textTheme),
-              darkTheme: darkTheme.copyWith(textTheme: textTheme),
-              themeMode: themeProvider.themeMode,
-              locale: settingsProvider.locale,
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: _introCompleted
-                  ? MainNavigationScreen(key: mainNavKey)
-                  : IntroductionScreen(onComplete: _onIntroComplete),
-            ),
+            title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
+            debugShowCheckedModeBanner: false,
+            theme: lightTheme.copyWith(textTheme: textTheme),
+            darkTheme: darkTheme.copyWith(textTheme: textTheme),
+            themeMode: themeProvider.themeMode,
+            locale: settingsProvider.locale,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: _introCompleted
+                ? MainNavigationScreen(key: mainNavKey)
+                : IntroductionScreen(onComplete: _onIntroComplete),
+          ),
         );
       },
     ),
@@ -325,10 +330,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         context,
         listen: false,
       );
-      final themeProvider = Provider.of<ThemeProvider>(
-        context,
-        listen: false,
-      );
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       // Connect YouTube service to MusicProvider for notification integration
       musicProv.setYouTubeService(youTubeService);
       // Set up widget auto-update — fires on every notifyListeners
@@ -461,9 +463,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         isDarkMode: isDarkMode,
         primaryColor: themeProvider.primaryColor,
       );
-
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   @override

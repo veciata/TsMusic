@@ -41,7 +41,9 @@ Widget buildSquareStyle(StyleParams params) {
                               fit: BoxFit.cover,
                             )
                           : null,
-                      color: albumArtUrl == null ? theme.colorScheme.primaryContainer : null,
+                      color: albumArtUrl == null
+                          ? theme.colorScheme.primaryContainer
+                          : null,
                     ),
                     child: albumArtUrl == null
                         ? Center(
@@ -57,9 +59,9 @@ Widget buildSquareStyle(StyleParams params) {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Left-aligned Text
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -91,15 +93,13 @@ Widget buildSquareStyle(StyleParams params) {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           progressBar,
-          
-          Expanded(
-            child: playbackControls,
-          ),
-          
+
+          Expanded(child: playbackControls),
+
           bottomControls,
         ],
       ),

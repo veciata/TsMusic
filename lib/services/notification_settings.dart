@@ -9,9 +9,11 @@ AudioServiceConfig getNotificationSettings({
   String? channelDescription,
   bool? showNotificationBadge,
   Color? notificationColor,
-  double? fontSize, // For future use - not currently supported by audio_service package
+  double?
+  fontSize, // For future use - not currently supported by audio_service package
 }) => AudioServiceConfig(
-  androidNotificationChannelId: channelId ?? 'com.veciata.tsmusic.channel.audio',
+  androidNotificationChannelId:
+      channelId ?? 'com.veciata.tsmusic.channel.audio',
   androidNotificationChannelName: channelName ?? 'TsMusic Playback',
   androidNotificationChannelDescription:
       channelDescription ?? 'TsMusic playback notification',

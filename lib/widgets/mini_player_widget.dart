@@ -8,26 +8,20 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/screens/now_playing_screen.dart';
 import 'package:tsmusic/models/player_styles.dart';
 
-
 Route _slideUpRoute() => PageRouteBuilder(
-      pageBuilder: (context, animation, secondaryAnimation) =>
-          const NowPlayingScreen(),
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(0.0, 1.0);
-        const end = Offset.zero;
-        const curve = Curves.easeInOut;
+  pageBuilder: (context, animation, secondaryAnimation) =>
+      const NowPlayingScreen(),
+  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+    const begin = Offset(0.0, 1.0);
+    const end = Offset.zero;
+    const curve = Curves.easeInOut;
 
-        final tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+    final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
 
-        return SlideTransition(
-          position: animation.drive(tween),
-          child: child,
-        );
-      },
-      transitionDuration: const Duration(milliseconds: 350),
-
-    );
+    return SlideTransition(position: animation.drive(tween), child: child);
+  },
+  transitionDuration: const Duration(milliseconds: 350),
+);
 
 void _showMinimalPlayer(BuildContext context) {
   showModalBottomSheet(
@@ -125,8 +119,10 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
         return GestureDetector(
           onTap: () {
             if (hasTrack) {
-              final themeProvider =
-                  Provider.of<ThemeProvider>(context, listen: false);
+              final themeProvider = Provider.of<ThemeProvider>(
+                context,
+                listen: false,
+              );
               if (themeProvider.playerStyle == PlayerStyle.minimal) {
                 _showMinimalPlayer(context);
               } else {
@@ -156,8 +152,10 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
                 ),
                 Expanded(
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
                         _AlbumArt(
@@ -251,36 +249,32 @@ class _ProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: progress),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-          builder: (context, value, _) => Container(
-            height: 3,
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.5),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: value.clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color,
-                  gradient: isPlaying
-                      ? LinearGradient(
-                          colors: [
-                            color.withValues(alpha: 0.6),
-                            color,
-                          ],
-                        )
-                      : null,
-                ),
-              ),
+    child: TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: progress),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      builder: (context, value, _) => Container(
+        height: 3,
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        child: FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: value.clamp(0.0, 1.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color,
+              gradient: isPlaying
+                  ? LinearGradient(
+                      colors: [color.withValues(alpha: 0.6), color],
+                    )
+                  : null,
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _AlbumArt extends StatelessWidget {
@@ -330,10 +324,7 @@ class _AlbumArt extends StatelessWidget {
               ),
             )
           : Center(
-              child: Icon(
-                Icons.music_note,
-                color: theme.colorScheme.primary,
-              ),
+              child: Icon(Icons.music_note, color: theme.colorScheme.primary),
             ),
     );
   }
@@ -352,20 +343,20 @@ class _PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 44,
-        height: 44,
-        child: IconButton(
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Icon(
-              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              key: ValueKey('play_$isPlaying'),
-              size: 26,
-            ),
-          ),
-          color: color,
-          onPressed: onPressed,
-          splashRadius: 22,
+    width: 44,
+    height: 44,
+    child: IconButton(
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: Icon(
+          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          key: ValueKey('play_$isPlaying'),
+          size: 26,
         ),
-      );
+      ),
+      color: color,
+      onPressed: onPressed,
+      splashRadius: 22,
+    ),
+  );
 }

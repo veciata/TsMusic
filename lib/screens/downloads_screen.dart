@@ -107,8 +107,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.delete),
-              onPressed:
-                  _selectedSongs.isEmpty ? null : _deleteSelected,
+              onPressed: _selectedSongs.isEmpty ? null : _deleteSelected,
               color: Colors.red,
             ),
           ] else ...[
@@ -120,10 +119,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   PageRouteBuilder(
                     pageBuilder: (context, animation, secondaryAnimation) =>
                         FadeThroughTransition(
-                      animation: animation,
-                      secondaryAnimation: secondaryAnimation,
-                      child: const SearchScreen(),
-                    ),
+                          animation: animation,
+                          secondaryAnimation: secondaryAnimation,
+                          child: const SearchScreen(),
+                        ),
                   ),
                 );
               },
@@ -180,21 +179,21 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               if (activeDownloads.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.all(16.0),
-                  child: Text('Downloading...',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: Text(
+                    'Downloading...',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
-                ...activeDownloads
-                    .map(_buildDownloadItem)
-                    ,
+                ...activeDownloads.map(_buildDownloadItem),
                 const Divider(),
               ],
               if (allSongs.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.all(16.0),
-                  child: Text('Downloaded',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: Text(
+                    'Downloaded',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
                 ...allSongs.map(_buildSongItem),
               ],
@@ -204,165 +203,157 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
 
   Widget _buildDownloadItem(dynamic download) => Card(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: ListTile(
-          leading: const Icon(Icons.downloading, size: 32),
-          title: Text(
-            download.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    child: ListTile(
+      leading: const Icon(Icons.downloading, size: 32),
+      title: Text(download.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: download.cancelRequested
+          ? const Padding(
+              padding: EdgeInsets.only(right: 12.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                ),
+              ),
+            )
+          : IconButton(
+              icon: const Icon(Icons.cancel, color: Colors.red),
+              onPressed: () => _youTubeService.cancelDownload(download.videoId),
+              tooltip: 'Cancel download',
+            ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: download.progress > 0 ? download.progress : null,
+            minHeight: 4,
+            backgroundColor: Colors.grey[300],
+            valueColor: AlwaysStoppedAnimation<Color>(
+              download.cancelRequested
+                  ? Colors.orange
+                  : Theme.of(context).primaryColor,
+            ),
           ),
-          trailing: download.cancelRequested
-              ? const Padding(
-                  padding: EdgeInsets.only(right: 12.0),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                    ),
-                  ),
-                )
-              : IconButton(
-                  icon: const Icon(Icons.cancel, color: Colors.red),
-                  onPressed: () =>
-                      _youTubeService.cancelDownload(download.videoId),
-                  tooltip: 'Cancel download',
-                ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: download.progress > 0 ? download.progress : null,
-                minHeight: 4,
-                backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  download.cancelRequested
-                      ? Colors.orange
-                      : Theme.of(context).primaryColor,
-                ),
+              Text(
+                download.progress > 0
+                    ? '${(download.progress * 100).toStringAsFixed(1)}%'
+                    : 'Downloading...',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    download.progress > 0
-                        ? '${(download.progress * 100).toStringAsFixed(1)}%'
-                        : 'Downloading...',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (download.cancelRequested)
-                    const Text(
-                      'Canceling...',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                ],
-              ),
-              if (download.error != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  download.error! == 'youtube_html_error'
-                      ? 'Download unavailable. Please try again later.'
-                      : download.error!,
+              if (download.cancelRequested)
+                const Text(
+                  'Canceling...',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
+                    color: Colors.orange,
                     fontSize: 12,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
-              ],
             ],
           ),
-        ),
-      );
+          if (download.error != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              download.error! == 'youtube_html_error'
+                  ? 'Download unavailable. Please try again later.'
+                  : download.error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 
   Widget _buildSongItem(Song song) => Card(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: ListTile(
-          leading: _isMultiSelectMode
-              ? Checkbox(
-                  value: _selectedSongs.contains(song.id),
-                  onChanged: (value) {
-                    setState(() {
-                      if (value == true) {
-                        _selectedSongs.add(song.id);
-                      } else {
-                        _selectedSongs.remove(song.id);
-                      }
-                    });
+    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    child: ListTile(
+      leading: _isMultiSelectMode
+          ? Checkbox(
+              value: _selectedSongs.contains(song.id),
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _selectedSongs.add(song.id);
+                  } else {
+                    _selectedSongs.remove(song.id);
+                  }
+                });
+              },
+            )
+          : _buildThumbnail(song),
+      title: SlidingText(
+        song.title,
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: _isMultiSelectMode
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(song.formattedDuration),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'relocate') {
+                      _showRelocateDialog(song);
+                    } else if (value == 'delete') {
+                      _deleteSong(song);
+                    }
                   },
-                )
-              : _buildThumbnail(song),
-          title: SlidingText(
-            song.title,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          subtitle: Text(
-            song.artists.isNotEmpty
-                ? song.artists.join(' & ')
-                : 'Unknown Artist',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: _isMultiSelectMode
-              ? null
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(song.formattedDuration),
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'relocate') {
-                          _showRelocateDialog(song);
-                        } else if (value == 'delete') {
-                          _deleteSong(song);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'relocate',
-                          child: Row(
-                            children: [
-                              Icon(Icons.drive_file_move),
-                              SizedBox(width: 8),
-                              Text('Move to...'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Delete',
-                                  style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ],
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'relocate',
+                      child: Row(
+                        children: [
+                          Icon(Icons.drive_file_move),
+                          SizedBox(width: 8),
+                          Text('Move to...'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-          onTap: _isMultiSelectMode
-              ? () {
-                  setState(() {
-                    if (_selectedSongs.contains(song.id)) {
-                      _selectedSongs.remove(song.id);
-                    } else {
-                      _selectedSongs.add(song.id);
-                    }
-                  });
+              ],
+            ),
+      onTap: _isMultiSelectMode
+          ? () {
+              setState(() {
+                if (_selectedSongs.contains(song.id)) {
+                  _selectedSongs.remove(song.id);
+                } else {
+                  _selectedSongs.add(song.id);
                 }
-              : null,
-        ),
-      );
+              });
+            }
+          : null,
+    ),
+  );
 
   Widget _buildThumbnail(Song song) {
     if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
@@ -390,8 +381,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Future<void> _scanLocalFiles() async {
     try {
-      final musicProvider =
-          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProvider = Provider.of<music_provider.MusicProvider>(
+        context,
+        listen: false,
+      );
       final songs = musicProvider.youtubeSongs;
       final List<Song> localFiles = List.from(songs);
 
@@ -406,8 +399,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Future<void> _showRelocateDialog(Song song) async {
-    final settingsProvider =
-        Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currentLocation = settingsProvider.downloadLocation;
 
     final targetLocation = await showDialog<String>(
@@ -416,11 +411,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         title: const Text('Move to...'),
         children: ['internal', 'downloads', 'music']
             .where((loc) => loc != currentLocation)
-            .map((loc) => RadioListTile<String>(
-                  title: Text(loc[0].toUpperCase() + loc.substring(1)),
-                  value: loc,
-                  onChanged: (value) => Navigator.pop(context, value),
-                ))
+            .map(
+              (loc) => RadioListTile<String>(
+                title: Text(loc[0].toUpperCase() + loc.substring(1)),
+                value: loc,
+                onChanged: (value) => Navigator.pop(context, value),
+              ),
+            )
             .toList(),
       ),
     );
@@ -430,9 +427,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     try {
       final sourceFile = File(song.url);
       if (!await sourceFile.exists()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File not found')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('File not found')));
         return;
       }
 
@@ -447,8 +444,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       await sourceFile.copy(targetFile.path);
       await sourceFile.delete();
 
-      final musicProvider =
-          Provider.of<music_provider.MusicProvider>(context, listen: false);
+      final musicProvider = Provider.of<music_provider.MusicProvider>(
+        context,
+        listen: false,
+      );
       final updatedSong = song.copyWith(url: targetFile.path);
       musicProvider.addSongToPlaylist(updatedSong);
 
@@ -457,16 +456,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       final locationLabels = {
         'internal': 'Internal Storage',
         'downloads': 'Downloads folder',
-        'music': 'Music folder'
+        'music': 'Music folder',
       };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Moved to ${locationLabels[targetLocation]}')),
       );
     } catch (e) {
       debugPrint('Error relocating song: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to move: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to move: $e')));
     }
   }
 
@@ -503,9 +502,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         await musicProvider.deleteSong(song);
         _scanLocalFiles();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
       }
     }
   }
@@ -533,12 +532,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     if (confirmed == true) {
       setState(() => _isMultiSelectMode = false);
       for (final songId in _selectedSongs.toList()) {
-        final song = _localFiles
-            .cast<Song?>()
-            .firstWhere(
-                (s) => s?.id == songId,
-                orElse: () => null,
-            );
+        final song = _localFiles.cast<Song?>().firstWhere(
+          (s) => s?.id == songId,
+          orElse: () => null,
+        );
         if (song != null) {
           try {
             final file = File(song.url);
@@ -570,63 +567,69 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       setState(() {
         _downloadProgress[videoId] = 0.0;
       });
-      final settingsProvider =
-          Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider = Provider.of<SettingsProvider>(
+        context,
+        listen: false,
+      );
       _youTubeService
           .downloadAudio(
-        videoId: videoId,
-        preferredFormat: settingsProvider.audioFormat,
-        downloadLocation: settingsProvider.downloadLocation,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() {
-              _downloadProgress[videoId] = progress;
-            });
-          }
-        },
-      )
+            videoId: videoId,
+            preferredFormat: settingsProvider.audioFormat,
+            downloadLocation: settingsProvider.downloadLocation,
+            onProgress: (progress) {
+              if (mounted) {
+                setState(() {
+                  _downloadProgress[videoId] = progress;
+                });
+              }
+            },
+          )
           .then((result) async {
-        if (result != null && mounted) {
-          Provider.of<music_provider.MusicProvider>(context, listen: false)
-              .addDownloadedSongToLibrary(result.song);
-          _scanLocalFiles();
-          setState(() {
-            _downloadProgress.remove(videoId);
-          });
-        }
-      }).catchError((error) {
-        if (mounted) {
-          setState(() {
-            _downloadProgress.remove(videoId);
-          });
-          final errorStr = error.toString().toLowerCase();
-          final isHtmlError = errorStr.contains('youtube_html_error') ||
-              errorStr.contains('html') ||
-              errorStr.contains('ip') ||
-              errorStr.contains('consent') ||
-              errorStr.contains('blocked') ||
-              errorStr.contains('unavailable');
+            if (result != null && mounted) {
+              Provider.of<music_provider.MusicProvider>(
+                context,
+                listen: false,
+              ).addDownloadedSongToLibrary(result.song);
+              _scanLocalFiles();
+              setState(() {
+                _downloadProgress.remove(videoId);
+              });
+            }
+          })
+          .catchError((error) {
+            if (mounted) {
+              setState(() {
+                _downloadProgress.remove(videoId);
+              });
+              final errorStr = error.toString().toLowerCase();
+              final isHtmlError =
+                  errorStr.contains('youtube_html_error') ||
+                  errorStr.contains('html') ||
+                  errorStr.contains('ip') ||
+                  errorStr.contains('consent') ||
+                  errorStr.contains('blocked') ||
+                  errorStr.contains('unavailable');
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      isHtmlError
-                          ? 'Download unavailable. Please try again later.'
-                          : 'Download failed: $error',
-                    ),
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          isHtmlError
+                              ? 'Download unavailable. Please try again later.'
+                              : 'Download failed: $error',
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      });
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          });
     }
   }
 }

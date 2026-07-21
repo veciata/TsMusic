@@ -59,7 +59,9 @@ class ClipboardService with WidgetsBindingObserver {
       );
     }
 
-    final videoInPlaylistMatch = _youtubeVideoInPlaylistRegExp.firstMatch(trimmed);
+    final videoInPlaylistMatch = _youtubeVideoInPlaylistRegExp.firstMatch(
+      trimmed,
+    );
     if (videoInPlaylistMatch != null) {
       return YouTubeLinkResult(
         url: trimmed,
@@ -70,10 +72,7 @@ class ClipboardService with WidgetsBindingObserver {
 
     final videoMatch = _youtubeVideoRegExp.firstMatch(trimmed);
     if (videoMatch != null) {
-      return YouTubeLinkResult(
-        url: trimmed,
-        videoId: videoMatch.group(1),
-      );
+      return YouTubeLinkResult(url: trimmed, videoId: videoMatch.group(1));
     }
 
     return null;

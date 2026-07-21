@@ -94,8 +94,11 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Row(
                         children: [
-                          Icon(Icons.album, size: 16,
-                              color: theme.colorScheme.primary),
+                          Icon(
+                            Icons.album,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Local',
@@ -144,7 +147,9 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Icon(
-                              isCurrentSong ? Icons.play_circle : Icons.music_note,
+                              isCurrentSong
+                                  ? Icons.play_circle
+                                  : Icons.music_note,
                               size: 18,
                               color: isCurrentSong
                                   ? theme.colorScheme.primary
@@ -174,12 +179,19 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           trailing: isCurrentSong
-                              ? Icon(Icons.equalizer, size: 18,
-                                  color: theme.colorScheme.primary)
+                              ? Icon(
+                                  Icons.equalizer,
+                                  size: 18,
+                                  color: theme.colorScheme.primary,
+                                )
                               : ReorderableDragStartListener(
                                   index: index,
-                                  child: Icon(Icons.drag_handle, size: 18,
-                                      color: theme.colorScheme.onSurface.withAlpha(128)),
+                                  child: Icon(
+                                    Icons.drag_handle,
+                                    size: 18,
+                                    color: theme.colorScheme.onSurface
+                                        .withAlpha(128),
+                                  ),
                                 ),
                           onTap: () {
                             musicProvider.playAt(index);
@@ -196,8 +208,11 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Row(
                         children: [
-                          Icon(Icons.cloud, size: 16,
-                              color: theme.colorScheme.tertiary),
+                          Icon(
+                            Icons.cloud,
+                            size: 16,
+                            color: theme.colorScheme.tertiary,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Online',
@@ -212,21 +227,33 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                             child: Tooltip(
                               message: 'Add YouTube Playlist from Clipboard',
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: theme.colorScheme.tertiary.withAlpha(100)),
+                                  border: Border.all(
+                                    color: theme.colorScheme.tertiary.withAlpha(
+                                      100,
+                                    ),
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.paste, size: 12, color: theme.colorScheme.tertiary),
+                                    Icon(
+                                      Icons.paste,
+                                      size: 12,
+                                      color: theme.colorScheme.tertiary,
+                                    ),
                                     const SizedBox(width: 3),
                                     Text(
                                       'Paste Playlist',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: theme.colorScheme.tertiary,
-                                      ),
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.tertiary,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -311,8 +338,13 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                                 musicProvider: musicProvider,
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.music_note, size: 16,
-                                  color: theme.colorScheme.onSurface.withAlpha(77)),
+                              Icon(
+                                Icons.music_note,
+                                size: 16,
+                                color: theme.colorScheme.onSurface.withAlpha(
+                                  77,
+                                ),
+                              ),
                             ],
                           ),
                           onTap: () {
@@ -351,16 +383,18 @@ Future<void> _pastePlaylist(BuildContext context) async {
   final rawText = data?.text;
   if (rawText == null || rawText.trim().isEmpty) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clipboard is empty')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Clipboard is empty')));
     }
     return;
   }
 
   final text = rawText.trim();
   // Accept full URLs or bare playlist IDs
-  if (!text.contains('youtube') && !text.contains('youtu.be') && !RegExp(r'^[A-Za-z0-9_\-]{10,}$').hasMatch(text)) {
+  if (!text.contains('youtube') &&
+      !text.contains('youtu.be') &&
+      !RegExp(r'^[A-Za-z0-9_\-]{10,}$').hasMatch(text)) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Not a valid YouTube playlist URL or ID')),
@@ -379,9 +413,9 @@ Future<void> _pastePlaylist(BuildContext context) async {
     }
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load playlist: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load playlist: $e')));
     }
   }
 }
@@ -421,7 +455,9 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
     final activeDownloadsList = widget.youTubeService.activeDownloads
         .where((d) => d.videoId == widget.song.youtubeId)
         .toList();
-    final activeDownloads = activeDownloadsList.isNotEmpty ? activeDownloadsList.first : null;
+    final activeDownloads = activeDownloadsList.isNotEmpty
+        ? activeDownloadsList.first
+        : null;
 
     if (_isDownloaded) return const SizedBox.shrink();
 
@@ -436,20 +472,28 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
               width: 18,
               height: 18,
               child: CircularProgressIndicator(
-                value: activeDownloads.progress > 0 ? activeDownloads.progress : null,
+                value: activeDownloads.progress > 0
+                    ? activeDownloads.progress
+                    : null,
                 strokeWidth: 2,
               ),
             ),
-            Icon(Icons.download, size: 10,
-                color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.download,
+              size: 10,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ],
         ),
       );
     }
 
     return IconButton(
-      icon: Icon(Icons.download, size: 18,
-          color: Theme.of(context).colorScheme.primary),
+      icon: Icon(
+        Icons.download,
+        size: 18,
+        color: Theme.of(context).colorScheme.primary,
+      ),
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
       onPressed: () async {
@@ -462,9 +506,9 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Download failed: $e')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
           }
         }
       },

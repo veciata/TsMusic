@@ -2,11 +2,13 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 
 class DownloadNotificationService {
-  static final DownloadNotificationService _instance = DownloadNotificationService._internal();
+  static final DownloadNotificationService _instance =
+      DownloadNotificationService._internal();
   factory DownloadNotificationService() => _instance;
   DownloadNotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
 
   /// Set to true when downloads screen is visible
@@ -17,7 +19,9 @@ class DownloadNotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const darwinSettings = DarwinInitializationSettings();
     const initSettings = InitializationSettings(
       android: androidSettings,
@@ -65,9 +69,7 @@ class DownloadNotificationService {
     );
   }
 
-  Future<void> showDownloadComplete({
-    required String title,
-  }) async {
+  Future<void> showDownloadComplete({required String title}) async {
     if (isDownloadsScreenVisible || !_isInitialized) return;
 
     const androidDetails = AndroidNotificationDetails(

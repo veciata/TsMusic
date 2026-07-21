@@ -16,52 +16,63 @@ class QueueScreen extends StatelessWidget {
         title: const Text('Now Playing Queue'),
         actions: [
           Consumer2<MusicProvider, YouTubeService>(
-            builder: (context, musicProvider, youTubeService, _) => PopupMenuButton<String>(
-              tooltip: 'Clear queue',
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) async {
-                if (value == 'clear_local') {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Clear Local Queue?'),
-                      content: const Text('This will remove all local songs from the queue.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
+            builder: (context, musicProvider, youTubeService, _) =>
+                PopupMenuButton<String>(
+                  tooltip: 'Clear queue',
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) async {
+                    if (value == 'clear_local') {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Clear Local Queue?'),
+                          content: const Text(
+                            'This will remove all local songs from the queue.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Clear'),
+                            ),
+                          ],
                         ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Clear'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true) {
-                    await musicProvider.clearQueue();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Local queue cleared')),
                       );
+                      if (confirmed == true) {
+                        await musicProvider.clearQueue();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Local queue cleared'),
+                            ),
+                          );
+                        }
+                      }
+                    } else if (value == 'clear_online') {
+                      youTubeService.clearOnlinePlaylist();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Online queue cleared')),
+                        );
+                      }
                     }
-                  }
-                } else if (value == 'clear_online') {
-                  youTubeService.clearOnlinePlaylist();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Online queue cleared')),
-                    );
-                  }
-                }
-              },
-              itemBuilder: (context) => [
-                if (musicProvider.queue.isNotEmpty)
-                  const PopupMenuItem(value: 'clear_local', child: Text('Clear Local Queue')),
-                if (youTubeService.onlinePlaylist.isNotEmpty)
-                  const PopupMenuItem(value: 'clear_online', child: Text('Clear Online Queue')),
-              ],
-            ),
+                  },
+                  itemBuilder: (context) => [
+                    if (musicProvider.queue.isNotEmpty)
+                      const PopupMenuItem(
+                        value: 'clear_local',
+                        child: Text('Clear Local Queue'),
+                      ),
+                    if (youTubeService.onlinePlaylist.isNotEmpty)
+                      const PopupMenuItem(
+                        value: 'clear_online',
+                        child: Text('Clear Online Queue'),
+                      ),
+                  ],
+                ),
           ),
         ],
       ),
@@ -87,7 +98,11 @@ class QueueScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: Row(
                     children: [
-                      Icon(Icons.album, size: 18, color: theme.colorScheme.primary),
+                      Icon(
+                        Icons.album,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Local Playlist',
@@ -134,7 +149,11 @@ class QueueScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: Row(
                     children: [
-                      Icon(Icons.cloud, size: 18, color: theme.colorScheme.tertiary),
+                      Icon(
+                        Icons.cloud,
+                        size: 18,
+                        color: theme.colorScheme.tertiary,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Online Playlist',
@@ -166,7 +185,8 @@ class QueueScreen extends StatelessWidget {
                     isCurrent: isCurrent,
                     isOnline: true,
                     onTap: () => youTubeService.playOnlinePlaylistAt(index),
-                    onRemove: () => youTubeService.removeFromOnlinePlaylist(index),
+                    onRemove: () =>
+                        youTubeService.removeFromOnlinePlaylist(index),
                   );
                 }),
               ],
@@ -204,15 +224,15 @@ class QueueScreen extends StatelessWidget {
       ),
       onDismissed: (_) {
         onRemove();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Removed: ${song.title}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Removed: ${song.title}')));
       },
       child: ListTile(
         tileColor: isCurrent
             ? (isOnline
-                ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
-                : theme.colorScheme.primaryContainer.withOpacity(0.5))
+                  ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
+                  : theme.colorScheme.primaryContainer.withOpacity(0.5))
             : null,
         leading: Container(
           width: 40,
@@ -220,16 +240,18 @@ class QueueScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: isCurrent
                 ? (isOnline
-                    ? theme.colorScheme.tertiary.withOpacity(0.2)
-                    : theme.colorScheme.primary.withOpacity(0.2))
+                      ? theme.colorScheme.tertiary.withOpacity(0.2)
+                      : theme.colorScheme.primary.withOpacity(0.2))
                 : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
           child: isCurrent
-              ? Icon(Icons.equalizer,
+              ? Icon(
+                  Icons.equalizer,
                   color: isOnline
                       ? theme.colorScheme.tertiary
-                      : theme.colorScheme.primary)
+                      : theme.colorScheme.primary,
+                )
               : Icon(
                   isOnline ? Icons.cloud : Icons.music_note,
                   color: theme.colorScheme.onSurface.withOpacity(0.5),
@@ -253,12 +275,17 @@ class QueueScreen extends StatelessWidget {
             if (isOnline)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: Icon(Icons.cloud, size: 12,
-                    color: theme.colorScheme.tertiary.withOpacity(0.6)),
+                child: Icon(
+                  Icons.cloud,
+                  size: 12,
+                  color: theme.colorScheme.tertiary.withOpacity(0.6),
+                ),
               ),
             Expanded(
               child: Text(
-                song.artists.isNotEmpty ? song.artists.join(' & ') : 'Unknown Artist',
+                song.artists.isNotEmpty
+                    ? song.artists.join(' & ')
+                    : 'Unknown Artist',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

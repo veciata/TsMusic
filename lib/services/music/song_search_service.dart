@@ -6,19 +6,25 @@ class SongSearchService {
     if (query.isEmpty) {
       return List.from(songs);
     }
-    
+
     final queryLower = query.toLowerCase();
     return songs.where((song) {
-      final artistMatch = song.artists.any((artist) => artist.toLowerCase().contains(queryLower));
+      final artistMatch = song.artists.any(
+        (artist) => artist.toLowerCase().contains(queryLower),
+      );
       return song.title.toLowerCase().contains(queryLower) ||
           artistMatch ||
           (song.album?.toLowerCase().contains(queryLower) ?? false);
     }).toList();
   }
 
-  List<Song> sortSongs(List<Song> songs, {required SongSortOption sortBy, bool ascending = true}) {
+  List<Song> sortSongs(
+    List<Song> songs, {
+    required SongSortOption sortBy,
+    bool ascending = true,
+  }) {
     final sorted = List<Song>.from(songs);
-    
+
     sorted.sort((a, b) {
       int compare;
       switch (sortBy) {
@@ -42,7 +48,7 @@ class SongSearchService {
       }
       return ascending ? compare : -compare;
     });
-    
+
     return sorted;
   }
 
@@ -58,5 +64,7 @@ class SongSearchService {
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
   }
 
-  List<Song> getSongsByArtist(List<Song> songs, String artistName) => songs.where((song) => song.artists.any((artist) => artist == artistName)).toList();
+  List<Song> getSongsByArtist(List<Song> songs, String artistName) => songs
+      .where((song) => song.artists.any((artist) => artist == artistName))
+      .toList();
 }

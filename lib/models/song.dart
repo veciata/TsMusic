@@ -49,8 +49,8 @@ class Song {
     this.trackNumber,
     DateTime? dateAdded,
     this.localThumbnailPath,
-  })  : tags = tags ?? [],
-        dateAdded = dateAdded ?? DateTime.now();
+  }) : tags = tags ?? [],
+       dateAdded = dateAdded ?? DateTime.now();
 
   Song copyWith({
     int? id,
@@ -68,24 +68,23 @@ class Song {
     int? trackNumber,
     DateTime? dateAdded,
     String? localThumbnailPath,
-  }) =>
-      Song(
-        id: id ?? this.id,
-        youtubeId: youtubeId ?? this.youtubeId,
-        title: title ?? this.title,
-        artists: artists ?? this.artists,
-        album: album ?? this.album,
-        albumArtUrl: albumArtUrl ?? this.albumArtUrl,
-        url: url ?? this.url,
-        duration: duration ?? this.duration,
-        storageType: storageType ?? this.storageType,
-        isFavorite: isFavorite ?? this.isFavorite,
-        isDownloaded: isDownloaded ?? this.isDownloaded,
-        tags: tags ?? this.tags,
-        trackNumber: trackNumber ?? this.trackNumber,
-        dateAdded: dateAdded ?? this.dateAdded,
-        localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
-      );
+  }) => Song(
+    id: id ?? this.id,
+    youtubeId: youtubeId ?? this.youtubeId,
+    title: title ?? this.title,
+    artists: artists ?? this.artists,
+    album: album ?? this.album,
+    albumArtUrl: albumArtUrl ?? this.albumArtUrl,
+    url: url ?? this.url,
+    duration: duration ?? this.duration,
+    storageType: storageType ?? this.storageType,
+    isFavorite: isFavorite ?? this.isFavorite,
+    isDownloaded: isDownloaded ?? this.isDownloaded,
+    tags: tags ?? this.tags,
+    trackNumber: trackNumber ?? this.trackNumber,
+    dateAdded: dateAdded ?? this.dateAdded,
+    localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
+  );
 
   factory Song.fromJson(Map<String, dynamic> json) {
     // Handle both int and String IDs for robustness
@@ -130,33 +129,33 @@ class Song {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'youtubeId': youtubeId,
-        'title': title,
-        'artists': artists,
-        'album': album,
-        'albumArtUrl': albumArtUrl,
-        'url': url,
-        'duration': duration,
-        'storageType': storageType.name,
-        'isFavorite': isFavorite,
-        'isDownloaded': isDownloaded,
-        'tags': tags,
-        'trackNumber': trackNumber,
-        'dateAdded': dateAdded.toIso8601String(),
-        'localThumbnailPath': localThumbnailPath,
-      };
+    'id': id,
+    'youtubeId': youtubeId,
+    'title': title,
+    'artists': artists,
+    'album': album,
+    'albumArtUrl': albumArtUrl,
+    'url': url,
+    'duration': duration,
+    'storageType': storageType.name,
+    'isFavorite': isFavorite,
+    'isDownloaded': isDownloaded,
+    'tags': tags,
+    'trackNumber': trackNumber,
+    'dateAdded': dateAdded.toIso8601String(),
+    'localThumbnailPath': localThumbnailPath,
+  };
 
   Map<String, dynamic> toDbMap() => {
-        'id': id,
-        'youtube_id': youtubeId,
-        'title': title,
-        'file_path': url,
-        'duration': duration,
-        'track_number': trackNumber,
-        'thumbnail_path': localThumbnailPath,
-        'created_at': dateAdded.toIso8601String(),
-      };
+    'id': id,
+    'youtube_id': youtubeId,
+    'title': title,
+    'file_path': url,
+    'duration': duration,
+    'track_number': trackNumber,
+    'thumbnail_path': localThumbnailPath,
+    'created_at': dateAdded.toIso8601String(),
+  };
 
   Map<String, dynamic> toJson() => toMap();
 }

@@ -20,8 +20,15 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   VoidCallback? _onOnlinePlay;
   VoidCallback? _onOnlinePause;
   Function()? _onOnlineStop;
-  
-  AudioPlayerHandler(this._player, this.onCurrentSongChanged, this.onPlaybackStateChanged, {this.onSkipToNext, this.onSkipToPrevious, this.onOnlineMediaChanged}) : super() {
+
+  AudioPlayerHandler(
+    this._player,
+    this.onCurrentSongChanged,
+    this.onPlaybackStateChanged, {
+    this.onSkipToNext,
+    this.onSkipToPrevious,
+    this.onOnlineMediaChanged,
+  }) : super() {
     _init();
   }
 
@@ -160,21 +167,23 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
           ];
     final compactIndices = const [0, 1];
 
-    playbackState.add(PlaybackState(
-      controls: controls,
-      systemActions: const {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-      },
-      androidCompactActionIndices: compactIndices,
-      processingState: _mapProcessingState(),
-      playing: isPlaying,
-      updatePosition: _isOnlineMode ? Duration.zero : _player.state.position,
-      bufferedPosition: _isOnlineMode ? Duration.zero : _player.state.buffer,
-      speed: _player.state.rate,
-      queueIndex: 0,
-    ));
+    playbackState.add(
+      PlaybackState(
+        controls: controls,
+        systemActions: const {
+          MediaAction.seek,
+          MediaAction.seekForward,
+          MediaAction.seekBackward,
+        },
+        androidCompactActionIndices: compactIndices,
+        processingState: _mapProcessingState(),
+        playing: isPlaying,
+        updatePosition: _isOnlineMode ? Duration.zero : _player.state.position,
+        bufferedPosition: _isOnlineMode ? Duration.zero : _player.state.buffer,
+        speed: _player.state.rate,
+        queueIndex: 0,
+      ),
+    );
   }
 
   void _updatePosition(Duration position) {
@@ -200,7 +209,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     if (_player.state.buffering) {
       return AudioProcessingState.buffering;
     }
-  if (mediaItem.value != null) {
+    if (mediaItem.value != null) {
       return AudioProcessingState.ready;
     }
     return AudioProcessingState.idle;
@@ -210,13 +219,13 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   Future<void> setMedia(Media media, {Song? song}) async {
     _currentSong = song;
     await _player.open(media);
-    
+
     if (song != null) {
       try {
-        final duration = song.duration > 0 
-            ? Duration(milliseconds: song.duration) 
+        final duration = song.duration > 0
+            ? Duration(milliseconds: song.duration)
             : _player.state.duration;
-            
+
         mediaItem.add(_createMediaItem(song, duration));
         queue.add([_createMediaItem(song, duration)]);
         onCurrentSongChanged(song);
@@ -234,7 +243,9 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     return MediaItem(
       id: song.id.toString(),
       title: song.title.isNotEmpty ? song.title : 'Unknown Title',
-      artist: song.artists.isNotEmpty ? song.artists.join(', ') : 'Unknown Artist',
+      artist: song.artists.isNotEmpty
+          ? song.artists.join(', ')
+          : 'Unknown Artist',
       album: song.album,
       artUri: artUri,
       duration: duration,
@@ -249,7 +260,9 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     return MediaItem(
       id: 'yt:${song.youtubeId ?? song.id.toString()}',
       title: song.title.isNotEmpty ? song.title : 'Unknown Title',
-      artist: song.artists.isNotEmpty ? song.artists.join(', ') : 'Unknown Artist',
+      artist: song.artists.isNotEmpty
+          ? song.artists.join(', ')
+          : 'Unknown Artist',
       album: 'YouTube Music',
       artUri: artUri,
       duration: duration,
@@ -283,37 +296,43 @@ class AudioNotificationService {
       debugPrint('AudioNotificationService: Got session, configuring...');
       await session.configure(const AudioSessionConfiguration.music());
       debugPrint('AudioNotificationService: Audio session configured');
-      
+
       debugPrint('AudioNotificationService: Calling AudioService.init()...');
       // Initialize audio service with detailed error handling
       try {
-         _audioHandler = await AudioService.init(
-           builder: () => AudioPlayerHandler(
-             player,
-             onCurrentSongChanged,
-             onPlaybackStateChanged,
-             onSkipToNext: onSkipToNext,
-             onSkipToPrevious: onSkipToPrevious,
-             onOnlineMediaChanged: onOnlineMediaChanged,
-           ),
-            config: getNotificationSettings(
-              notificationColor: notificationColor,
-              fontSize: null, // Reserved for future implementation
-            ),
-         );
-        debugPrint('AudioNotificationService: AudioService.init() returned handler=$_audioHandler');
-        
+        _audioHandler = await AudioService.init(
+          builder: () => AudioPlayerHandler(
+            player,
+            onCurrentSongChanged,
+            onPlaybackStateChanged,
+            onSkipToNext: onSkipToNext,
+            onSkipToPrevious: onSkipToPrevious,
+            onOnlineMediaChanged: onOnlineMediaChanged,
+          ),
+          config: getNotificationSettings(
+            notificationColor: notificationColor,
+            fontSize: null, // Reserved for future implementation
+          ),
+        );
+        debugPrint(
+          'AudioNotificationService: AudioService.init() returned handler=$_audioHandler',
+        );
+
         if (_audioHandler == null) {
           debugPrint('AudioNotificationService: WARNING - handler is null!');
           throw Exception('AudioService.init() returned null');
         }
-        
+
         return _audioHandler;
       } catch (e) {
-        debugPrint('AudioNotificationService: Error during AudioService.init(): $e');
+        debugPrint(
+          'AudioNotificationService: Error during AudioService.init(): $e',
+        );
         // Check if it's a platform exception
         if (e is PlatformException) {
-          debugPrint('AudioNotificationService: PlatformException code: ${e.code}, message: ${e.message}');
+          debugPrint(
+            'AudioNotificationService: PlatformException code: ${e.code}, message: ${e.message}',
+          );
         }
         rethrow;
       }
@@ -322,7 +341,9 @@ class AudioNotificationService {
       debugPrint('AudioNotificationService: Stack trace: $stackTrace');
       // If it's a platform exception, print more details
       if (e is PlatformException) {
-        debugPrint('AudioNotificationService: PlatformException code: ${e.code}, message: ${e.message}, details: ${e.details}');
+        debugPrint(
+          'AudioNotificationService: PlatformException code: ${e.code}, message: ${e.message}, details: ${e.details}',
+        );
       }
       return null;
     }

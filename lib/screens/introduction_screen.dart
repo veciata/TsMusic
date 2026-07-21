@@ -247,38 +247,38 @@ class _IntroPageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: page.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(60),
-            ),
-            child: Icon(page.icon, size: 60, color: page.color),
+    padding: const EdgeInsets.all(32),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            color: page.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(60),
           ),
-          const SizedBox(height: 48),
-          Text(
-            page.title,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+          child: Icon(page.icon, size: 60, color: page.color),
+        ),
+        const SizedBox(height: 48),
+        Text(
+          page.title,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          page.description,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 16),
-          Text(
-            page.description,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
 }
 
 class _PermissionPageView extends StatelessWidget {
@@ -294,46 +294,46 @@ class _PermissionPageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: page.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(60),
-            ),
-            child: Icon(
-              isGranted ? Icons.check_circle : page.icon,
-              size: 60,
-              color: isGranted ? Colors.green : page.color,
-            ),
+    padding: const EdgeInsets.all(32),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            color: page.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(60),
           ),
-          const SizedBox(height: 48),
-          Text(
-            isGranted
-                ? AppLocalizations.of(context).permissionGranted
-                : page.title,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+          child: Icon(
+            isGranted ? Icons.check_circle : page.icon,
+            size: 60,
+            color: isGranted ? Colors.green : page.color,
           ),
-          const SizedBox(height: 16),
-          Text(
-            isGranted
-                ? AppLocalizations.of(context).permissionGrantedDesc
-                : page.description,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 48),
+        Text(
+          isGranted
+              ? AppLocalizations.of(context).permissionGranted
+              : page.title,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          isGranted
+              ? AppLocalizations.of(context).permissionGrantedDesc
+              : page.description,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-        ],
-      ),
-    );
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
 }
 
 class _DotIndicator extends StatelessWidget {
@@ -344,12 +344,12 @@ class _DotIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: isActive ? 24 : 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: isActive ? color : color.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(4),
-      ),
-    );
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    width: isActive ? 24 : 8,
+    height: 8,
+    decoration: BoxDecoration(
+      color: isActive ? color : color.withValues(alpha: 0.3),
+      borderRadius: BorderRadius.circular(4),
+    ),
+  );
 }

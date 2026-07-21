@@ -37,7 +37,10 @@ class YouTubePlaybackWidget extends StatelessWidget {
         .where((d) => d.videoId == audio.id)
         .firstOrNull;
 
-    final musicProvider = Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(
+      context,
+      listen: false,
+    );
     final downloadedSong = musicProvider.songs
         .where((s) => s.youtubeId == audio.id && s.tags.contains('tsmusic'))
         .firstOrNull;
@@ -56,15 +59,29 @@ class YouTubePlaybackWidget extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(audio.artists.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              audio.artists.join(', '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             if (isCurrent && isPlaying)
               Container(
                 margin: const EdgeInsets.only(top: 2),
                 child: Row(
                   children: [
-                    Icon(Icons.play_arrow, size: 14, color: Theme.of(context).colorScheme.primary),
+                    Icon(
+                      Icons.play_arrow,
+                      size: 14,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     const SizedBox(width: 4),
-                    Text('Playing...', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary)),
+                    Text(
+                      'Playing...',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -82,13 +99,19 @@ class YouTubePlaybackWidget extends StatelessWidget {
           children: [
             if (isLoading)
               IconButton(
-                icon: Icon(Icons.stop, color: Theme.of(context).colorScheme.primary),
+                icon: Icon(
+                  Icons.stop,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: youtubePlayer.stop,
                 tooltip: 'Stop/Kill',
               )
             else if (isCurrent && isPlaying)
               IconButton(
-                icon: Icon(Icons.stop, color: Theme.of(context).colorScheme.primary),
+                icon: Icon(
+                  Icons.stop,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: youtubePlayer.stop,
                 tooltip: 'Stop/Kill',
               )

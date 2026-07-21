@@ -5,7 +5,7 @@ class AudioService {
   final Player _player = Player();
   PlaylistMode _loopMode = PlaylistMode.none;
   bool _shuffleEnabled = false;
-  
+
   // Getters
   Stream<Duration> get positionStream => _player.stream.position;
   Stream<bool> get playingStream => _player.stream.playing;
@@ -43,7 +43,7 @@ class AudioService {
   Future<void> pause() async => await _player.pause();
   Future<void> stop() async => await _player.stop();
   Future<void> seek(Duration position) async => await _player.seek(position);
-  
+
   Future<void> setShuffleEnabled(bool enabled) async {
     _shuffleEnabled = enabled;
     // Shuffle mode handling will be done at playlist level

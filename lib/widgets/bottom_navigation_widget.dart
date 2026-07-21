@@ -33,10 +33,12 @@ class BottomNavigationWidget extends StatelessWidget {
 
     // Add SQL debug tab in debug mode
     if (kDebugMode) {
-      items.add(BottomNavigationBarItem(
-        icon: const Icon(Icons.storage),
-        label: localizations.sql,
-      ));
+      items.add(
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.storage),
+          label: localizations.sql,
+        ),
+      );
     }
 
     return BottomNavigationBar(

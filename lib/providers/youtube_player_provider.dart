@@ -10,7 +10,7 @@ class YouTubePlayerProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _loadingVideoId;
   Timer? _debounceTimer;
-  
+
   // Active screen tracking for lifecycle management
   final Set<String> _activeScreens = <String>{};
 
@@ -33,14 +33,18 @@ class YouTubePlayerProvider extends ChangeNotifier {
   /// Register a screen as active (for lifecycle management)
   void registerScreen(String screenName) {
     _activeScreens.add(screenName);
-    debugPrint('YouTube: Screen registered: $screenName, active screens: $_activeScreens');
+    debugPrint(
+      'YouTube: Screen registered: $screenName, active screens: $_activeScreens',
+    );
   }
 
   /// Unregister a screen (called when screen is disposed/navigated away)
   void unregisterScreen(String screenName) {
     _activeScreens.remove(screenName);
-    debugPrint('YouTube: Screen unregistered: $screenName, active screens: $_activeScreens');
-    
+    debugPrint(
+      'YouTube: Screen unregistered: $screenName, active screens: $_activeScreens',
+    );
+
     // Auto-stop YouTube audio when no active screens remain
     if (_activeScreens.isEmpty) {
       debugPrint('YouTube: No active screens, stopping playback');
@@ -54,18 +58,20 @@ class YouTubePlayerProvider extends ChangeNotifier {
       debugPrint('YouTube: Cannot play - no active screens');
       throw Exception('YouTube playback not available - no active screens');
     }
-    
+
     if (_loadingVideoId == audio.id) return;
-    
+
     _setLoading(audio.id);
-    
+
     try {
-      await _youTubeService.playAudio(audio).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw TimeoutException('Connection timeout');
-        },
-      );
+      await _youTubeService
+          .playAudio(audio)
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw TimeoutException('Connection timeout');
+            },
+          );
     } catch (e) {
       debugPrint('Error playing YouTube audio: $e');
       rethrow;

@@ -1,10 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-
 
 class LocalMusicScreen extends StatelessWidget {
   const LocalMusicScreen({super.key});
@@ -26,7 +23,9 @@ class LocalMusicScreen extends StatelessWidget {
       body: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProvider, _) {
           // Load music when the screen is first built
-          if (musicProvider.songs.isEmpty && !musicProvider.isLoading && musicProvider.error == null) {
+          if (musicProvider.songs.isEmpty &&
+              !musicProvider.isLoading &&
+              musicProvider.error == null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               musicProvider.loadLocalMusic();
             });
@@ -51,7 +50,11 @@ class LocalMusicScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red,
+                    ),
                     const SizedBox(height: 24),
                     Text(
                       musicProvider.error!,

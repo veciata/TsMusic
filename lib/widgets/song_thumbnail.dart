@@ -19,9 +19,9 @@ class SongThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = context
-        .watch<mp.MusicProvider>()
-        .isThumbnailLoading(song);
+    final isLoading = context.watch<mp.MusicProvider>().isThumbnailLoading(
+      song,
+    );
 
     if (song.localThumbnailPath != null) {
       return ClipRRect(
@@ -57,35 +57,35 @@ class SongThumbnail extends StatelessWidget {
   }
 
   Widget _buildFallback(BuildContext context) => Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
-      child: Icon(
-        Icons.music_note,
-        size: size * 0.6,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(borderRadius),
+    ),
+    child: Icon(
+      Icons.music_note,
+      size: size * 0.6,
+      color: Theme.of(context).colorScheme.primary,
+    ),
+  );
 
   Widget _buildLoading(BuildContext context) => Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
-      child: Center(
-        child: SizedBox(
-          width: size * 0.4,
-          height: size * 0.4,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(borderRadius),
+    ),
+    child: Center(
+      child: SizedBox(
+        width: size * 0.4,
+        height: size * 0.4,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
-    );
+    ),
+  );
 }

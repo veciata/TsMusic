@@ -4,7 +4,7 @@ import 'package:shimmer/shimmer.dart';
 class SkeletonListTile extends StatelessWidget {
   final bool hasLeading;
   final bool hasTrailing;
-  
+
   const SkeletonListTile({
     super.key,
     this.hasLeading = true,
@@ -15,7 +15,7 @@ class SkeletonListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final baseColor = Theme.of(context).colorScheme.surfaceContainerHighest;
     final highlightColor = Theme.of(context).colorScheme.surface;
-    
+
     return Shimmer.fromColors(
       baseColor: baseColor,
       highlightColor: highlightColor,
@@ -64,34 +64,28 @@ class SkeletonListTile extends StatelessWidget {
 
 class SkeletonHomeScreen extends StatelessWidget {
   final int itemCount;
-  
-  const SkeletonHomeScreen({
-    super.key,
-    this.itemCount = 10,
-  });
+
+  const SkeletonHomeScreen({super.key, this.itemCount = 10});
 
   @override
   Widget build(BuildContext context) => Scaffold(
-      body: ListView.builder(
-        itemCount: itemCount,
-        itemBuilder: (context, index) => const SkeletonListTile(),
-      ),
-    );
+    body: ListView.builder(
+      itemCount: itemCount,
+      itemBuilder: (context, index) => const SkeletonListTile(),
+    ),
+  );
 }
 
 class SkeletonDownloadsScreen extends StatelessWidget {
   final int itemCount;
-  
-  const SkeletonDownloadsScreen({
-    super.key,
-    this.itemCount = 5,
-  });
+
+  const SkeletonDownloadsScreen({super.key, this.itemCount = 5});
 
   @override
   Widget build(BuildContext context) {
     final baseColor = Theme.of(context).colorScheme.surfaceContainerHighest;
     final highlightColor = Theme.of(context).colorScheme.surface;
-    
+
     return Shimmer.fromColors(
       baseColor: baseColor,
       highlightColor: highlightColor,

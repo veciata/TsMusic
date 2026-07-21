@@ -42,7 +42,12 @@ class SettingsProvider with ChangeNotifier {
       debugPrint('Device locale: $deviceLocale');
 
       // Parse platform locale (e.g., "en_US", "tr_TR")
-      final languageCode = deviceLocale.split('_').first.split('-').first.toLowerCase();
+      final languageCode = deviceLocale
+          .split('_')
+          .first
+          .split('-')
+          .first
+          .toLowerCase();
 
       // Check if language is supported
       for (final locale in _supportedLocales) {

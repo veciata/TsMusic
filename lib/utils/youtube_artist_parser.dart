@@ -77,33 +77,57 @@ class YouTubeArtistParser {
   static String _cleanChannelName(String channel) {
     String cleaned = channel
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(VEVO|vevo|Vevo)\s*[-|]?',
-                caseSensitive: false),
-            ' ')
+          RegExp(r'\s*[-|]?\s*(VEVO|vevo|Vevo)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Official)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Official)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Music)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Music)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Topic)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Topic)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Lyrics?)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Lyrics?)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Audio)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Audio)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(HD)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(HD)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(4K?)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(4K?)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Explicit)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Explicit)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Remix)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Remix)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Cover)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Cover)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Live)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Live)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(
-            RegExp(r'\s*[-|]?\s*(Original)\s*[-|]?', caseSensitive: false), ' ')
+          RegExp(r'\s*[-|]?\s*(Original)\s*[-|]?', caseSensitive: false),
+          ' ',
+        )
         .replaceAll(RegExp(r'\s*\|\s*.*$'), '')
         .replaceAll(RegExp(r'\s*-\s*Topic$'), '')
         .trim();

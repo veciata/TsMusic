@@ -19,14 +19,14 @@ import 'package:tsmusic/services/download_notification_service.dart';
 /// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
 /// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
 Map<String, String> _youtubePlaybackHttpHeaders() => {
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Referer': 'https://www.youtube.com/',
-      'Origin': 'https://www.youtube.com',
-      'Cookie': 'CONSENT=YES+cb',
-      'Accept': '*/*',
-      'Accept-Language': 'en-US,en;q=0.5',
-    };
+  'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Referer': 'https://www.youtube.com/',
+  'Origin': 'https://www.youtube.com',
+  'Cookie': 'CONSENT=YES+cb',
+  'Accept': '*/*',
+  'Accept-Language': 'en-US,en;q=0.5',
+};
 
 class DownloadResult {
   final String filePath;
@@ -58,8 +58,8 @@ class YouTubeAudio {
     try {
       safeDuration =
           video.duration != null && video.duration!.inMilliseconds > 0
-              ? video.duration
-              : null;
+          ? video.duration
+          : null;
     } catch (e) {
       safeDuration = null;
     }
@@ -117,9 +117,10 @@ class YouTubeService with ChangeNotifier {
 
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
-  
+
   // Caches for performance optimization
-  late final LRUCache<String, List<YouTubeAudio>> _searchResultsCache; // Cache search results
+  late final LRUCache<String, List<YouTubeAudio>>
+  _searchResultsCache; // Cache search results
   late final LRUCache<String, String> _audioUrlCache; // Cache audio stream URLs
 
   Function()? _stopOtherPlayer;
@@ -160,12 +161,14 @@ class YouTubeService with ChangeNotifier {
 
   // Public constructor
   YouTubeService({YoutubeExplode? yt, http.Client? httpClient, Player? player})
-      : _yt = yt ?? YoutubeExplode(),
-        _httpClient = httpClient ?? http.Client(),
-        _player = player ?? Player() {
+    : _yt = yt ?? YoutubeExplode(),
+      _httpClient = httpClient ?? http.Client(),
+      _player = player ?? Player() {
     _instance = this;
     // Initialize caches with max capacity
-    _searchResultsCache = LRUCache<String, List<YouTubeAudio>>(maxCapacity: 100);
+    _searchResultsCache = LRUCache<String, List<YouTubeAudio>>(
+      maxCapacity: 100,
+    );
     _audioUrlCache = LRUCache<String, String>(maxCapacity: 200);
     _init();
   }
@@ -348,7 +351,8 @@ class YouTubeService with ChangeNotifier {
 
       if (audioUrl == null) {
         throw Exception(
-            'Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.');
+          'Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.',
+        );
       }
 
       debugPrint('Playing audio from URL: $audioUrl');
@@ -403,7 +407,8 @@ class YouTubeService with ChangeNotifier {
         );
       } catch (e) {
         debugPrint(
-            'Manifest androidVr ile alınamadı, varsayılan deneniyor: $e');
+          'Manifest androidVr ile alınamadı, varsayılan deneniyor: $e',
+        );
         manifest = await _yt.videos.streamsClient.getManifest(videoId);
       }
 
@@ -413,8 +418,9 @@ class YouTubeService with ChangeNotifier {
         return null;
       }
 
-      final m4aStreams =
-          audioStreams.where((s) => s.container.name == 'mp4').toList();
+      final m4aStreams = audioStreams
+          .where((s) => s.container.name == 'mp4')
+          .toList();
       final StreamInfo streamInfo = m4aStreams.isNotEmpty
           ? m4aStreams.reduce(
               (a, b) =>
@@ -427,10 +433,10 @@ class YouTubeService with ChangeNotifier {
 
       final streamUrl = streamInfo.url.toString();
       debugPrint('✅ Got YouTube stream URL (${streamInfo.container.name})');
-      
+
       // Cache the stream URL
       _audioUrlCache.put(videoId, streamUrl);
-      
+
       return streamUrl;
     } catch (e) {
       debugPrint('❌ Stream extraction failed: $e');
@@ -503,7 +509,8 @@ class YouTubeService with ChangeNotifier {
       _activeDownloads.remove(videoId);
       _notifyProgressUpdate();
       debugPrint(
-          '_completeDownload: Download for videoId: $videoId completed and removed from active list.');
+        '_completeDownload: Download for videoId: $videoId completed and removed from active list.',
+      );
 
       final downloadNotification = DownloadNotificationService();
       if (_activeDownloads.isEmpty) {
@@ -551,10 +558,10 @@ class YouTubeService with ChangeNotifier {
       _searchPages[query] = searchResults;
       final videos = searchResults.whereType<Video>().toList();
       final audioList = videos.map(YouTubeAudio.fromVideo).toList();
-      
+
       // Cache the results
       _searchResultsCache.put(query, audioList);
-      
+
       return audioList;
     } catch (e) {
       debugPrint('Error searching YouTube: $e');
@@ -586,7 +593,8 @@ class YouTubeService with ChangeNotifier {
       }
       // Audio-only streams required - no video fallback
       debugPrint(
-          'getAudioStreamUrl: No audio-only streams available for videoId: $videoId');
+        'getAudioStreamUrl: No audio-only streams available for videoId: $videoId',
+      );
       return null;
     } catch (e) {
       debugPrint('Error getting audio stream URL: $e');
@@ -636,9 +644,7 @@ class YouTubeService with ChangeNotifier {
         try {
           manifest = await _yt.videos.streamsClient.getManifest(videoId);
         } catch (e2) {
-          debugPrint(
-            'Failed to get manifest with default client: $e2',
-          );
+          debugPrint('Failed to get manifest with default client: $e2');
           throw Exception('youtube_html_error');
         }
       }
@@ -656,50 +662,61 @@ class YouTubeService with ChangeNotifier {
 
       if (preferredFormat == AudioFormat.m4a) {
         // User wants M4A - find best m4a stream
-        final m4aStreams =
-            audioStreams.where((s) => s.container.name == 'mp4').toList();
+        final m4aStreams = audioStreams
+            .where((s) => s.container.name == 'mp4')
+            .toList();
         if (m4aStreams.isNotEmpty) {
-          selectedStream = m4aStreams.reduce((a, b) =>
-              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          selectedStream = m4aStreams.reduce(
+            (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+          );
           debugPrint('downloadAudio: Selected m4a format as requested');
         }
       } else if (preferredFormat == AudioFormat.opus) {
         // User wants OPUS - find best webm/opus stream
-        final opusStreams =
-            audioStreams.where((s) => s.container.name == 'webm').toList();
+        final opusStreams = audioStreams
+            .where((s) => s.container.name == 'webm')
+            .toList();
         if (opusStreams.isNotEmpty) {
-          selectedStream = opusStreams.reduce((a, b) =>
-              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          selectedStream = opusStreams.reduce(
+            (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+          );
           debugPrint('downloadAudio: Selected opus format as requested');
         }
       } else if (preferredFormat == AudioFormat.mp3) {
         // MP3 typically comes as m4a container or webm
         final mp3Streams = audioStreams
             .where(
-                (s) => s.container.name == 'mp4' || s.container.name == 'webm')
+              (s) => s.container.name == 'mp4' || s.container.name == 'webm',
+            )
             .toList();
         if (mp3Streams.isNotEmpty) {
-          selectedStream = mp3Streams.reduce((a, b) =>
-              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          selectedStream = mp3Streams.reduce(
+            (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+          );
           debugPrint('downloadAudio: Selected stream for MP3 preference');
         }
       }
 
       // Auto mode or fallback: prefer m4a for Android compatibility, then highest bitrate
       if (selectedStream == null) {
-        final m4aStreams =
-            audioStreams.where((s) => s.container.name == 'mp4').toList();
+        final m4aStreams = audioStreams
+            .where((s) => s.container.name == 'mp4')
+            .toList();
         if (m4aStreams.isNotEmpty) {
-          selectedStream = m4aStreams.reduce((a, b) =>
-              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          selectedStream = m4aStreams.reduce(
+            (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+          );
           debugPrint(
-              'downloadAudio: Auto mode - selected m4a for Android compatibility');
+            'downloadAudio: Auto mode - selected m4a for Android compatibility',
+          );
         } else {
           // Fallback to highest bitrate available
-          selectedStream = audioStreams.reduce((a, b) =>
-              a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+          selectedStream = audioStreams.reduce(
+            (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
+          );
           debugPrint(
-              'downloadAudio: Auto mode - using highest bitrate ${selectedStream.container.name}');
+            'downloadAudio: Auto mode - using highest bitrate ${selectedStream.container.name}',
+          );
         }
       }
 
@@ -731,36 +748,37 @@ class YouTubeService with ChangeNotifier {
         final existingFile = File(existingPath);
         if (await existingFile.exists()) {
           debugPrint(
-              'downloadAudio: Video $videoId already downloaded at $existingPath');
+            'downloadAudio: Video $videoId already downloaded at $existingPath',
+          );
           _completeDownload(videoId);
           return DownloadResult(
+            filePath: existingPath,
+            song: await _addDownloadedSongToLibrary(
+              videoId: videoId,
               filePath: existingPath,
-              song: await _addDownloadedSongToLibrary(
-                videoId: videoId,
-                filePath: existingPath,
-                title: video.title,
-                artists: YouTubeArtistParser.parseArtistName(
-                    video.title, video.author),
-                duration: video.duration?.inMilliseconds ?? 0,
-                thumbnailUrl: video.thumbnails.mediumResUrl,
+              title: video.title,
+              artists: YouTubeArtistParser.parseArtistName(
+                video.title,
+                video.author,
               ),
-            );
+              duration: video.duration?.inMilliseconds ?? 0,
+              thumbnailUrl: video.thumbnails.mediumResUrl,
+            ),
+          );
         }
       }
 
       // Simple filename: Title.extension (video ID stored in metadata, not filename)
       final finalFile = File(
-        path.join(
-          musicDir.path,
-          '$safeTitle.$audioExtension',
-        ),
+        path.join(musicDir.path, '$safeTitle.$audioExtension'),
       );
 
       if (await finalFile.exists()) {
         final fileSize = await finalFile.length();
         if (fileSize > 0) {
           debugPrint(
-              'downloadAudio: File already exists and is valid: ${finalFile.path}. Skipping.');
+            'downloadAudio: File already exists and is valid: ${finalFile.path}. Skipping.',
+          );
           _completeDownload(videoId);
           return DownloadResult(
             filePath: finalFile.path,
@@ -769,14 +787,17 @@ class YouTubeService with ChangeNotifier {
               filePath: finalFile.path,
               title: video.title,
               artists: YouTubeArtistParser.parseArtistName(
-                  video.title, video.author),
+                video.title,
+                video.author,
+              ),
               duration: video.duration?.inMilliseconds ?? 0,
               thumbnailUrl: video.thumbnails.mediumResUrl,
             ),
           );
         } else {
           debugPrint(
-              'downloadAudio: Empty file found: ${finalFile.path}. Deleting and re-downloading.');
+            'downloadAudio: Empty file found: ${finalFile.path}. Deleting and re-downloading.',
+          );
           await finalFile.delete();
         }
       }
@@ -787,7 +808,8 @@ class YouTubeService with ChangeNotifier {
       // Use YouTube Explode copyTo method - more reliable than manual streaming
       final contentLength = streamInfo.size.totalBytes;
       debugPrint(
-          'downloadAudio: Expected content length: $contentLength bytes');
+        'downloadAudio: Expected content length: $contentLength bytes',
+      );
 
       var receivedBytes = 0;
       var lastProgressUpdate = DateTime.now();
@@ -816,7 +838,8 @@ class YouTubeService with ChangeNotifier {
               _updateDownloadProgress(videoId, progress);
               onProgress?.call(progress);
               debugPrint(
-                  'downloadAudio: Progress ${(progress * 100).toStringAsFixed(1)}%');
+                'downloadAudio: Progress ${(progress * 100).toStringAsFixed(1)}%',
+              );
             }
           }
         }
@@ -834,7 +857,8 @@ class YouTubeService with ChangeNotifier {
 
       final finalFileSize = await finalFile.length();
       debugPrint(
-          'downloadAudio: Download completed. Final file size: $finalFileSize bytes');
+        'downloadAudio: Download completed. Final file size: $finalFileSize bytes',
+      );
 
       if (downloadProgress?.cancelRequested == true) {
         if (await finalFile.exists()) {
@@ -865,7 +889,8 @@ class YouTubeService with ChangeNotifier {
         download.isDownloading = false;
         // Check if this is an HTML/IP error
         final errorStr = e.toString().toLowerCase();
-        final isHtmlError = errorStr.contains('youtube_html_error') ||
+        final isHtmlError =
+            errorStr.contains('youtube_html_error') ||
             errorStr.contains('html') ||
             errorStr.contains('ip') ||
             errorStr.contains('consent') ||
@@ -875,8 +900,9 @@ class YouTubeService with ChangeNotifier {
         if (isHtmlError) {
           download.error = 'youtube_html_error';
         } else {
-          download.error =
-              download.cancelRequested ? 'Canceled' : 'Download failed';
+          download.error = download.cancelRequested
+              ? 'Canceled'
+              : 'Download failed';
         }
         _notifyProgressUpdate();
       }
@@ -954,7 +980,10 @@ class YouTubeService with ChangeNotifier {
   }
 
   /// Downloads a thumbnail image and saves it locally
-  Future<String?> _downloadThumbnail(String videoId, String thumbnailUrl) async {
+  Future<String?> _downloadThumbnail(
+    String videoId,
+    String thumbnailUrl,
+  ) async {
     try {
       final musicDir = await _getMusicDirectory('internal');
       final thumbnailFile = File(

@@ -31,10 +31,8 @@ class PaginatedSongsService {
 
   late Stream<PaginationResult<Song>> paginatedStream;
 
-  PaginatedSongsService({
-    required List<Song> songs,
-    this.pageSize = 50,
-  }) : _allSongs = List.from(songs) {
+  PaginatedSongsService({required List<Song> songs, this.pageSize = 50})
+    : _allSongs = List.from(songs) {
     paginatedStream = _streamController.stream;
   }
 
@@ -75,10 +73,13 @@ class PaginatedSongsService {
     int pageNumber,
   ) async {
     final filteredSongs = _allSongs
-        .where((song) =>
-            song.title.toLowerCase().contains(query.toLowerCase()) ||
-            song.artist.toLowerCase().contains(query.toLowerCase()) ||
-            (song.album != null && song.album!.toLowerCase().contains(query.toLowerCase())))
+        .where(
+          (song) =>
+              song.title.toLowerCase().contains(query.toLowerCase()) ||
+              song.artist.toLowerCase().contains(query.toLowerCase()) ||
+              (song.album != null &&
+                  song.album!.toLowerCase().contains(query.toLowerCase())),
+        )
         .toList();
 
     return await compute(_loadPageInBackground, {
@@ -93,7 +94,8 @@ class PaginatedSongsService {
     int pageNumber,
     int Function(Song, Song) comparator,
   ) async {
-    final sortedSongs = List.from(_allSongs)..sort((a, b) => comparator(a as Song, b as Song));
+    final sortedSongs = List.from(_allSongs)
+      ..sort((a, b) => comparator(a as Song, b as Song));
     return await compute(_loadPageInBackground, {
       'songs': sortedSongs,
       'pageNumber': pageNumber,

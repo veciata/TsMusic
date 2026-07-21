@@ -65,8 +65,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     super.dispose();
   }
 
-  Widget _buildAlbumArt(ThemeData theme, String? albumArtUrl, String title,
-      {bool circular = false, bool spin = true, double size = 280}) {
+  Widget _buildAlbumArt(
+    ThemeData theme,
+    String? albumArtUrl,
+    String title, {
+    bool circular = false,
+    bool spin = true,
+    double size = 280,
+  }) {
     final Widget content = Container(
       width: size,
       height: size,
@@ -103,13 +109,19 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     if (!spin) return content;
 
     return AnimatedBuilder(
-      animation: _albumArtController ??
+      animation:
+          _albumArtController ??
           AnimationController(
-              vsync: this, duration: const Duration(seconds: 20)),
+            vsync: this,
+            duration: const Duration(seconds: 20),
+          ),
       builder: (context, child) {
-        final controller = _albumArtController ??
+        final controller =
+            _albumArtController ??
             AnimationController(
-                vsync: this, duration: const Duration(seconds: 20));
+              vsync: this,
+              duration: const Duration(seconds: 20),
+            );
         return Transform.rotate(
           angle: controller.value * 2 * 3.14159,
           child: content,
@@ -123,12 +135,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     required VoidCallback onPressed,
     double size = 24,
     Color? color,
-  }) =>
-      IconButton(
-        icon: Icon(icon, size: size),
-        color: color,
-        onPressed: onPressed,
-      );
+  }) => IconButton(
+    icon: Icon(icon, size: size),
+    color: color,
+    onPressed: onPressed,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -174,9 +185,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final albumArtUrl = currentSong.albumArtUrl;
 
     final header = _buildHeader(theme, l10n);
-    final albumArt = _buildAlbumArt(theme, albumArtUrl, currentSong.title,
-        circular: playerStyle == PlayerStyle.classic,
-        spin: playerStyle == PlayerStyle.classic);
+    final albumArt = _buildAlbumArt(
+      theme,
+      albumArtUrl,
+      currentSong.title,
+      circular: playerStyle == PlayerStyle.classic,
+      spin: playerStyle == PlayerStyle.classic,
+    );
     final progressBar = _buildProgressBar(theme, duration, musicProvider);
     final playbackControls = _buildPlaybackControls(theme, musicProvider);
     final bottomControls = _buildBottomControls(theme, musicProvider);
@@ -224,163 +239,175 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         playerWidget = buildGlassStyle(params);
     }
 
-return Scaffold(
-       appBar: AppBar(
-         leading: IconButton(
-           icon: const Icon(Icons.arrow_downward),
-           onPressed: () => Navigator.pop(context),
-         ),
-         title: Text(l10n.nowPlaying),
-         centerTitle: true,
-         actions: [
-           Consumer<ThemeProvider>(
-             builder: (context, themeProvider, _) {
-               return IconButton(
-                 icon: const Icon(Icons.palette),
-                 onPressed: () => _showStyleSelector(context, themeProvider, l10n),
-               );
-             },
-           ),
-         ],
-       ),
-       body: playerWidget,
-     );
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_downward),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(l10n.nowPlaying),
+        centerTitle: true,
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) {
+              return IconButton(
+                icon: const Icon(Icons.palette),
+                onPressed: () =>
+                    _showStyleSelector(context, themeProvider, l10n),
+              );
+            },
+          ),
+        ],
+      ),
+      body: playerWidget,
+    );
   }
 
   Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          const SizedBox(width: 48),
-          const Spacer(),
-          Text(
-            l10n.nowPlaying,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+    padding: const EdgeInsets.all(16.0),
+    child: Row(
+      children: [
+        const SizedBox(width: 48),
+        const Spacer(),
+        Text(
+          l10n.nowPlaying,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          const Spacer(),
-          const SizedBox(width: 48),
-        ],
-      ),
-    );
+        ),
+        const Spacer(),
+        const SizedBox(width: 48),
+      ],
+    ),
+  );
 
   Widget _buildProgressBar(
-      ThemeData theme, int duration, MusicProvider musicProvider) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          Slider(
-            value: _currentPosition,
-            max: duration.toDouble(),
-            onChanged: (value) {
-              setState(() {
-                _currentPosition = value;
-                _isDragging = true;
-              });
-            },
-            onChangeEnd: (value) {
-              musicProvider.seek(Duration(seconds: value.toInt()));
-              setState(() => _isDragging = false);
-            },
-            activeColor: theme.colorScheme.primary,
-            inactiveColor: theme.colorScheme.onSurface.withOpacity(0.3),
+    ThemeData theme,
+    int duration,
+    MusicProvider musicProvider,
+  ) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    child: Column(
+      children: [
+        Slider(
+          value: _currentPosition,
+          max: duration.toDouble(),
+          onChanged: (value) {
+            setState(() {
+              _currentPosition = value;
+              _isDragging = true;
+            });
+          },
+          onChangeEnd: (value) {
+            musicProvider.seek(Duration(seconds: value.toInt()));
+            setState(() => _isDragging = false);
+          },
+          activeColor: theme.colorScheme.primary,
+          inactiveColor: theme.colorScheme.onSurface.withOpacity(0.3),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(formatDurationFromSeconds(_currentPosition.toInt())),
+              Text(formatDurationFromSeconds(duration)),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(formatDurationFromSeconds(_currentPosition.toInt())),
-                Text(formatDurationFromSeconds(duration)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+        ),
+      ],
+    ),
+  );
 
-  Widget _buildPlaybackControls(ThemeData theme, MusicProvider musicProvider,
-      {bool compact = false}) => Padding(
-      padding: EdgeInsets.symmetric(vertical: 32, horizontal: compact ? 0 : 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildControlButton(
-            icon: Icons.shuffle,
-            onPressed: musicProvider.toggleShuffle,
-            color: musicProvider.shuffleEnabled
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface.withOpacity(0.7),
-          ),
-          _buildControlButton(
-            icon: Icons.skip_previous,
-            size: compact ? 28 : 32,
-            onPressed: musicProvider.previous,
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: Icon(
-                musicProvider.isPlaying ? Icons.pause : Icons.play_arrow,
-                size: compact ? 28 : 32,
+  Widget _buildPlaybackControls(
+    ThemeData theme,
+    MusicProvider musicProvider, {
+    bool compact = false,
+  }) => Padding(
+    padding: EdgeInsets.symmetric(vertical: 32, horizontal: compact ? 0 : 24),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildControlButton(
+          icon: Icons.shuffle,
+          onPressed: musicProvider.toggleShuffle,
+          color: musicProvider.shuffleEnabled
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface.withOpacity(0.7),
+        ),
+        _buildControlButton(
+          icon: Icons.skip_previous,
+          size: compact ? 28 : 32,
+          onPressed: musicProvider.previous,
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withOpacity(0.5),
+                blurRadius: 10,
+                spreadRadius: 2,
               ),
-              color: theme.colorScheme.onPrimary,
-              onPressed: () {
-                if (musicProvider.isPlaying) {
-                  musicProvider.pause();
-                } else {
-                  musicProvider.play();
-                }
-                _startOrStopAnimation();
-              },
+            ],
+          ),
+          child: IconButton(
+            icon: Icon(
+              musicProvider.isPlaying ? Icons.pause : Icons.play_arrow,
+              size: compact ? 28 : 32,
             ),
-          ),
-          _buildControlButton(
-            icon: Icons.skip_next,
-            size: compact ? 28 : 32,
-            onPressed: musicProvider.next,
-          ),
-          _buildControlButton(
-            icon: musicProvider.loopMode == PlaylistMode.single
-                ? Icons.repeat_one
-                : Icons.repeat,
-            onPressed: musicProvider.cycleRepeatMode,
-            color: musicProvider.loopMode != PlaylistMode.none
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface.withOpacity(0.7),
-          ),
-        ],
-      ),
-    );
-
-  Widget _buildBottomControls(ThemeData theme, MusicProvider musicProvider) => Padding(
-      padding: const EdgeInsets.only(bottom: 32, left: 24, right: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.queue_music),
+            color: theme.colorScheme.onPrimary,
             onPressed: () {
-              showNowPlayingQueue(context);
+              if (musicProvider.isPlaying) {
+                musicProvider.pause();
+              } else {
+                musicProvider.play();
+              }
+              _startOrStopAnimation();
             },
-            tooltip: AppLocalizations.of(context).queue,
           ),
-        ],
-      ),
-    );
+        ),
+        _buildControlButton(
+          icon: Icons.skip_next,
+          size: compact ? 28 : 32,
+          onPressed: musicProvider.next,
+        ),
+        _buildControlButton(
+          icon: musicProvider.loopMode == PlaylistMode.single
+              ? Icons.repeat_one
+              : Icons.repeat,
+          onPressed: musicProvider.cycleRepeatMode,
+          color: musicProvider.loopMode != PlaylistMode.none
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface.withOpacity(0.7),
+        ),
+      ],
+    ),
+  );
 
-  void _showStyleSelector(BuildContext context, ThemeProvider themeProvider, AppLocalizations l10n) {
+  Widget _buildBottomControls(ThemeData theme, MusicProvider musicProvider) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 32, left: 24, right: 24),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.queue_music),
+              onPressed: () {
+                showNowPlayingQueue(context);
+              },
+              tooltip: AppLocalizations.of(context).queue,
+            ),
+          ],
+        ),
+      );
+
+  void _showStyleSelector(
+    BuildContext context,
+    ThemeProvider themeProvider,
+    AppLocalizations l10n,
+  ) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Padding(
@@ -399,8 +426,9 @@ return Scaffold(
               return ListTile(
                 leading: Icon(
                   isSelected ? Icons.check_circle : Icons.circle_outlined,
-                  color:
-                      isSelected ? Theme.of(context).colorScheme.primary : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
                 title: Text(style.displayName),
                 onTap: () {

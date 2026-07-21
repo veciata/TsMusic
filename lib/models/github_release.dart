@@ -28,13 +28,13 @@ class GitHubRelease {
 
   /// Create from GitHub API JSON.
   factory GitHubRelease.fromJson(Map<String, dynamic> json) => GitHubRelease(
-      tagName: json['tag_name'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      body: json['body'] as String? ?? '',
-      htmlUrl: json['html_url'] as String? ?? '',
-      publishedAt:
-          DateTime.tryParse(json['published_at'] as String? ?? '') ??
-          DateTime.now(),
-      isPrerelease: json['prerelease'] as bool? ?? false,
-    );
+    tagName: json['tag_name'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    body: json['body'] as String? ?? '',
+    htmlUrl: json['html_url'] as String? ?? '',
+    publishedAt:
+        DateTime.tryParse(json['published_at'] as String? ?? '') ??
+        DateTime.now(),
+    isPrerelease: json['prerelease'] as bool? ?? false,
+  );
 }

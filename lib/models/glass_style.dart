@@ -16,21 +16,14 @@ Widget buildGlassStyle(StyleParams params) {
       children: [
         // Background art heavily blurred
         if (albumArtUrl != null)
-          Positioned.fill(
-            child: Image.network(
-              albumArtUrl,
-              fit: BoxFit.cover,
-            ),
-          )
+          Positioned.fill(child: Image.network(albumArtUrl, fit: BoxFit.cover))
         else
           Container(color: theme.colorScheme.primaryContainer),
 
         Positioned.fill(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-            child: Container(
-              color: Colors.black.withOpacity(0.3),
-            ),
+            child: Container(color: Colors.black.withOpacity(0.3)),
           ),
         ),
 
@@ -39,7 +32,7 @@ Widget buildGlassStyle(StyleParams params) {
             children: [
               header,
               const SizedBox(height: 20),
-              
+
               // Glass Art Container
               Expanded(
                 flex: 3,
@@ -69,7 +62,8 @@ Widget buildGlassStyle(StyleParams params) {
                                       fit: BoxFit.cover,
                                     )
                                   : Container(
-                                      color: theme.colorScheme.surface.withOpacity(0.5),
+                                      color: theme.colorScheme.surface
+                                          .withOpacity(0.5),
                                       child: Icon(
                                         Icons.music_note,
                                         size: 80,
@@ -128,24 +122,30 @@ Widget buildGlassStyle(StyleParams params) {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
-                          
+
                           Theme(
                             data: theme.copyWith(
                               sliderTheme: SliderThemeData(
                                 activeTrackColor: Colors.white,
-                                inactiveTrackColor: Colors.white.withOpacity(0.2),
+                                inactiveTrackColor: Colors.white.withOpacity(
+                                  0.2,
+                                ),
                                 thumbColor: Colors.white,
                               ),
                               textTheme: theme.textTheme.copyWith(
-                                bodySmall: theme.textTheme.bodySmall?.copyWith(color: Colors.white),
+                                bodySmall: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                             child: progressBar,
                           ),
-                          
+
                           Theme(
                             data: theme.copyWith(
-                              iconTheme: theme.iconTheme.copyWith(color: Colors.white),
+                              iconTheme: theme.iconTheme.copyWith(
+                                color: Colors.white,
+                              ),
                               colorScheme: theme.colorScheme.copyWith(
                                 primary: Colors.white,
                                 onSurface: Colors.white,

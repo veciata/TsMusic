@@ -2,8 +2,9 @@ import 'package:flutter/services.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 
 class HomeWidgetBridge {
-  static const MethodChannel _channel =
-      MethodChannel('com.veciata.tsmusic/widget');
+  static const MethodChannel _channel = MethodChannel(
+    'com.veciata.tsmusic/widget',
+  );
 
   static void init(music_provider.MusicProvider musicProv) {
     _channel.setMethodCallHandler((call) async {

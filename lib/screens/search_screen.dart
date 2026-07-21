@@ -55,7 +55,9 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     _checkConnectivity();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       _checkConnectivity();
     });
   }
@@ -118,8 +120,9 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _handleDownload(YouTubeAudio audio) async {
     if (!mounted) return;
 
-    final isDownloading =
-        _youTubeService.activeDownloads.any((d) => d.videoId == audio.id);
+    final isDownloading = _youTubeService.activeDownloads.any(
+      (d) => d.videoId == audio.id,
+    );
     if (isDownloading) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Download already in progress')),
@@ -128,15 +131,20 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider = Provider.of<SettingsProvider>(
+        context,
+        listen: false,
+      );
       final result = await _youTubeService.downloadAudio(
         videoId: audio.id,
         preferredFormat: settingsProvider.audioFormat,
         downloadLocation: settingsProvider.downloadLocation,
       );
       if (result != null && mounted) {
-        Provider.of<music_provider.MusicProvider>(context, listen: false)
-            .addDownloadedSongToLibrary(result.song);
+        Provider.of<music_provider.MusicProvider>(
+          context,
+          listen: false,
+        ).addDownloadedSongToLibrary(result.song);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download completed: ${audio.title}')),
@@ -145,7 +153,8 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       if (mounted) {
         final errorStr = e.toString().toLowerCase();
-        final isHtmlError = errorStr.contains('youtube_html_error') ||
+        final isHtmlError =
+            errorStr.contains('youtube_html_error') ||
             errorStr.contains('html') ||
             errorStr.contains('ip') ||
             errorStr.contains('consent') ||
@@ -174,8 +183,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (_searchController.text.isNotEmpty && !_isSearchingYouTube && _hasMoreYouTubeResults) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (_searchController.text.isNotEmpty &&
+          !_isSearchingYouTube &&
+          _hasMoreYouTubeResults) {
         _searchYouTube(_searchController.text, loadMore: true);
       }
     }
@@ -240,9 +252,12 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Widget _buildMixedResults(List<model.Song> localSongs,
-      music_provider.MusicProvider provider,
-      model.Song? currentSong, bool isPlaying) {
+  Widget _buildMixedResults(
+    List<model.Song> localSongs,
+    music_provider.MusicProvider provider,
+    model.Song? currentSong,
+    bool isPlaying,
+  ) {
     final query = _searchController.text.toLowerCase();
 
     if (query.isEmpty) {
@@ -250,8 +265,11 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 64,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+            Icon(
+              Icons.search,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+            ),
             const SizedBox(height: 16),
             Text(
               'Search for songs...',
@@ -264,10 +282,16 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    final filteredLocalSongs = localSongs.where((song) =>
-        song.title.toLowerCase().contains(query) ||
-        song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
-        (song.album?.toLowerCase().contains(query) ?? false)).toList();
+    final filteredLocalSongs = localSongs
+        .where(
+          (song) =>
+              song.title.toLowerCase().contains(query) ||
+              song.artists.any(
+                (artist) => artist.toLowerCase().contains(query),
+              ) ||
+              (song.album?.toLowerCase().contains(query) ?? false),
+        )
+        .toList();
 
     final localYoutubeIds = localSongs
         .where((s) => s.youtubeId != null)
@@ -300,8 +324,10 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-          ...filteredLocalSongs.map((song) => _buildLocalResultItem(
-              song, provider, currentSong, isPlaying)),
+          ...filteredLocalSongs.map(
+            (song) =>
+                _buildLocalResultItem(song, provider, currentSong, isPlaying),
+          ),
         ],
         if (!_isOffline && _hasFetchedYouTube && hasOnlineResults) ...[
           Padding(
@@ -323,19 +349,29 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Center(child: CircularProgressIndicator()),
             ),
         ],
-        if (!hasLocalResults && !hasOnlineResults && !_isSearchingYouTube && _hasFetchedYouTube)
+        if (!hasLocalResults &&
+            !hasOnlineResults &&
+            !_isSearchingYouTube &&
+            _hasFetchedYouTube)
           Center(
             child: Padding(
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  Icon(Icons.search_off, size: 64,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+                  Icon(
+                    Icons.search_off,
+                    size: 64,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.3),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No results found',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
                 ],
@@ -347,7 +383,10 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: EdgeInsets.all(16.0),
             child: Center(child: CircularProgressIndicator()),
           ),
-        if (!_hasFetchedYouTube && !_isSearchingYouTube && query.isNotEmpty && !_isOffline)
+        if (!_hasFetchedYouTube &&
+            !_isSearchingYouTube &&
+            query.isNotEmpty &&
+            !_isOffline)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Center(
@@ -362,9 +401,12 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildLocalResultItem(model.Song song,
-      music_provider.MusicProvider provider,
-      model.Song? currentSong, bool isPlaying) {
+  Widget _buildLocalResultItem(
+    model.Song song,
+    music_provider.MusicProvider provider,
+    model.Song? currentSong,
+    bool isPlaying,
+  ) {
     final isCurrent = provider.currentSong?.id == song.id;
     final isSongPlaying = provider.isPlaying && isCurrent;
     final l10n = AppLocalizations.of(context);
@@ -387,7 +429,9 @@ class _SearchScreenState extends State<SearchScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: Icon(isCurrent && isSongPlaying ? Icons.pause : Icons.play_arrow),
+            icon: Icon(
+              isCurrent && isSongPlaying ? Icons.pause : Icons.play_arrow,
+            ),
             onPressed: () {
               if (isCurrent) {
                 if (isSongPlaying) {
@@ -429,7 +473,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     const Icon(Icons.delete_outline, color: Colors.red),
                     const SizedBox(width: 8),
-                    Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+                    Text(
+                      l10n.delete,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ],
                 ),
               ),
@@ -511,9 +558,9 @@ class _SearchScreenState extends State<SearchScreen> {
           await file.delete();
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.move}: $selected')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${l10n.move}: $selected')));
         }
       } catch (e) {
         if (mounted) {
@@ -553,15 +600,15 @@ class _SearchScreenState extends State<SearchScreen> {
       try {
         await provider.deleteSong(song);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.songDeleted)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.songDeleted)));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.error}: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${l10n.error}: $e')));
         }
       }
     }
@@ -634,7 +681,11 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             Expanded(
               child: _buildMixedResults(
-                  localSongs, musicProvider, currentSong, isPlaying),
+                localSongs,
+                musicProvider,
+                currentSong,
+                isPlaying,
+              ),
             ),
             const MiniPlayerWidget(),
             if (_isOffline)
@@ -644,10 +695,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: Center(
                   child: Text(
                     'Offline Mode - Showing local results only',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),

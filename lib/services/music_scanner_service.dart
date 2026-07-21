@@ -43,8 +43,9 @@ class MusicScannerService {
       if (primaryStorage == null) return;
 
       final musicDir = Directory(path.join(primaryStorage.path, 'Music'));
-      final downloadsDir =
-          Directory(path.join(primaryStorage.path, 'Download'));
+      final downloadsDir = Directory(
+        path.join(primaryStorage.path, 'Download'),
+      );
 
       if (await musicDir.exists()) {
         await _scanDirectory(musicDir);
@@ -104,9 +105,11 @@ class MusicScannerService {
     }
   }
 
-// Extract metadata from audio file
+  // Extract metadata from audio file
   Future<Map<String, dynamic>> _extractMetadata(
-      File file, String normalizedPath) async {
+    File file,
+    String normalizedPath,
+  ) async {
     try {
       // Load the audio file to get metadata
       await _audioPlayer.open(Media(file.path));
@@ -139,7 +142,10 @@ class MusicScannerService {
 
   // Insert song and related data into database
   Future<void> _insertSongToDatabase(
-      File file, Map<String, dynamic> songData, String normalizedPath) async {
+    File file,
+    Map<String, dynamic> songData,
+    String normalizedPath,
+  ) async {
     final db = await _dbHelper.database;
     final List<String> artists =
         songData['artists'] as List<String>? ?? ['Unknown Artist'];
@@ -165,18 +171,14 @@ class MusicScannerService {
       );
 
       // Insert song
-      final songId = await txn.insert(
-        DatabaseHelper.tableSongs,
-        {
-          'title': songData['title'],
-          'album_id': albumId,
-          'genre_id': genreId,
-          'file_path': songData['file_path'],
-          'duration': songData['duration'],
-          'track_number': songData['track_number'],
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      final songId = await txn.insert(DatabaseHelper.tableSongs, {
+        'title': songData['title'],
+        'album_id': albumId,
+        'genre_id': genreId,
+        'file_path': songData['file_path'],
+        'duration': songData['duration'],
+        'track_number': songData['track_number'],
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       // Add all artists to song
       for (final artistId in artistIds) {
@@ -217,11 +219,9 @@ class MusicScannerService {
       return artists.first['id'] as int;
     }
 
-    return await txn.insert(
-      DatabaseHelper.tableArtists,
-      {'name': trimmedName},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await txn.insert(DatabaseHelper.tableArtists, {
+      'name': trimmedName,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   // Helper method to get or create a genre
@@ -236,11 +236,9 @@ class MusicScannerService {
       return genres.first['id'] as int;
     }
 
-    return await txn.insert(
-      DatabaseHelper.tableGenres,
-      {'name': genreName},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await txn.insert(DatabaseHelper.tableGenres, {
+      'name': genreName,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   // Helper method to get or create an album
@@ -260,15 +258,11 @@ class MusicScannerService {
       return albums.first['id'] as int;
     }
 
-    return await txn.insert(
-      DatabaseHelper.tableAlbums,
-      {
-        'name': albumName,
-        'artist_id': artistId,
-        'year': ?year,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await txn.insert(DatabaseHelper.tableAlbums, {
+      'name': albumName,
+      'artist_id': artistId,
+      'year': ?year,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   // Helper method to get or create a tag
@@ -283,10 +277,8 @@ class MusicScannerService {
       return tags.first['id'] as int;
     }
 
-    return await txn.insert(
-      DatabaseHelper.tableTags,
-      {'name': tagName},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await txn.insert(DatabaseHelper.tableTags, {
+      'name': tagName,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 }

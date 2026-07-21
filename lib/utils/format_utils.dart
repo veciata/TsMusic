@@ -1,4 +1,3 @@
-
 String formatDurationFromMs(int durationMs) {
   final duration = Duration(milliseconds: durationMs);
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');

@@ -343,41 +343,41 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   PreferredSizeWidget _buildMultiSelectAppBar(AppLocalizations l10n) => AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.close),
-        onPressed: () {
-          setState(() {
-            _isMultiSelectMode = false;
-            _selectedSongs.clear();
-          });
-        },
+    leading: IconButton(
+      icon: const Icon(Icons.close),
+      onPressed: () {
+        setState(() {
+          _isMultiSelectMode = false;
+          _selectedSongs.clear();
+        });
+      },
+    ),
+    title: Text('${_selectedSongs.length} ${l10n.selected}'),
+    actions: [
+      IconButton(
+        icon: const Icon(Icons.drive_file_move_outline),
+        onPressed: _selectedSongs.isEmpty
+            ? null
+            : () => _moveSelectedSongs(context),
+        tooltip: l10n.move,
       ),
-      title: Text('${_selectedSongs.length} ${l10n.selected}'),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.drive_file_move_outline),
-          onPressed: _selectedSongs.isEmpty
-              ? null
-              : () => _moveSelectedSongs(context),
-          tooltip: l10n.move,
-        ),
-        IconButton(
-          icon: const Icon(Icons.playlist_add),
-          onPressed: _selectedSongs.isEmpty
-              ? null
-              : () => showPlaylistSelector(context),
-          tooltip: l10n.addToPlaylist,
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete),
-          onPressed: _selectedSongs.isEmpty
-              ? null
-              : () => _deleteSelectedSongs(context),
-          tooltip: l10n.delete,
-          color: Colors.red,
-        ),
-      ],
-    );
+      IconButton(
+        icon: const Icon(Icons.playlist_add),
+        onPressed: _selectedSongs.isEmpty
+            ? null
+            : () => showPlaylistSelector(context),
+        tooltip: l10n.addToPlaylist,
+      ),
+      IconButton(
+        icon: const Icon(Icons.delete),
+        onPressed: _selectedSongs.isEmpty
+            ? null
+            : () => _deleteSelectedSongs(context),
+        tooltip: l10n.delete,
+        color: Colors.red,
+      ),
+    ],
+  );
 
   Future<void> _deleteSelectedSongs(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
@@ -491,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen>
           SnackBar(
             content: Text('${_selectedSongs.length} ${l10n.songsMoved}'),
           ),
-          );
+        );
       }
     }
   }
@@ -547,12 +547,12 @@ class _HomeScreenState extends State<HomeScreen>
                   milliseconds: 300 + (index * 50).clamp(0, 500),
                 ),
                 builder: (context, value, child) => Opacity(
-                    opacity: value,
-                    child: Transform.translate(
-                      offset: Offset(0, 20 * (1 - value)),
-                      child: child,
-                    ),
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 20 * (1 - value)),
+                    child: child,
                   ),
+                ),
                 child: _buildSongTile(song, musicProvider),
               );
             },
@@ -948,10 +948,7 @@ class _HomeScreenState extends State<HomeScreen>
         await _showDeleteConfirmation(song, provider);
         break;
       case 'add_to_playlist':
-        showAddToPlaylistSheet(
-          context,
-          item: PlaylistItem(songId: song.id),
-        );
+        showAddToPlaylistSheet(context, item: PlaylistItem(songId: song.id));
         break;
     }
   }

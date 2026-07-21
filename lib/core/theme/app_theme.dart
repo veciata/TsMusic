@@ -25,11 +25,17 @@ ThemeData buildLightTheme(Color primaryColor) {
     cardColor: colorScheme.surface,
     dividerColor: Colors.grey[300],
     textTheme: TextTheme(
-      titleLarge:
-          TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.8)),
+      titleLarge: TextStyle(
+        color: colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+      titleMedium: TextStyle(
+        color: colorScheme.onSurface.withValues(alpha: 0.8),
+      ),
       bodyLarge: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.8)),
-      bodyMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.8)),
+      bodyMedium: TextStyle(
+        color: colorScheme.onSurface.withValues(alpha: 0.8),
+      ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -82,11 +88,17 @@ ThemeData buildDarkTheme(Color primaryColor) {
     cardColor: colorScheme.surface,
     dividerColor: Colors.grey[700],
     textTheme: TextTheme(
-      titleLarge:
-          TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.9)),
+      titleLarge: TextStyle(
+        color: colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+      titleMedium: TextStyle(
+        color: colorScheme.onSurface.withValues(alpha: 0.9),
+      ),
       bodyLarge: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.9)),
-      bodyMedium: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.9)),
+      bodyMedium: TextStyle(
+        color: colorScheme.onSurface.withValues(alpha: 0.9),
+      ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -119,9 +131,7 @@ ThemeData buildDarkTheme(Color primaryColor) {
     ),
     cardTheme: ThemeData.dark().cardTheme.copyWith(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: colorScheme.surface,
       surfaceTintColor: colorScheme.surfaceTint,
       shadowColor: Colors.black.withValues(alpha: 0.1),

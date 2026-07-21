@@ -37,10 +37,7 @@ Widget buildModernStyle(StyleParams params) {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: albumArt,
-                    ),
+                    Expanded(flex: 3, child: albumArt),
                     Expanded(
                       flex: 2,
                       child: Padding(

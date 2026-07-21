@@ -1,8 +1,4 @@
-enum ThemeTemperature {
-  cold,
-  neutral,
-  warm,
-}
+enum ThemeTemperature { cold, neutral, warm }
 
 extension ThemeTemperatureExtension on ThemeTemperature {
   String get displayName {

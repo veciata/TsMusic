@@ -195,11 +195,12 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) => AppLocalizations.supportedLocales.any(
-      (supportedLocale) => supportedLocale.languageCode == locale.languageCode,
-    );
+    (supportedLocale) => supportedLocale.languageCode == locale.languageCode,
+  );
 
   @override
-  Future<AppLocalizations> load(Locale locale) async => AppLocalizations._getLocalizedValues(locale);
+  Future<AppLocalizations> load(Locale locale) async =>
+      AppLocalizations._getLocalizedValues(locale);
 
   @override
   bool shouldReload(LocalizationsDelegate<AppLocalizations> old) => false;

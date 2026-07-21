@@ -81,13 +81,13 @@ class _SlidingTextState extends State<SlidingText>
 
   @override
   Widget build(BuildContext context) => ClipRect(
-      child: SingleChildScrollView(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        child: Text(widget.text, style: widget.style, maxLines: 1),
-      ),
-    );
+    child: SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      child: Text(widget.text, style: widget.style, maxLines: 1),
+    ),
+  );
 
   @override
   void dispose() {
