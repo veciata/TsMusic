@@ -13,6 +13,8 @@ import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
+import 'package:tsmusic/models/playlist_item.dart';
+import 'package:tsmusic/models/storage_type.dart';
 import 'package:tsmusic/services/audio_notification_service.dart';
 import 'package:tsmusic/services/home_widget_service.dart';
 import 'package:tsmusic/database/database_helper.dart';
@@ -68,6 +70,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         duration: audio.duration?.inMilliseconds ?? 0,
         albumArtUrl: audio.thumbnailUrl,
         url: audio.audioUrl ?? '',
+        storageType: StorageType.remote,
       );
       if (!audioHandler.isOnlineMode) {
         audioHandler.setOnlineMode(
@@ -229,6 +232,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       albumArtUrl: a.thumbnailUrl,
       url: a.audioUrl ?? '',
       tags: ['youtube'],
+      storageType: StorageType.remote,
     )).toList();
   }
 
@@ -300,6 +304,8 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _savePlaybackState();
+    } else if (state == AppLifecycleState.resumed) {
+      _onWidgetUpdateNeeded?.call();
     }
   }
 
@@ -383,18 +389,16 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           savedIndex >= 0 && savedIndex < _playlist.length) {
         _currentIndex = savedIndex;
 
-        // Resume playing if there was a last played song
+        // Load audio source and seek to saved position, but do NOT auto-play
         if (_lastPlayedSong != null) {
           await _setAudioSource(_playlist[_currentIndex]);
           await _player.seek(Duration(milliseconds: savedPosition));
-          await _player.play();
-          await _updateNotification();
 
           final song = _playlist[_currentIndex];
           requestThumbnail(song, priority: 0);
           notifyListeners();
 
-          debugPrint('Resumed playback at index $_currentIndex, position ${Duration(milliseconds: savedPosition)}');
+          debugPrint('Restored playback position at index $_currentIndex, position ${Duration(milliseconds: savedPosition)} (paused)');
         }
       }
     } catch (e) {
@@ -1683,6 +1687,7 @@ Future<void> _setAudioSource(Song song) async {
         duration: song.duration,
         albumArtUrl: song.albumArtUrl,
         url: 'yt:$ytId',
+        storageType: StorageType.remote,
       );
       audioHandler.setOnlineMedia(ytSong, isPlaying: true);
       await audioHandler.play();
@@ -2793,6 +2798,35 @@ Future<void> _setAudioSource(Song song) async {
       return songId;
     } catch (e) {
       debugPrint('Error adding online song to playlist: $e');
+      rethrow;
+    }
+  }
+
+  static bool isYouTubeOnlyUrl(String url) {
+    return url.startsWith('yt:');
+  }
+
+  Future<int> addMixedSongToPlaylist(
+      PlaylistItem item, int playlistId) async {
+    try {
+      if (item.songId != null) {
+        await _databaseHelper.addSongsToPlaylist(
+            playlistId, [item.songId!]);
+        notifyListeners();
+        return item.songId!;
+      } else if (item.youtubeId != null) {
+        return await addOnlineSongToPlaylist(
+          youtubeId: item.youtubeId!,
+          title: item.title ?? 'Unknown',
+          artists: item.artists ?? ['Unknown Artist'],
+          duration: item.duration ?? 0,
+          thumbnailUrl: item.thumbnailUrl,
+          playlistId: playlistId,
+        );
+      }
+      return -1;
+    } catch (e) {
+      debugPrint('Error adding mixed song to playlist: $e');
       rethrow;
     }
   }

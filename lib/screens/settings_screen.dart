@@ -616,6 +616,16 @@ class SettingsScreen extends StatelessWidget {
             title: l10n.downloads,
             icon: Icons.download,
             children: [
+              SwitchListTile(
+                title: const Text('Auto-download YouTube songs on play'),
+                subtitle: const Text(
+                    'Download YouTube songs when they start playing'),
+                value: settingsProvider.autoDownloadOnPlay,
+                onChanged: (value) =>
+                    settingsProvider.setAutoDownloadOnPlay(value),
+                secondary: const Icon(Icons.cloud_download),
+              ),
+              const Divider(height: 1),
               ListTile(
                 title: Text(l10n.audioDownloadFormat),
                 leading: const Icon(Icons.audiotrack),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -24,6 +25,9 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
 import 'package:tsmusic/widgets/bottom_navigation_widget.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
+import 'package:tsmusic/core/services/error_tracking_service.dart';
+import 'package:tsmusic/core/services/clipboard_service.dart';
+import 'package:tsmusic/widgets/youtube_link_bottom_sheet.dart';
 
 import 'package:tsmusic/services/download_notification_service.dart';
 import 'package:tsmusic/services/home_widget_service.dart';
@@ -34,6 +38,19 @@ final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize error tracking before anything else
+  await ErrorTrackingService().init();
+
+  // Set up global platform error handler for async framework errors
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    ErrorTrackingService().recordError(
+      error,
+      stack,
+      context: 'PlatformDispatcher.onError',
+    );
+    return true;
+  };
 
   // Initialize MediaKit for audio playback
   MediaKit.ensureInitialized();
@@ -50,12 +67,75 @@ Future<void> main() async {
   final introCompleted = prefs.getBool('intro_completed') ?? false;
   final lastSeenVersion = prefs.getString('last_seen_version') ?? '';
 
-  runApp(
-    MusicPlayerApp(
-      youTubeService: youTubeService,
-      introCompleted: introCompleted,
-      lastSeenVersion: lastSeenVersion,
-    ),
+  // Set custom ErrorWidget for fatal rendering exceptions
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    ErrorTrackingService().recordFlutterError(details);
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 64,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Something went wrong',
+                  style: ThemeData.dark().textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'A rendering error occurred. The app may need to restart.',
+                  style: ThemeData.dark().textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[400],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Attempt recovery by re-triggering a build
+                    ErrorWidget.builder = ErrorWidget.builder;
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
+  runZonedGuarded(
+    () {
+      runApp(
+        MusicPlayerApp(
+          youTubeService: youTubeService,
+          introCompleted: introCompleted,
+          lastSeenVersion: lastSeenVersion,
+        ),
+      );
+    },
+    (Object error, StackTrace stack) {
+      ErrorTrackingService().recordError(
+        error,
+        stack,
+        context: 'runZonedGuarded',
+      );
+    },
   );
 }
 
@@ -75,13 +155,63 @@ class MusicPlayerApp extends StatefulWidget {
   State<MusicPlayerApp> createState() => _MusicPlayerAppState();
 }
 
-class _MusicPlayerAppState extends State<MusicPlayerApp> {
+class _MusicPlayerAppState extends State<MusicPlayerApp> with WidgetsBindingObserver {
   late bool _introCompleted;
+  final ClipboardService _clipboardService = ClipboardService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _introCompleted = widget.introCompleted;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _checkClipboard();
+    }
+  }
+
+  Future<void> _checkClipboard() async {
+    final link = await _clipboardService.checkClipboard();
+    if (link == null || !mounted) return;
+
+    showYouTubeLinkBottomSheet(
+      context,
+      link: link,
+      onSelected: (action) {
+        switch (action) {
+          case YouTubeLinkAction.download:
+            _handleYouTubeDownload(link);
+          case YouTubeLinkAction.search:
+            _handleYouTubeSearch(link);
+        }
+      },
+    );
+  }
+
+  void _handleYouTubeDownload(YouTubeLinkResult link) {
+    final ytService = Provider.of<YouTubeService>(context, listen: false);
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    if (link.isPlaylist) {
+      mainNavKey.currentState?.goToDownloads();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Playlist download not yet supported. Open the video to download.')),
+      );
+    } else if (link.videoId != null) {
+      ytService.downloadAudio(
+        videoId: link.videoId!,
+        preferredFormat: settings.audioFormat,
+        downloadLocation: settings.downloadLocation,
+      );
+    }
+  }
+
+  void _handleYouTubeSearch(YouTubeLinkResult link) {
+    final query = link.videoId ?? link.playlistId ?? link.url;
+    mainNavKey.currentState?._openSearch(query);
   }
 
   void _onIntroComplete() {
@@ -195,10 +325,16 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         context,
         listen: false,
       );
+      final themeProvider = Provider.of<ThemeProvider>(
+        context,
+        listen: false,
+      );
       // Connect YouTube service to MusicProvider for notification integration
       musicProv.setYouTubeService(youTubeService);
       // Set up widget auto-update — fires on every notifyListeners
       musicProv.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
+      // Set up theme widget auto-update — fires when theme/color changes
+      themeProvider.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
       // Load from database first, then scan for new music in background
       _initializeMusic(musicProv);
       // Check for GitHub releases and show update modal if new ones found.

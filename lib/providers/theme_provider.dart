@@ -13,6 +13,12 @@ class ThemeProvider with ChangeNotifier {
   Color _primaryColor = const Color(0xFF1DB954);
   PlayerStyle _playerStyle = PlayerStyle.modern;
 
+  VoidCallback? _onWidgetUpdateNeeded;
+
+  void setOnWidgetUpdateNeeded(VoidCallback callback) {
+    _onWidgetUpdateNeeded = callback;
+  }
+
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _isDarkMode;
   Color get primaryColor => _primaryColor;
@@ -48,6 +54,7 @@ class ThemeProvider with ChangeNotifier {
     await prefs.setInt(_themeModeKey, mode.index);
 
     notifyListeners();
+    _onWidgetUpdateNeeded?.call();
   }
 
   Future<void> setPrimaryColor(Color color) async {
@@ -57,6 +64,7 @@ class ThemeProvider with ChangeNotifier {
     await prefs.setInt(_primaryColorKey, color.value);
 
     notifyListeners();
+    _onWidgetUpdateNeeded?.call();
   }
 
   Future<void> setPlayerStyle(PlayerStyle style) async {

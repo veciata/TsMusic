@@ -11,16 +11,19 @@ class SettingsProvider with ChangeNotifier {
   static const String _downloadLocationKey = 'downloadLocation';
   static const String _firstLaunchKey = 'first_launch';
   static const String _defaultPlaybackModeKey = 'defaultPlaybackMode';
+  static const String _autoDownloadOnPlayKey = 'auto_download_on_play';
 
   AudioFormat _audioFormat = AudioFormat.auto;
   Locale _locale = const Locale('en', 'US');
   String _downloadLocation = 'internal';
   PlaybackMode _defaultPlaybackMode = PlaybackMode.local;
+  bool _autoDownloadOnPlay = false;
 
   AudioFormat get audioFormat => _audioFormat;
   Locale get locale => _locale;
   String get downloadLocation => _downloadLocation;
   PlaybackMode get defaultPlaybackMode => _defaultPlaybackMode;
+  bool get autoDownloadOnPlay => _autoDownloadOnPlay;
 
   SettingsProvider() {
     _loadSettings();
@@ -95,7 +98,19 @@ class SettingsProvider with ChangeNotifier {
       debugPrint('First launch: set locale to ${_locale.languageCode}');
     }
 
+    // Load auto-download on play
+    _autoDownloadOnPlay = prefs.getBool(_autoDownloadOnPlayKey) ?? false;
+
     notifyListeners();
+  }
+
+  Future<void> setAutoDownloadOnPlay(bool value) async {
+    if (_autoDownloadOnPlay != value) {
+      _autoDownloadOnPlay = value;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_autoDownloadOnPlayKey, value);
+      notifyListeners();
+    }
   }
 
   Future<void> setAudioFormat(AudioFormat format) async {

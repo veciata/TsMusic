@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:tsmusic/models/playlist_item.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
@@ -498,7 +499,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                             onSelected: (value) {
                               switch (value) {
                                 case 'add_to_playlist':
-                                  showAddToPlaylistSheet(context, songId: song.id);
+                                  showAddToPlaylistSheet(context, item: PlaylistItem(songId: song.id));
                                 case 'delete':
                                   _deleteLocalSong(song);
                               }

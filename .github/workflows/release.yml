@@ -2,129 +2,117 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      channel:
-        description: 'Release channel'
-        required: true
-        default: 'stable'
-        type: choice
-        options:
-          - stable
-          - alpha
+    branches: [main, release]
+    tags: ['v*']
+  pull_request:
+    branches: [main, release]
 
 permissions:
   contents: write
 
+env:
+  FLUTTER_VERSION: '3.29.2'
+
 jobs:
-  release:
+  lint:
+    name: Lint & Analyze
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
         with:
-          fetch-tags: true
+          flutter-version: ${{ env.FLUTTER_VERSION }}
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      - run: flutter format --dry-run --set-exit-if-changed lib/
+
+  test:
+    name: Run Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.6'
-          channel: 'stable'
-          cache: true
+          flutter-version: ${{ env.FLUTTER_VERSION }}
 
-      - name: Get dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Resolve version
-        id: versioning
+      - run: flutter test --coverage
+
+  build:
+    name: Build Android Release
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - run: flutter pub get
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            # Extract from pushed tag: refs/tags/v1.2.2 -> 1.2.2
-            VERSION_NAME="${GITHUB_REF_NAME#v}"
-          else
-            # Manual: read from pubspec.yaml
-            VERSION_NAME=$(grep "^version:" pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
-          fi
-          BUILD_NUMBER=$(( ${{ github.run_number }} + 6 ))
+          echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.jks
 
-          CHANNEL="${{ inputs.channel || 'stable' }}"
-          # For stable releases the tag is vX.Y.Z; for alpha it's vX.Y.Z-alpha.N
-          if [[ "$CHANNEL" == "alpha" ]]; then
-            RELEASE_TAG="v${VERSION_NAME}-alpha.${BUILD_NUMBER}"
-            IS_PRERELEASE="true"
-          else
-            RELEASE_TAG="v${VERSION_NAME}"
-            IS_PRERELEASE="false"
-          fi
-
-          echo "v_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "v_num=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
-
-      - name: Create tag (manual trigger only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Extract version from pubspec.yaml
+        id: version
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git tag "${{ steps.versioning.outputs.release_tag }}" "${{ github.sha }}"
-          git push origin "${{ steps.versioning.outputs.release_tag }}"
+          VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Build version: $VERSION"
 
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEY_JKS }}" | base64 --decode > android/app/release-keystore.jks
+      - name: Build AAB
+        env:
+          KEYSTORE_PATH: android/app/upload-keystore.jks
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: flutter build appbundle --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
       - name: Build APK
         env:
-          KEYSTORE_PATH: release-keystore.jks
+          KEYSTORE_PATH: android/app/upload-keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          flutter build apk --release \
-            --build-name=${{ steps.versioning.outputs.v_name }} \
-            --build-number=${{ steps.versioning.outputs.v_num }}
+        run: flutter build apk --release --split-per-abi --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
-      - name: Rename APK
+      - name: Sign APKs (optional alignment)
         run: |
-          for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk; do
-            if [ -f "$f" ]; then
-              dir=$(dirname "$f")
-              mv "$f" "$dir/tsmusic-${{ steps.versioning.outputs.channel }}.apk"
-              break
-            fi
+          # APKs are already signed during build. Verify signatures.
+          for apk in build/app/outputs/flutter-apk/*.apk; do
+            echo "Signed: $(basename $apk)"
           done
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: build/app/outputs/bundle/release/*.aab
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apks
+          path: build/app/outputs/flutter-apk/*.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.versioning.outputs.release_tag }}
-          name: "${{ steps.versioning.outputs.channel == 'alpha' && 'Alpha' || 'Release' }} v${{ steps.versioning.outputs.v_name }}"
-          body: |
-            ## ${{ steps.versioning.outputs.channel == 'alpha' && 'Alpha' || 'Release' }} v${{ steps.versioning.outputs.v_name }}
-
-            **Channel:** ${{ steps.versioning.outputs.channel }}
-            **Build:** ${{ steps.versioning.outputs.v_num }}
-
-            ### Changes
-            ${{ github.event.head_commit.message }}
+          name: TS Music v${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          body_path: CHANGELOG.md
           files: |
-            build/app/outputs/flutter-apk/tsmusic-${{ steps.versioning.outputs.channel }}.apk
-            build/app/outputs/apk/release/tsmusic-${{ steps.versioning.outputs.channel }}.apk
+            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/*.apk
           draft: false
-          prerelease: ${{ steps.versioning.outputs.is_prerelease }}
-
-      - name: Update latest tag (stable only)
-        if: steps.versioning.outputs.channel == 'stable'
-        run: |
-          git tag -f latest "${{ github.sha }}"
-          git push origin latest --force
-
-      - name: Save Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tsmusic-${{ steps.versioning.outputs.channel }}-${{ steps.versioning.outputs.v_name }}
-          path: |
-            build/app/outputs/flutter-apk/tsmusic-${{ steps.versioning.outputs.channel }}.apk
-            build/app/outputs/apk/release/tsmusic-${{ steps.versioning.outputs.channel }}.apk
+          prerelease: false

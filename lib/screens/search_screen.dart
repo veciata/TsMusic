@@ -8,6 +8,7 @@ import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/models/song.dart' as model;
+import 'package:tsmusic/models/playlist_item.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
@@ -268,8 +269,22 @@ class _SearchScreenState extends State<SearchScreen> {
         song.artists.any((artist) => artist.toLowerCase().contains(query)) ||
         (song.album?.toLowerCase().contains(query) ?? false)).toList();
 
+    final localYoutubeIds = localSongs
+        .where((s) => s.youtubeId != null)
+        .map((s) => s.youtubeId!)
+        .toSet();
+    final localTitleSet = localSongs
+        .map((s) => s.title.toLowerCase().trim())
+        .toSet();
+
+    final filteredYouTubeResults = _youtubeResults.where((yt) {
+      if (yt.id != null && localYoutubeIds.contains(yt.id)) return false;
+      if (localTitleSet.contains(yt.title.toLowerCase().trim())) return false;
+      return true;
+    }).toList();
+
     final hasLocalResults = filteredLocalSongs.isNotEmpty;
-    final hasOnlineResults = _youtubeResults.isNotEmpty;
+    final hasOnlineResults = filteredYouTubeResults.isNotEmpty;
 
     return ListView(
       controller: _scrollController,
@@ -292,14 +307,16 @@ class _SearchScreenState extends State<SearchScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Online Results (${_youtubeResults.length})',
+              filteredYouTubeResults.length < _youtubeResults.length
+                  ? 'Online Results (${filteredYouTubeResults.length}/${_youtubeResults.length})'
+                  : 'Online Results (${_youtubeResults.length})',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          ..._youtubeResults.map(_buildYouTubeResultItem),
+          ...filteredYouTubeResults.map(_buildYouTubeResultItem),
           if (_hasMoreYouTubeResults && !_isSearchingYouTube)
             const Padding(
               padding: EdgeInsets.all(16.0),
@@ -441,7 +458,7 @@ class _SearchScreenState extends State<SearchScreen> {
   ) async {
     switch (action) {
       case 'add_to_playlist':
-        showAddToPlaylistSheet(context, songId: song.id);
+        showAddToPlaylistSheet(context, item: PlaylistItem(songId: song.id));
       case 'move':
         await _showMoveDialog(song);
       case 'delete':

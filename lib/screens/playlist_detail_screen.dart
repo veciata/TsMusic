@@ -302,11 +302,20 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.1),
+                                color: song.url.startsWith('yt:')
+                                    ? Colors.red.withValues(alpha: 0.15)
+                                    : theme.colorScheme.primary
+                                        .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Icon(Icons.music_note),
+                              child: Icon(
+                                song.url.startsWith('yt:')
+                                    ? Icons.cloud
+                                    : Icons.music_note,
+                                color: song.url.startsWith('yt:')
+                                    ? Colors.red
+                                    : null,
+                              ),
                             ),
                       title: Text(song.title),
                       subtitle: Text(song.artists.join(' & ')),

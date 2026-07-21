@@ -197,7 +197,7 @@ class DatabaseHelper {
   }
 
   // Increment this version when making schema changes
-  static const int databaseVersion = 5;
+  static const int databaseVersion = 6;
 
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), 'music_player.db');
@@ -273,6 +273,20 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 6) {
+      try {
+        await db.execute('ALTER TABLE $tablePlaylists ADD COLUMN playlist_type TEXT NOT NULL DEFAULT \'local_only\'');
+        await db.update(
+          tablePlaylists,
+          {'playlist_type': 'remote_compatible'},
+          where: '$columnId = ?',
+          whereArgs: [nowPlayingPlaylistId],
+        );
+        debugPrint('Successfully added playlist_type column to playlists table');
+      } catch (e) {
+        debugPrint('Note: playlist_type column may already exist: $e');
+      }
+    }
     if (oldVersion < 4) {
       // Version 4: Add youtube_id column to songs table
       try {
@@ -311,6 +325,7 @@ class DatabaseHelper {
         name TEXT NOT NULL UNIQUE,
         description TEXT,
         cover_art_url TEXT,
+        playlist_type TEXT NOT NULL DEFAULT 'local_only',
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     ''');
@@ -324,6 +339,7 @@ class DatabaseHelper {
         'description':
             'Currently playing queue. This playlist is managed automatically.',
         'cover_art_url': null,
+        'playlist_type': 'remote_compatible',
         columnCreatedAt: DateTime.now().toIso8601String(),
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,

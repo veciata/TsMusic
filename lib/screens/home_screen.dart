@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
+import 'package:tsmusic/models/playlist_item.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/utils/format_utils.dart';
@@ -947,7 +948,10 @@ class _HomeScreenState extends State<HomeScreen>
         await _showDeleteConfirmation(song, provider);
         break;
       case 'add_to_playlist':
-        showPlaylistSelector(context);
+        showAddToPlaylistSheet(
+          context,
+          item: PlaylistItem(songId: song.id),
+        );
         break;
     }
   }
