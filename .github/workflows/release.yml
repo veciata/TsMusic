@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_VERSION: '3.29.2'
+  FLUTTER_VERSION: '3.44.1'
 
 jobs:
   lint:
