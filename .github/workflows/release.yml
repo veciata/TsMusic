@@ -24,6 +24,12 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: flutter-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: flutter-pub-
+
       - run: flutter pub get
 
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -41,6 +47,12 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: flutter-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: flutter-pub-
+
       - run: flutter pub get
 
       - run: flutter test --coverage
@@ -56,6 +68,12 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: flutter-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: flutter-pub-
 
       - run: flutter pub get
 
@@ -136,6 +154,12 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: flutter-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: flutter-pub-
 
       - run: flutter pub get
 
