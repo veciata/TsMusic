@@ -2,10 +2,10 @@ name: Release
 
 on:
   push:
-    branches: [main, release, alpha]
+    branches: [main, release]
     tags: ['v*']
   pull_request:
-    branches: [main, release, alpha]
+    branches: [main, release]
 
 permissions:
   contents: write
@@ -36,11 +36,11 @@ jobs:
 
       - run: dart format --output=none --set-exit-if-changed lib/
 
-  # ── ALPHA TRACK: build prerelease first, then run tests ──
-  build-alpha:
-    name: Build Alpha Prerelease
+  # ── LATEST TRACK: build and update "latest" release on main push ──
+  build-latest:
+    name: Build Latest Release
     needs: lint
-    if: github.ref_name == 'alpha'
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -84,73 +84,26 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build apk --release --split-per-abi --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: alpha-release-aab
-          path: build/app/outputs/bundle/release/*.aab
+      - name: Delete old latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        continue-on-error: true
+        run: gh release delete latest --yes --cleanup-tag || true
 
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: alpha-release-apks
-          path: build/app/outputs/flutter-apk/*.apk
-
-      - name: Generate alpha tag
-        id: tag
-        run: |
-          ALPHA_TAG="v${{ steps.version.outputs.version }}-alpha.${{ github.run_number }}"
-          echo "tag=$ALPHA_TAG" >> $GITHUB_OUTPUT
-
-      - name: Create Alpha Prerelease
+      - name: Create Latest Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          V="${{ steps.version.outputs.version }}"
-          gh release create "$TAG" \
-            --title "TS Music v${V} Alpha #${{ github.run_number }}" \
-            --notes "## Alpha Build #${{ github.run_number }}
-          Version: v${V}
-          Branch: alpha (${{ github.sha }})
-          **Tests:** running after build" \
-            --prerelease \
+          gh release create latest \
+            --title "TS Music v${{ steps.version.outputs.version }} (Latest)" \
+            --notes "## Latest Build
+          Version: v${{ steps.version.outputs.version }}
+          Commit: ${{ github.sha }}
+          Branch: main
+          Package: \`com.veciata.tsmusic\` (stable)" \
+            --latest \
             build/app/outputs/bundle/release/*.aab \
             build/app/outputs/flutter-apk/*.apk
-
-  test-alpha:
-    name: Run Tests (Alpha)
-    needs: build-alpha
-    if: github.ref_name == 'alpha'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: flutter-pub-${{ hashFiles('pubspec.lock') }}
-          restore-keys: flutter-pub-
-
-      - run: flutter pub get
-
-      - run: flutter test
-
-      - name: Update prerelease with test result
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          V=$(grep '^version: ' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          TAG="v${V}-alpha.${{ github.run_number }}"
-          gh release edit "$TAG" \
-            --notes "## Alpha Build #${{ github.run_number }}
-          Version: v${V}
-          Branch: alpha (${{ github.sha }})
-          **Tests:** ✅ passed"
 
   # ── STABLE TRACK: build and release on tag push ──
   test-stable:

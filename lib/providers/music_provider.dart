@@ -406,15 +406,15 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         // Load audio source and seek to saved position, but do NOT auto-play
         if (_lastPlayedSong != null) {
           await _setAudioSource(_playlist[_currentIndex]);
+          // Player.open() auto-plays in media_kit — pause immediately
+          await _player.pause();
           await _player.seek(Duration(milliseconds: savedPosition));
 
           final song = _playlist[_currentIndex];
           requestThumbnail(song, priority: 0);
           notifyListeners();
 
-          debugPrint(
-            'Restored playback position at index $_currentIndex, position ${Duration(milliseconds: savedPosition)} (paused)',
-          );
+          debugPrint('Restored playback position at index $_currentIndex, position ${Duration(milliseconds: savedPosition)} (paused)');
         }
       }
     } catch (e) {

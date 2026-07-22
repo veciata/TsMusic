@@ -423,11 +423,13 @@ class _HomeScreenState extends State<HomeScreen>
     final l10n = AppLocalizations.of(context);
     final locations = [
       {
-        'label': l10n.internalStorage,
+        'label': l10n.musicFolder,
         'path': '/storage/emulated/0/Music/tsmusic',
       },
-      {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
-      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music'},
+      {
+        'label': l10n.downloads,
+        'path': '/storage/emulated/0/Download/tsmusic',
+      },
     ];
 
     final musicProvider = Provider.of<music_provider.MusicProvider>(
@@ -465,6 +467,9 @@ class _HomeScreenState extends State<HomeScreen>
           try {
             final file = File(song.url);
             final newPath = path.join(selectedPath, path.basename(song.url));
+            if (file.path == newPath) continue;
+            final targetFile = File(newPath);
+            if (await targetFile.exists()) continue;
             try {
               await file.rename(newPath);
             } on FileSystemException {
@@ -472,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen>
               await file.delete();
             }
             final updatedSong = song.copyWith(url: newPath);
-            musicProvider.addSongToPlaylist(updatedSong);
+            await musicProvider.updateSong(updatedSong);
           } catch (e) {
             debugPrint('Error moving song ${song.id}: $e');
           }

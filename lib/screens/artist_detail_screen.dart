@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:tsmusic/models/playlist_item.dart';
@@ -327,6 +328,93 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     }
   }
 
+  Future<void> _showMoveDialog(Song song) async {
+    final l10n = AppLocalizations.of(context);
+    final locations = [
+      {
+        'label': l10n.musicFolder,
+        'path': '/storage/emulated/0/Music/tsmusic',
+      },
+      {
+        'label': l10n.downloads,
+        'path': '/storage/emulated/0/Download/tsmusic',
+      },
+    ];
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.moveTo),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: locations
+              .map(
+                (loc) => ListTile(
+                  title: Text(loc['label']!),
+                  subtitle: Text(loc['path']!),
+                  onTap: () => Navigator.pop(context, loc['path']),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      try {
+        final targetDir = Directory(selected);
+        if (!await targetDir.exists()) {
+          await targetDir.create(recursive: true);
+        }
+
+        final file = File(song.url);
+        final newPath = path.join(selected, path.basename(song.url));
+
+        if (file.path == newPath) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('File is already in this location')),
+            );
+          }
+          return;
+        }
+
+        final targetFile = File(newPath);
+        if (await targetFile.exists()) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('File already exists at target')),
+            );
+          }
+          return;
+        }
+
+        try {
+          await file.rename(newPath);
+        } on FileSystemException {
+          await file.copy(newPath);
+          await file.delete();
+        }
+
+        final musicProvider = context.read<music_provider.MusicProvider>();
+        final updatedSong = song.copyWith(url: newPath);
+        await musicProvider.updateSong(updatedSong);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.move}: ${path.basename(newPath)}')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.errorMovingFile}: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildArtistInitialFallback() {
     return Container(
       color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
@@ -519,6 +607,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                                     context,
                                     item: PlaylistItem(songId: song.id),
                                   );
+                                case 'move':
+                                  _showMoveDialog(song);
                                 case 'delete':
                                   _deleteLocalSong(song);
                               }
@@ -531,6 +621,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
                                     const Icon(Icons.playlist_add),
                                     const SizedBox(width: 8),
                                     Text(l10n.addToPlaylist),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'move',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.drive_file_move_outline),
+                                    const SizedBox(width: 8),
+                                    Text(l10n.moveTo),
                                   ],
                                 ),
                               ),

@@ -190,7 +190,7 @@ class MusicScannerService {
       }
 
       // Add tag if in tsmusic folder
-      if (file.path.contains('/Music/tsmusic/')) {
+      if (file.path.contains('/tsmusic/')) {
         final tagId = await _getOrCreateTag(txn, 'tsmusic');
         await txn.insert(
           DatabaseHelper.tableSongTags,

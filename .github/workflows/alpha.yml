@@ -2,7 +2,7 @@ name: Alpha
 
 on:
   push:
-    branches: [main]
+    branches: [alpha]
 
 concurrency:
   group: alpha-${{ github.ref }}
@@ -12,56 +12,80 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.6'
           channel: 'stable'
           cache: true
 
-      - name: Get dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Resolve version
-        id: versioning
-        run: |
-          BASE_VER=$(grep "^version:" pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
-          BUILD_NUM=$(( ${{ github.run_number }} + 6 ))
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          ALPHA_TAG="v${BASE_VER}-alpha.${BUILD_NUM}+${SHORT_SHA}"
-          echo "v_name=$BASE_VER" >> $GITHUB_OUTPUT
-          echo "v_num=$BUILD_NUM" >> $GITHUB_OUTPUT
-          echo "release_tag=$ALPHA_TAG" >> $GITHUB_OUTPUT
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
 
-      - name: Build APK (unsigned)
-        run: |
-          flutter build apk --release --no-sound-null-safety \
-            --build-name=${{ steps.versioning.outputs.v_name }} \
-            --build-number=${{ steps.versioning.outputs.v_num }} || \
-          flutter build apk --debug \
-            --build-name=${{ steps.versioning.outputs.v_name }} \
-            --build-number=${{ steps.versioning.outputs.v_num }}
+      - name: Test
+        run: flutter test
 
-      - name: Rename APK
-        run: |
-          for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk build/app/outputs/flutter-apk/app-debug.apk; do
-            if [ -f "$f" ]; then
-              dir=$(dirname "$f")
-              mv "$f" "$dir/tsmusic-alpha.apk"
-              break
-            fi
-          done
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Upload APK to workflow artifacts
-        uses: actions/upload-artifact@v4
+      - uses: subosito/flutter-action@v2
         with:
-          name: tsmusic-alpha-${{ steps.versioning.outputs.v_name }}-${{ github.sha }}
-          path: |
-            build/app/outputs/flutter-apk/tsmusic-alpha.apk
-            build/app/outputs/apk/release/tsmusic-alpha.apk
-          retention-days: 14
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/upload-keystore.jks
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}-alpha.${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      - name: Build APK (alpha app ID)
+        env:
+          ALPHA_BUILD: true
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build AAB (alpha app ID)
+        env:
+          ALPHA_BUILD: true
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: flutter build appbundle --release
+
+      - name: Create Prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          V="${{ steps.version.outputs.version }}"
+          gh release create "$TAG" \
+            --title "TS Music v${V} Alpha #${{ github.run_number }}" \
+            --notes "## Alpha Build #${{ github.run_number }}
+          Version: v${V}
+          Branch: alpha (${{ github.sha }})
+          Package: \`com.veciata.tsmusic.alpha\` (installs alongside stable)" \
+            --prerelease \
+            build/app/outputs/bundle/release/*.aab \
+            build/app/outputs/flutter-apk/*.apk

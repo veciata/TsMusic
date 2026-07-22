@@ -517,11 +517,13 @@ class _SearchScreenState extends State<SearchScreen> {
     final l10n = AppLocalizations.of(context);
     final locations = [
       {
-        'label': l10n.internalStorage,
+        'label': l10n.musicFolder,
         'path': '/storage/emulated/0/Music/tsmusic',
       },
-      {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
-      {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music/tsmusic'},
+      {
+        'label': l10n.downloads,
+        'path': '/storage/emulated/0/Download/tsmusic',
+      },
     ];
 
     final selected = await showDialog<String>(
@@ -534,6 +536,7 @@ class _SearchScreenState extends State<SearchScreen> {
               .map(
                 (loc) => ListTile(
                   title: Text(loc['label']!),
+                  subtitle: Text(loc['path']!),
                   onTap: () => Navigator.pop(context, loc['path']),
                 ),
               )
@@ -551,16 +554,41 @@ class _SearchScreenState extends State<SearchScreen> {
 
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
+
+        if (file.path == newPath) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('File is already in this location')),
+            );
+          }
+          return;
+        }
+
+        final targetFile = File(newPath);
+        if (await targetFile.exists()) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('File already exists at target')),
+            );
+          }
+          return;
+        }
+
         try {
           await file.rename(newPath);
         } on FileSystemException {
           await file.copy(newPath);
           await file.delete();
         }
+
+        final musicProvider = context.read<music_provider.MusicProvider>();
+        final updatedSong = song.copyWith(url: newPath);
+        await musicProvider.updateSong(updatedSong);
+
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('${l10n.move}: $selected')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${l10n.move}: ${path.basename(newPath)}')),
+          );
         }
       } catch (e) {
         if (mounted) {

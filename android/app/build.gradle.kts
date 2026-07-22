@@ -17,7 +17,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.veciata.tsmusic"
+        applicationId = if (System.getenv("ALPHA_BUILD") == "true") {
+            "com.veciata.tsmusic.alpha"
+        } else {
+            "com.veciata.tsmusic"
+        }
         minSdk = flutter.minSdkVersion  // Minimum SDK 21 (Android 5.0) for audio_service compatibility
         targetSdk = 34  // Target SDK 34 (Android 14) to avoid obsolete warnings
         versionCode = flutter.versionCode
