@@ -52,7 +52,7 @@ jobs:
 
       - name: Decode keystore (if available)
         env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_B64: ${{ secrets.KEY_JKS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_B64" ]; then

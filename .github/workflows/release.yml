@@ -64,7 +64,7 @@ jobs:
 
       - name: Decode keystore
         env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_B64: ${{ secrets.KEY_JKS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/keystore.jks
@@ -173,7 +173,7 @@ jobs:
 
       - name: Decode keystore
         env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_B64: ${{ secrets.KEY_JKS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/keystore.jks
