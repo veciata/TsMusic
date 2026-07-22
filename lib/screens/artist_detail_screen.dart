@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -251,6 +250,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
     if (confirmed == true) {
       try {
+        if (!mounted) return;
         await context.read<music_provider.MusicProvider>().deleteSong(song);
         if (mounted) {
           ScaffoldMessenger.of(
@@ -304,6 +304,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
     if (confirmed == true) {
       setState(() => _isMultiSelectMode = false);
+      if (!mounted) return;
       final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
         listen: false,
@@ -415,8 +416,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     }
   }
 
-  Widget _buildArtistInitialFallback() {
-    return Container(
+  Widget _buildArtistInitialFallback() => Container(
       color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
       alignment: Alignment.center,
       child: Text(
@@ -428,7 +428,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         ),
       ),
     );
-  }
 
   @override
   void dispose() {

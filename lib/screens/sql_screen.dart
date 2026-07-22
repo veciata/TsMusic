@@ -573,7 +573,7 @@ class _TablesTab extends StatelessWidget {
           radius: 14,
           backgroundColor: Theme.of(
             context,
-          ).colorScheme.primary.withOpacity(0.1),
+          ).colorScheme.primary.withValues(alpha: 0.1),
           child: Text(
             '$count',
             style: TextStyle(
@@ -587,7 +587,7 @@ class _TablesTab extends StatelessWidget {
           final db = await DatabaseHelper().database;
           final rows = await db.query(name, limit: 100);
           if (!context.mounted) return;
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => _RowsScreen(table: name, rows: rows),

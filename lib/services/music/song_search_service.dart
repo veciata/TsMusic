@@ -23,9 +23,7 @@ class SongSearchService {
     required SongSortOption sortBy,
     bool ascending = true,
   }) {
-    final sorted = List<Song>.from(songs);
-
-    sorted.sort((a, b) {
+    final sorted = List<Song>.from(songs)..sort((a, b) {
       int compare;
       switch (sortBy) {
         case SongSortOption.title:

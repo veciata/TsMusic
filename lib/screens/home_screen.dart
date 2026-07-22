@@ -1,8 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
@@ -110,31 +109,30 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
 
-      final songs = uniqueSongs.values.toList();
-
-      songs.sort((a, b) {
-        int compare;
-        switch (provider.currentSortOption) {
-          case SongSortOption.title:
-            compare = a.title.compareTo(b.title);
-            break;
-          case SongSortOption.artist:
-            final artistA = a.artists.isNotEmpty ? a.artists.join(' & ') : '';
-            final artistB = b.artists.isNotEmpty ? b.artists.join(' & ') : '';
-            compare = artistA.compareTo(artistB);
-            break;
-          case SongSortOption.album:
-            compare = (a.album ?? '').compareTo(b.album ?? '');
-            break;
-          case SongSortOption.duration:
-            compare = a.duration.compareTo(b.duration);
-            break;
-          case SongSortOption.dateAdded:
-            compare = a.dateAdded.compareTo(b.dateAdded);
-            break;
-        }
-        return provider.sortAscending ? compare : -compare;
-      });
+      final songs = uniqueSongs.values.toList()
+        ..sort((a, b) {
+          int compare;
+          switch (provider.currentSortOption) {
+            case SongSortOption.title:
+              compare = a.title.compareTo(b.title);
+              break;
+            case SongSortOption.artist:
+              final artistA = a.artists.isNotEmpty ? a.artists.join(' & ') : '';
+              final artistB = b.artists.isNotEmpty ? b.artists.join(' & ') : '';
+              compare = artistA.compareTo(artistB);
+              break;
+            case SongSortOption.album:
+              compare = (a.album ?? '').compareTo(b.album ?? '');
+              break;
+            case SongSortOption.duration:
+              compare = a.duration.compareTo(b.duration);
+              break;
+            case SongSortOption.dateAdded:
+              compare = a.dateAdded.compareTo(b.dateAdded);
+              break;
+          }
+          return provider.sortAscending ? compare : -compare;
+        });
 
       return songs;
     } catch (e) {
@@ -402,8 +400,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
       final musicProvider = Provider.of<music_provider.MusicProvider>(
-        context,
+        this.context,
         listen: false,
       );
       for (final id in _selectedSongs) {
@@ -492,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen>
       await musicProvider.refreshSongs();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(
             content: Text('${_selectedSongs.length} ${l10n.songsMoved}'),
           ),
@@ -690,13 +689,13 @@ class _HomeScreenState extends State<HomeScreen>
                   await DatabaseHelper().createPlaylist(name);
                   await _loadPlaylists();
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(this.context).showSnackBar(
                       SnackBar(content: Text(l10n.playlistCreated)),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(this.context).showSnackBar(
                       SnackBar(content: Text('${l10n.error}: $e')),
                     );
                   }
@@ -819,7 +818,7 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           ),
                         );
-                        _loadPlaylists();
+                        unawaited(_loadPlaylists());
                       },
                     );
                   },

@@ -84,7 +84,7 @@ class ColorSelector extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -117,9 +117,12 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
                       : null,
                 ),
               ),
+              // ignore: deprecated_member_use
               leading: Radio<PlayerStyle>(
                 value: style,
+                // ignore: deprecated_member_use
                 groupValue: themeProvider.playerStyle,
+                // ignore: deprecated_member_use
                 onChanged: (PlayerStyle? newStyle) {
                   if (newStyle != null) {
                     themeProvider.setPlayerStyle(newStyle);
@@ -171,9 +174,12 @@ void _showDownloadLocationDialog(
                       : null,
                 ),
               ),
+              // ignore: deprecated_member_use
               leading: Radio<String>(
                 value: location,
+                // ignore: deprecated_member_use
                 groupValue: settingsProvider.downloadLocation,
+                // ignore: deprecated_member_use
                 onChanged: (String? newLocation) {
                   if (newLocation != null) {
                     settingsProvider.setDownloadLocation(newLocation);
@@ -224,9 +230,12 @@ void _showAudioFormatDialog(
                       : null,
                 ),
               ),
+              // ignore: deprecated_member_use
               leading: Radio<AudioFormat>(
                 value: format,
+                // ignore: deprecated_member_use
                 groupValue: settingsProvider.audioFormat,
+                // ignore: deprecated_member_use
                 onChanged: (AudioFormat? newFormat) {
                   if (newFormat != null) {
                     settingsProvider.setAudioFormat(newFormat);
@@ -278,9 +287,12 @@ void _showPlaybackModeDialog(
                       : null,
                 ),
               ),
+              // ignore: deprecated_member_use
               leading: Radio<PlaybackMode>(
                 value: mode,
+                // ignore: deprecated_member_use
                 groupValue: settingsProvider.defaultPlaybackMode,
+                // ignore: deprecated_member_use
                 onChanged: (PlaybackMode? newMode) {
                   if (newMode != null) {
                     settingsProvider.setDefaultPlaybackMode(newMode);
@@ -331,9 +343,12 @@ void _showLanguageDialog(
                       : null,
                 ),
               ),
+              // ignore: deprecated_member_use
               leading: Radio<Locale>(
                 value: locale,
+                // ignore: deprecated_member_use
                 groupValue: settingsProvider.locale,
+                // ignore: deprecated_member_use
                 onChanged: (Locale? newLocale) {
                   if (newLocale != null) {
                     settingsProvider.setLanguage(newLocale);
@@ -634,7 +649,7 @@ class SettingsScreen extends StatelessWidget {
                         (color) => ColorSelector(
                           color: color,
                           isSelected:
-                              themeProvider.primaryColor.value == color.value,
+                              themeProvider.primaryColor.toARGB32() == color.toARGB32(),
                           onTap: () => themeProvider.setPrimaryColor(color),
                         ),
                       )
@@ -654,8 +669,7 @@ class SettingsScreen extends StatelessWidget {
                   'Download YouTube songs when they start playing',
                 ),
                 value: settingsProvider.autoDownloadOnPlay,
-                onChanged: (value) =>
-                    settingsProvider.setAutoDownloadOnPlay(value),
+                onChanged: settingsProvider.setAutoDownloadOnPlay,
                 secondary: const Icon(Icons.cloud_download),
               ),
               const Divider(height: 1),

@@ -311,7 +311,6 @@ class AudioNotificationService {
           ),
           config: getNotificationSettings(
             notificationColor: notificationColor,
-            fontSize: null, // Reserved for future implementation
           ),
         );
         debugPrint(
@@ -351,7 +350,7 @@ class AudioNotificationService {
 
   static Future<void> dispose() async {
     await _audioHandler?.disposePlayer();
-    await AudioService.stop();
+    await _audioHandler?.stop();
     _audioHandler = null;
   }
 }

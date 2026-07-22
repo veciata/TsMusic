@@ -116,17 +116,15 @@ class _PlaylistSelectorBottomSheetState
                 try {
                   await _db.createPlaylist(name);
                   await _loadPlaylists();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.playlistCreated)),
-                    );
-                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(content: Text(l10n.playlistCreated)),
+                  );
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(
+                    this.context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               }
             },
@@ -166,7 +164,8 @@ class _PlaylistSelectorBottomSheetState
         if (item.songId != null) {
           await _db.addSongsToPlaylist(playlistId, [item.songId!]);
         } else if (item.youtubeId != null) {
-          final musicProvider = context.read<music_provider.MusicProvider>();
+            if (!mounted) return;
+            final musicProvider = context.read<music_provider.MusicProvider>();
           await musicProvider.addOnlineSongToPlaylist(
             youtubeId: item.youtubeId!,
             title: item.title ?? 'Unknown',

@@ -98,8 +98,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   if (_selectedSongs.length == allSongs.length) {
                     _selectedSongs.clear();
                   } else {
-                    _selectedSongs.clear();
-                    _selectedSongs.addAll(allSongs.map((s) => s.id));
+                    _selectedSongs
+                      ..clear()
+                      ..addAll(allSongs.map((s) => s.id));
                   }
                 });
               },
@@ -415,6 +416,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               (loc) => RadioListTile<String>(
                 title: Text(loc[0].toUpperCase() + loc.substring(1)),
                 value: loc,
+                // ignore: deprecated_member_use
                 onChanged: (value) => Navigator.pop(context, value),
               ),
             )
@@ -427,6 +429,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     try {
       final sourceFile = File(song.url);
       if (!await sourceFile.exists()) {
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('File not found')));
@@ -444,6 +447,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       await sourceFile.copy(targetFile.path);
       await sourceFile.delete();
 
+      if (!mounted) return;
       final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
         listen: false,
@@ -458,11 +462,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         'downloads': 'Downloads folder',
         'music': 'Music folder',
       };
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Moved to ${locationLabels[targetLocation]}')),
       );
     } catch (e) {
       debugPrint('Error relocating song: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to move: $e')));
@@ -495,13 +501,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         if (await file.exists()) {
           await file.delete();
         }
+        if (!mounted) return;
         final musicProvider = Provider.of<music_provider.MusicProvider>(
           context,
           listen: false,
         );
         await musicProvider.deleteSong(song);
-        _scanLocalFiles();
+        await _scanLocalFiles();
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
@@ -542,6 +550,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             if (await file.exists()) {
               await file.delete();
             }
+            if (!mounted) return;
             final musicProvider = Provider.of<music_provider.MusicProvider>(
               context,
               listen: false,
@@ -553,7 +562,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         }
       }
       _selectedSongs.clear();
-      _scanLocalFiles();
+      await _scanLocalFiles();
     }
   }
 
@@ -571,65 +580,62 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         context,
         listen: false,
       );
-      _youTubeService
-          .downloadAudio(
-            videoId: videoId,
-            preferredFormat: settingsProvider.audioFormat,
-            downloadLocation: settingsProvider.downloadLocation,
-            onProgress: (progress) {
-              if (mounted) {
-                setState(() {
-                  _downloadProgress[videoId] = progress;
-                });
-              }
-            },
-          )
-          .then((result) async {
-            if (result != null && mounted) {
-              Provider.of<music_provider.MusicProvider>(
-                context,
-                listen: false,
-              ).addDownloadedSongToLibrary(result.song);
-              _scanLocalFiles();
-              setState(() {
-                _downloadProgress.remove(videoId);
-              });
-            }
-          })
-          .catchError((error) {
+      try {
+        final result = await _youTubeService.downloadAudio(
+          videoId: videoId,
+          preferredFormat: settingsProvider.audioFormat,
+          downloadLocation: settingsProvider.downloadLocation,
+          onProgress: (progress) {
             if (mounted) {
               setState(() {
-                _downloadProgress.remove(videoId);
+                _downloadProgress[videoId] = progress;
               });
-              final errorStr = error.toString().toLowerCase();
-              final isHtmlError =
-                  errorStr.contains('youtube_html_error') ||
-                  errorStr.contains('html') ||
-                  errorStr.contains('ip') ||
-                  errorStr.contains('consent') ||
-                  errorStr.contains('blocked') ||
-                  errorStr.contains('unavailable');
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          isHtmlError
-                              ? 'Download unavailable. Please try again later.'
-                              : 'Download failed: $error',
-                        ),
-                      ),
-                    ],
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
             }
+          },
+        );
+        if (result != null && mounted) {
+          Provider.of<music_provider.MusicProvider>(
+            context,
+            listen: false,
+          ).addDownloadedSongToLibrary(result.song);
+          await _scanLocalFiles();
+          setState(() {
+            _downloadProgress.remove(videoId);
           });
+        }
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _downloadProgress.remove(videoId);
+        });
+        final errorStr = error.toString().toLowerCase();
+        final isHtmlError =
+            errorStr.contains('youtube_html_error') ||
+            errorStr.contains('html') ||
+            errorStr.contains('ip') ||
+            errorStr.contains('consent') ||
+            errorStr.contains('blocked') ||
+            errorStr.contains('unavailable');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isHtmlError
+                        ? 'Download unavailable. Please try again later.'
+                        : 'Download failed: $error',
+                  ),
+                ),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 }

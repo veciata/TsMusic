@@ -138,9 +138,7 @@ class YouTubeService with ChangeNotifier {
 
   List<YouTubeAudio> get nextSuggestions => List.unmodifiable(_nextSuggestions);
 
-  void setLocalSongsCallback(List<ts.Song> Function() callback) {
-    _getLocalSongs = callback;
-  }
+  set localSongsCallback(List<ts.Song> Function() callback) => _getLocalSongs = callback;
 
   // Getters
   List<DownloadProgress> get activeDownloads =>
@@ -155,9 +153,7 @@ class YouTubeService with ChangeNotifier {
 
   static YouTubeService? get instance => _instance;
 
-  void setStopOtherPlayerCallback(Function() callback) {
-    _stopOtherPlayer = callback;
-  }
+  set stopOtherPlayerCallback(Function() callback) => _stopOtherPlayer = callback;
 
   // Public constructor
   YouTubeService({YoutubeExplode? yt, http.Client? httpClient, Player? player})
@@ -184,11 +180,11 @@ class YouTubeService with ChangeNotifier {
           await playOnlinePlaylistAt(nextIndex);
         } else if (_autoSuggestEnabled) {
           // Queue exhausted and auto-suggest on: suggest next
-          _updateSuggestions();
+          await _updateSuggestions();
         }
       }
       if (completed) {
-        _updateSuggestions();
+        await _updateSuggestions();
       }
     });
   }
@@ -481,9 +477,9 @@ class YouTubeService with ChangeNotifier {
 
   void _updateDownloadProgress(String videoId, double progress) {
     if (_activeDownloads.containsKey(videoId)) {
-      final download = _activeDownloads[videoId]!;
-      download.progress = progress;
-      download.isDownloading = progress < 1.0;
+      final download = _activeDownloads[videoId]!
+        ..progress = progress
+        ..isDownloading = progress < 1.0;
       _notifyProgressUpdate();
 
       final downloadNotification = DownloadNotificationService();
@@ -524,22 +520,23 @@ class YouTubeService with ChangeNotifier {
     final d = _activeDownloads[videoId];
     if (d == null) return false;
 
-    d.cancelRequested = true;
-    d.isDownloading = false;
+    d
+      ..cancelRequested = true
+      ..isDownloading = false;
 
     // Immediately remove from the list to update UI
     _activeDownloads.remove(videoId);
     _notifyProgressUpdate();
 
     // Background cancellation
-    Future.microtask(() async {
+    unawaited(Future.microtask(() async {
       try {
         await d.subscription?.cancel();
         debugPrint('cancelDownload: Subscription cancelled for $videoId');
       } catch (e) {
         debugPrint('Error during background subscription cancellation: $e');
       }
-    });
+    }));
 
     return true;
   }

@@ -44,8 +44,8 @@ class GitHubReleaseService {
           .toList();
 
       // Sort by published date ascending (oldest first).
-      releases.sort((a, b) => a.publishedAt.compareTo(b.publishedAt));
-      return releases;
+      return releases
+        ..sort((a, b) => a.publishedAt.compareTo(b.publishedAt));
     } catch (e) {
       debugPrint('Failed to fetch GitHub releases: $e');
       return [];

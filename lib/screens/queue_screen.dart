@@ -115,7 +115,7 @@ class QueueScreen extends StatelessWidget {
                       Text(
                         '${localQueue.length} songs',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -166,7 +166,7 @@ class QueueScreen extends StatelessWidget {
                       Text(
                         '${onlineSongs.length} songs',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -207,8 +207,7 @@ class QueueScreen extends StatelessWidget {
     required VoidCallback onTap,
     required VoidCallback onRemove,
     void Function(int, int)? onReorder,
-  }) {
-    return Dismissible(
+  }) => Dismissible(
       key: ValueKey('queue_${isOnline ? 'yt_' : ''}${song.id}_$index'),
       background: Container(
         color: Colors.red,
@@ -231,8 +230,8 @@ class QueueScreen extends StatelessWidget {
       child: ListTile(
         tileColor: isCurrent
             ? (isOnline
-                  ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
-                  : theme.colorScheme.primaryContainer.withOpacity(0.5))
+                    ? theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3)
+                    : theme.colorScheme.primaryContainer.withValues(alpha: 0.5))
             : null,
         leading: Container(
           width: 40,
@@ -240,8 +239,8 @@ class QueueScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: isCurrent
                 ? (isOnline
-                      ? theme.colorScheme.tertiary.withOpacity(0.2)
-                      : theme.colorScheme.primary.withOpacity(0.2))
+                    ? theme.colorScheme.tertiary.withValues(alpha: 0.2)
+                    : theme.colorScheme.primary.withValues(alpha: 0.2))
                 : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
@@ -254,7 +253,7 @@ class QueueScreen extends StatelessWidget {
                 )
               : Icon(
                   isOnline ? Icons.cloud : Icons.music_note,
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
         ),
         title: Text(
@@ -278,7 +277,7 @@ class QueueScreen extends StatelessWidget {
                 child: Icon(
                   Icons.cloud,
                   size: 12,
-                  color: theme.colorScheme.tertiary.withOpacity(0.6),
+                  color: theme.colorScheme.tertiary.withValues(alpha: 0.6),
                 ),
               ),
             Expanded(
@@ -294,10 +293,8 @@ class QueueScreen extends StatelessWidget {
         ),
         trailing: Icon(
           isOnline ? Icons.music_note : Icons.drag_handle,
-          color: theme.colorScheme.onSurface.withOpacity(0.4),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
         ),
         onTap: onTap,
       ),
-    );
-  }
-}
+    );}

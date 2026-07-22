@@ -81,7 +81,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         borderRadius: circular ? null : BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.3),
+            color: theme.colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 30,
             spreadRadius: 5,
             offset: const Offset(0, 10),
@@ -159,7 +159,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               Icon(
                 Icons.music_off,
                 size: 80,
-                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 20),
               Text(
@@ -172,7 +172,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               Text(
                 l10n.selectSongToPlay,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -249,13 +249,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         centerTitle: true,
         actions: [
           Consumer<ThemeProvider>(
-            builder: (context, themeProvider, _) {
-              return IconButton(
-                icon: const Icon(Icons.palette),
-                onPressed: () =>
-                    _showStyleSelector(context, themeProvider, l10n),
-              );
-            },
+            builder: (context, themeProvider, _) => IconButton(
+              icon: const Icon(Icons.palette),
+              onPressed: () =>
+                  _showStyleSelector(context, themeProvider, l10n),
+            ),
           ),
         ],
       ),
@@ -303,7 +301,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             setState(() => _isDragging = false);
           },
           activeColor: theme.colorScheme.primary,
-          inactiveColor: theme.colorScheme.onSurface.withOpacity(0.3),
+          inactiveColor: theme.colorScheme.onSurface.withValues(alpha: 0.3),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -333,7 +331,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           onPressed: musicProvider.toggleShuffle,
           color: musicProvider.shuffleEnabled
               ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface.withOpacity(0.7),
+              : theme.colorScheme.onSurface.withValues(alpha: 0.7),
         ),
         _buildControlButton(
           icon: Icons.skip_previous,
@@ -346,7 +344,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: theme.colorScheme.primary.withOpacity(0.5),
+                color: theme.colorScheme.primary.withValues(alpha: 0.5),
                 blurRadius: 10,
                 spreadRadius: 2,
               ),
@@ -380,7 +378,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           onPressed: musicProvider.cycleRepeatMode,
           color: musicProvider.loopMode != PlaylistMode.none
               ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface.withOpacity(0.7),
+              : theme.colorScheme.onSurface.withValues(alpha: 0.7),
         ),
       ],
     ),

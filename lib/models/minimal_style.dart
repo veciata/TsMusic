@@ -45,7 +45,7 @@ Widget buildMinimalStyle(StyleParams params) {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withOpacity(0.6),
+                          Colors.black.withValues(alpha: 0.6),
                           Colors.transparent,
                         ],
                       ),
@@ -85,7 +85,7 @@ Widget buildMinimalStyle(StyleParams params) {
                   Text(
                     currentSong.artists.join(', '),
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       letterSpacing: 1.2,
                     ),
                     textAlign: TextAlign.center,
@@ -100,8 +100,8 @@ Widget buildMinimalStyle(StyleParams params) {
                     data: theme.copyWith(
                       sliderTheme: SliderThemeData(
                         activeTrackColor: theme.colorScheme.onSurface,
-                        inactiveTrackColor: theme.colorScheme.onSurface
-                            .withOpacity(0.1),
+                            inactiveTrackColor: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.1),
                         thumbColor: theme.colorScheme.onSurface,
                         trackHeight: 2,
                         thumbShape: const RoundSliderThumbShape(

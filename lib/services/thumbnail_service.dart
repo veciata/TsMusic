@@ -72,16 +72,15 @@ class ThumbnailService {
     return null;
   }
 
-  String _safeArtistName(String name) {
-    // Sanitize artist name for use as a filename
-    return name.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-  }
+  String _safeArtistName(String name) =>
+      name.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]'), '_');
 
   void requestThumbnail(Song song, {int priority = 2}) {
     if (song.localThumbnailPath != null) return;
 
-    if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
-      if (_inProgress.contains(song.youtubeId!)) return;
+    final youtubeId = song.youtubeId;
+    if (youtubeId != null && youtubeId.isNotEmpty) {
+      if (_inProgress.contains(youtubeId)) return;
       _queue.add(_PriorityItem(song, priority));
       _sortQueue();
       _processQueue();
@@ -100,11 +99,12 @@ class ThumbnailService {
   void requestThumbnailForAll(List<Song> songs) {
     for (final song in songs) {
       if (song.localThumbnailPath != null) continue;
-      if (song.youtubeId != null &&
-          song.youtubeId!.isNotEmpty &&
-          _inProgress.contains(song.youtubeId!))
-        continue;
-      if (song.youtubeId == null || song.youtubeId!.isEmpty) {
+      final ytId = song.youtubeId;
+      if (ytId != null && ytId.isNotEmpty) {
+        if (_inProgress.contains(ytId)) {
+          continue;
+        }
+      } else {
         if (song.artists.isNotEmpty) {
           final key = 'artist:${song.artists.first}';
           if (_inProgress.contains(key)) continue;
@@ -119,8 +119,9 @@ class ThumbnailService {
   void _sortQueue() {
     final list = _queue.toList()
       ..sort((a, b) => a.priority.compareTo(b.priority));
-    _queue.clear();
-    _queue.addAll(list);
+    _queue
+      ..clear()
+      ..addAll(list);
   }
 
   Future<void> _processQueue() async {

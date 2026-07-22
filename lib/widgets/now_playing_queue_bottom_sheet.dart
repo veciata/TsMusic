@@ -403,6 +403,7 @@ Future<void> _pastePlaylist(BuildContext context) async {
     return;
   }
 
+  if (!context.mounted) return;
   try {
     final yt = context._youTubeService;
     final count = await yt.fetchPlaylistAndAdd(text);
@@ -505,11 +506,10 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
             setState(_checkDownloaded);
           }
         } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
-          }
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            this.context,
+          ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
         }
       },
       tooltip: 'Download',

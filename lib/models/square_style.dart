@@ -30,7 +30,7 @@ Widget buildSquareStyle(StyleParams params) {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: theme.colorScheme.shadow.withOpacity(0.2),
+                          color: theme.colorScheme.shadow.withValues(alpha: 0.2),
                           blurRadius: 30,
                           offset: const Offset(0, 15),
                         ),

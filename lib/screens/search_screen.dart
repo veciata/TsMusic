@@ -67,8 +67,9 @@ class _SearchScreenState extends State<SearchScreen> {
     _youtubePlayer.unregisterScreen('search_screen');
     _searchController.dispose();
     _searchFocusNode.dispose();
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
     _searchScrollController.dispose();
     _connectivitySubscription?.cancel();
     _searchDebounce?.cancel();
@@ -268,13 +269,13 @@ class _SearchScreenState extends State<SearchScreen> {
             Icon(
               Icons.search,
               size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
               'Search for songs...',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -302,7 +303,7 @@ class _SearchScreenState extends State<SearchScreen> {
         .toSet();
 
     final filteredYouTubeResults = _youtubeResults.where((yt) {
-      if (yt.id != null && localYoutubeIds.contains(yt.id)) return false;
+      if (localYoutubeIds.contains(yt.id)) return false;
       if (localTitleSet.contains(yt.title.toLowerCase().trim())) return false;
       return true;
     }).toList();
@@ -319,7 +320,7 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Text(
               'Local Results (${filteredLocalSongs.length})',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -337,7 +338,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ? 'Online Results (${filteredYouTubeResults.length}/${_youtubeResults.length})'
                   : 'Online Results (${_youtubeResults.length})',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -363,7 +364,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     size: 64,
                     color: Theme.of(
                       context,
-                    ).colorScheme.onSurface.withOpacity(0.3),
+                    ).colorScheme.onSurface.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -371,7 +372,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -674,10 +675,12 @@ class _SearchScreenState extends State<SearchScreen> {
     final isPlaying = musicProvider.isPlaying;
     final localSongs = musicProvider.songs;
 
-    return WillPopScope(
-      onWillPop: () async {
-        await _youtubePlayer.stop();
-        return true;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) {
+          await _youtubePlayer.stop();
+        }
       },
       child: Scaffold(
         appBar: AppBar(

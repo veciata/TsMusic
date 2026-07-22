@@ -32,7 +32,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   VoidCallback? _onWidgetUpdateNeeded;
 
-  void setOnWidgetUpdateNeeded(VoidCallback callback) {
+  set onWidgetUpdateNeeded(VoidCallback callback) {
     _onWidgetUpdateNeeded = callback;
   }
 
@@ -44,12 +44,14 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   void setYouTubeService(YouTubeService service) {
     _youTubeService = service;
-    service.setStopOtherPlayerCallback(() {
+    service.stopOtherPlayerCallback = () {
       if (_playlist.isNotEmpty && currentSong != null) {
         stop();
       }
-    });
-    service.setLocalSongsCallback(() => librarySongs);
+    };
+    // ignore: cascade_invocations
+    service.localSongsCallback = () => librarySongs;
+    // ignore: cascade_invocations
     service.addListener(_onYouTubeServiceStateChanged);
   }
 
@@ -90,9 +92,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
             currentSong: currentSong,
             isPlaying: _player.state.playing,
             isOnlinePlaying: false,
-            isDarkMode: false,
-            primaryColor: null,
-            queue: null,
           );
         }
       }
@@ -455,9 +454,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
             isOnlinePlaying: true,
             onlineTitle: song.title,
             onlineAuthor: song.artists.isNotEmpty ? song.artists.first : '',
-            isDarkMode: false,
-            primaryColor: null,
-            queue: null,
           );
         },
       );
@@ -511,8 +507,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       _updateSongInPlace(updated);
 
       // Remove from loading tracking — could be youtubeId or artist key
-      if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
-        _thumbnailLoadingIds.remove(song.youtubeId!);
+      final ytId = song.youtubeId;
+      if (ytId != null && ytId.isNotEmpty) {
+        _thumbnailLoadingIds.remove(ytId);
       } else if (song.artists.isNotEmpty) {
         _thumbnailLoadingIds.remove('artist:${song.artists.first}');
       }
@@ -522,8 +519,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('Thumbnail ready for ${song.title}: $localPath');
     };
     _thumbnailService!.onThumbnailFailed = (song) {
-      if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
-        _thumbnailLoadingIds.remove(song.youtubeId!);
+      final ytId = song.youtubeId;
+      if (ytId != null && ytId.isNotEmpty) {
+        _thumbnailLoadingIds.remove(ytId);
       } else if (song.artists.isNotEmpty) {
         _thumbnailLoadingIds.remove('artist:${song.artists.first}');
       }
@@ -549,8 +547,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   bool isThumbnailLoading(Song song) {
     if (song.localThumbnailPath != null) return false;
-    if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
-      return _thumbnailLoadingIds.contains(song.youtubeId!);
+    final ytId = song.youtubeId;
+    if (ytId != null && ytId.isNotEmpty) {
+      return _thumbnailLoadingIds.contains(ytId);
     }
     if (song.artists.isNotEmpty) {
       return _thumbnailLoadingIds.contains('artist:${song.artists.first}');
@@ -562,9 +561,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (song.localThumbnailPath != null) return;
 
     // Track by youtubeId if available, otherwise by artist key
-    if (song.youtubeId != null && song.youtubeId!.isNotEmpty) {
-      if (_thumbnailLoadingIds.contains(song.youtubeId!)) return;
-      _thumbnailLoadingIds.add(song.youtubeId!);
+    final ytId = song.youtubeId;
+    if (ytId != null && ytId.isNotEmpty) {
+      if (_thumbnailLoadingIds.contains(ytId)) return;
+      _thumbnailLoadingIds.add(ytId);
     } else if (song.artists.isNotEmpty) {
       final artistKey = 'artist:${song.artists.first}';
       if (_thumbnailLoadingIds.contains(artistKey)) return;
@@ -590,8 +590,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           )
           .toList();
       for (final song in songs) {
-        if (!_thumbnailLoadingIds.contains(song.youtubeId!)) {
-          _thumbnailLoadingIds.add(song.youtubeId!);
+        final ytId = song.youtubeId;
+        if (ytId != null && !_thumbnailLoadingIds.contains(ytId)) {
+          _thumbnailLoadingIds.add(ytId);
         }
       }
       _thumbnailService?.requestThumbnailForAll(songs);
@@ -1081,7 +1082,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         notifyListeners();
 
         // Check for new music in background
-        _checkForNewMusicInBackground();
+        unawaited(_checkForNewMusicInBackground());
       } else {
         // If no songs in database, do a full scan
         await _scanLocalStorageForMusic();
@@ -1138,7 +1139,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       // Save as last played song
       _lastPlayedSong = song;
-      _saveLastPlayedSong(song);
+      unawaited(_saveLastPlayedSong(song));
 
       notifyListeners();
     }
@@ -1154,8 +1155,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     _tempPlaylist.clear();
 
     // Load entire library as queue
-    _playlist.clear();
-    _playlist.addAll(_songsMap.values);
+    _playlist
+      ..clear()
+      ..addAll(_songsMap.values);
 
     // Find the clicked song
     var index = _playlist.indexWhere((s) => s.id == song.id);
@@ -1190,8 +1192,9 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     _isUsingTempPlaylist = false;
     _tempPlaylist.clear();
 
-    _playlist.clear();
-    _playlist.addAll(songs);
+    _playlist
+      ..clear()
+      ..addAll(songs);
     _currentIndex = startIndex.clamp(0, _playlist.length - 1);
 
     final song = _playlist[_currentIndex];
@@ -1203,7 +1206,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     // Save as last played song
     _lastPlayedSong = song;
-    _saveLastPlayedSong(song);
+    unawaited(_saveLastPlayedSong(song));
 
     notifyListeners();
     debugPrint(
@@ -1784,21 +1787,21 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (_youTubeService == null) return null;
 
     try {
-      String artist = artists.isNotEmpty ? artists.first : 'Unknown Artist';
-      String query = '$title $artist';
+      final String artist = artists.isNotEmpty ? artists.first : 'Unknown Artist';
+      final String query = '$title $artist';
 
-      List<YouTubeAudio> results = await _youTubeService!.searchAudio(query);
+      final List<YouTubeAudio> results = await _youTubeService!.searchAudio(query);
 
       if (results.isEmpty) return null;
 
-      double targetDurationSec = targetDurationMs / 1000.0;
+      final double targetDurationSec = targetDurationMs / 1000.0;
 
       YouTubeAudio? bestMatch;
       double minDiff = double.infinity;
 
-      for (var result in results) {
+      for (final result in results) {
         if (result.duration != null) {
-          double diff =
+          final double diff =
               (result.duration!.inMilliseconds / 1000.0 - targetDurationSec)
                   .abs();
           if (diff < minDiff && diff <= 5.0) {
@@ -2836,7 +2839,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _player.play();
       await _updateNotification();
       _lastPlayedSong = song;
-      _saveLastPlayedSong(song);
+      unawaited(_saveLastPlayedSong(song));
       requestThumbnail(song, priority: 0);
       notifyListeners();
     }
@@ -2910,9 +2913,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  static bool isYouTubeOnlyUrl(String url) {
-    return url.startsWith('yt:');
-  }
+  static bool isYouTubeOnlyUrl(String url) => url.startsWith('yt:');
 
   Future<int> addMixedSongToPlaylist(PlaylistItem item, int playlistId) async {
     try {

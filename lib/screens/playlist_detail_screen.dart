@@ -193,21 +193,19 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           selectedSongs.toList(),
                         );
                         await _loadSongs();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '${selectedSongs.length} songs added to playlist',
-                              ),
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${selectedSongs.length} songs added to playlist',
                             ),
-                          );
-                        }
+                          ),
+                        );
                       } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                        }
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(
+                          this.context,
+                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
                       }
                     },
               child: Text(l10n.add),
@@ -226,6 +224,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       listen: false,
     );
     await musicProvider.loadPlaylistAsQueue(widget.playlistId);
+    if (!mounted) return;
     Navigator.pop(context);
   }
 
@@ -279,7 +278,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             )
           : ReorderableListView.builder(
               itemCount: _songs.length,
-              onReorder: (oldIndex, newIndex) async {
+              onReorderItem: (int oldIndex, int newIndex) async {
                 if (oldIndex < newIndex) {
                   newIndex -= 1;
                 }
@@ -333,12 +332,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   onTap: _isEditMode
                       ? null
                       : () {
-                          final musicProvider =
-                              Provider.of<music_provider.MusicProvider>(
-                                context,
-                                listen: false,
-                              );
-                          musicProvider.playSong(song);
+                          Provider.of<music_provider.MusicProvider>(
+                            context,
+                            listen: false,
+                          ).playSong(song);
                         },
                 );
               },

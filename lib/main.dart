@@ -332,11 +332,10 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       );
       final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       // Connect YouTube service to MusicProvider for notification integration
-      musicProv.setYouTubeService(youTubeService);
-      // Set up widget auto-update — fires on every notifyListeners
-      musicProv.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
-      // Set up theme widget auto-update — fires when theme/color changes
-      themeProvider.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
+      musicProv
+        ..setYouTubeService(youTubeService)
+        ..onWidgetUpdateNeeded = () => _onWidgetUpdate(musicProv);
+      themeProvider.onWidgetUpdateNeeded = () => _onWidgetUpdate(musicProv);
       // Load from database first, then scan for new music in background
       _initializeMusic(musicProv);
       // Check for GitHub releases and show update modal if new ones found.

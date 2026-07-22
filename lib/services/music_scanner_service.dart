@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:media_kit/media_kit.dart';
@@ -54,7 +55,7 @@ class MusicScannerService {
         await _scanDirectory(downloadsDir);
       }
     } catch (e) {
-      print('Error scanning for music: $e');
+      debugPrint('Error scanning for music: $e');
     }
   }
 
@@ -72,7 +73,7 @@ class MusicScannerService {
         }
       }
     } catch (e) {
-      print('Error scanning directory ${dir.path}: $e');
+      debugPrint('Error scanning directory ${dir.path}: $e');
     }
   }
 
@@ -101,7 +102,7 @@ class MusicScannerService {
       // Insert into database
       await _insertSongToDatabase(file, metadata, normalizedPath);
     } catch (e) {
-      print('Error processing file ${file.path}: $e');
+      debugPrint('Error processing file ${file.path}: $e');
     }
   }
 
