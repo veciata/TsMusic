@@ -55,13 +55,31 @@ jobs:
           key: flutter-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: flutter-pub-
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - run: flutter pub get
 
       - name: Decode keystore
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/upload-keystore.jks
+          echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/keystore.jks
+          keytool -importkeystore \
+            -srckeystore ${{ github.workspace }}/android/app/keystore.jks \
+            -destkeystore ${{ github.workspace }}/android/app/keystore.jks \
+            -srcstoretype pkcs12 \
+            -deststoretype pkcs12 \
+            -srcstorepass "$KEY_PASSWORD" \
+            -deststorepass "$KEY_PASSWORD" \
+            -srcalias "${{ secrets.KEY_ALIAS }}" \
+            -destalias "${{ secrets.KEY_ALIAS }}" \
+            -srckeypass "$KEY_PASSWORD" \
+            -destkeypass "$KEY_PASSWORD" \
+            -J-Dkeystore.pkcs12.legacy
 
       - name: Extract version from pubspec.yaml
         id: version
@@ -72,14 +90,14 @@ jobs:
 
       - name: Build AAB
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build appbundle --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
       - name: Build APK
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build apk --release --split-per-abi --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
@@ -146,13 +164,31 @@ jobs:
           key: flutter-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: flutter-pub-
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - run: flutter pub get
 
       - name: Decode keystore
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/upload-keystore.jks
+          echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/keystore.jks
+          keytool -importkeystore \
+            -srckeystore ${{ github.workspace }}/android/app/keystore.jks \
+            -destkeystore ${{ github.workspace }}/android/app/keystore.jks \
+            -srcstoretype pkcs12 \
+            -deststoretype pkcs12 \
+            -srcstorepass "$KEY_PASSWORD" \
+            -deststorepass "$KEY_PASSWORD" \
+            -srcalias "${{ secrets.KEY_ALIAS }}" \
+            -destalias "${{ secrets.KEY_ALIAS }}" \
+            -srckeypass "$KEY_PASSWORD" \
+            -destkeypass "$KEY_PASSWORD" \
+            -J-Dkeystore.pkcs12.legacy
 
       - name: Extract version from pubspec.yaml
         id: version
@@ -163,14 +199,14 @@ jobs:
 
       - name: Build AAB
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build appbundle --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
       - name: Build APK
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/upload-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build apk --release --split-per-abi --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
