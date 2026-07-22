@@ -278,14 +278,13 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             )
           : ReorderableListView.builder(
               itemCount: _songs.length,
-              onReorderItem: (int oldIndex, int newIndex) async {
+              onReorder: (int oldIndex, int newIndex) async {
                 if (oldIndex < newIndex) {
                   newIndex -= 1;
                 }
                 final song = _songs.removeAt(oldIndex);
                 _songs.insert(newIndex, song);
                 setState(() {});
-                // TODO: Update positions in database
               },
               itemBuilder: (context, index) {
                 final song = _songs[index];

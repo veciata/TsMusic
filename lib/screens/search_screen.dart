@@ -582,6 +582,7 @@ class _SearchScreenState extends State<SearchScreen> {
           await file.delete();
         }
 
+        if (!mounted) return;
         final musicProvider = context.read<music_provider.MusicProvider>();
         final updatedSong = song.copyWith(url: newPath);
         await musicProvider.updateSong(updatedSong);
