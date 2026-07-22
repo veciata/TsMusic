@@ -50,13 +50,16 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Decode and re-encode keystore for compatibility
+      - name: Decode keystore (if available)
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "No keystore secret set — building unsigned"
+            exit 0
+          fi
           echo "$KEYSTORE_B64" | base64 -d > ${{ github.workspace }}/android/app/keystore.jks
-          # Re-encode to ensure PKCS12 compatibility across JDK versions
           keytool -importkeystore \
             -srckeystore ${{ github.workspace }}/android/app/keystore.jks \
             -destkeystore ${{ github.workspace }}/android/app/keystore.jks \
@@ -68,7 +71,8 @@ jobs:
             -destalias "${{ secrets.KEY_ALIAS }}" \
             -srckeypass "$KEY_PASSWORD" \
             -destkeypass "$KEY_PASSWORD" \
-            -J-Dkeystore.pkcs12.legacy
+            -J-Dkeystore.pkcs12.legacy || \
+            echo "Keystore re-encode failed (non-fatal), using original"
 
       - name: Extract version
         id: version
