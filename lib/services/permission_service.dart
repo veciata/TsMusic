@@ -31,15 +31,6 @@ class PermissionService {
       // Android 13+
       // Request audio permission for reading music
       final audioStatus = await Permission.audio.request();
-
-      // Request notification permission for media controls
-      if (audioStatus.isGranted) {
-        final notificationStatus = await Permission.notification.status;
-        if (notificationStatus.isDenied) {
-          await Permission.notification.request();
-        }
-      }
-
       return audioStatus.isGranted;
     } else if (sdkInt >= 30) {
       // Android 11-12
@@ -60,6 +51,20 @@ class PermissionService {
       final status = await Permission.storage.request();
       return status.isGranted;
     }
+  }
+
+  Future<bool> hasNotificationPermission() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+
+    final status = await Permission.notification.status;
+    return status.isGranted || status.isLimited;
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+
+    final status = await Permission.notification.request();
+    return status.isGranted;
   }
 
   /// Check if all required permissions are granted

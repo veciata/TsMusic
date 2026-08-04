@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/core/services/clipboard_service.dart';
 
-enum YouTubeLinkAction { download, search }
+enum YouTubeLinkAction { download, search, savePlaylist }
 
 void showYouTubeLinkBottomSheet(
   BuildContext context, {
@@ -53,6 +53,18 @@ void showYouTubeLinkBottomSheet(
               onSelected(YouTubeLinkAction.download);
             },
           ),
+          if (link.playlistId != null) ...[
+            const Divider(indent: 72),
+            ListTile(
+              leading: const Icon(Icons.playlist_add_rounded),
+              title: const Text('Save Playlist'),
+              subtitle: const Text('Add this playlist to your library'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onSelected(YouTubeLinkAction.savePlaylist);
+              },
+            ),
+          ],
           const Divider(indent: 72),
           ListTile(
             leading: const Icon(Icons.search),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -107,6 +108,7 @@ class YouTubeService with ChangeNotifier {
 
   final YoutubeExplode _yt;
   final http.Client _httpClient;
+  final YoutubeHttpClient _ytHttpClient;
   final Player _player;
 
   final Map<String, DownloadProgress> _activeDownloads = {};
@@ -125,6 +127,13 @@ class YouTubeService with ChangeNotifier {
 
   Function()? _stopOtherPlayer;
   List<ts.Song> Function()? _getLocalSongs;
+
+  // True when the current audio belongs to the main player queue (e.g. a
+  // YouTube-only song stored in a playlist). In this mode the service does
+  // not track the online playlist or auto-advance it.
+  bool _playingFromQueue = false;
+
+  bool get playingFromQueue => _playingFromQueue;
 
   // Auto-suggest state
   bool _autoSuggestEnabled = false;
@@ -163,6 +172,7 @@ class YouTubeService with ChangeNotifier {
   YouTubeService({YoutubeExplode? yt, http.Client? httpClient, Player? player})
     : _yt = yt ?? YoutubeExplode(),
       _httpClient = httpClient ?? http.Client(),
+      _ytHttpClient = YoutubeHttpClient(httpClient),
       _player = player ?? Player() {
     _instance = this;
     // Initialize caches with max capacity
@@ -178,7 +188,7 @@ class YouTubeService with ChangeNotifier {
       notifyListeners();
     });
     _player.stream.completed.listen((completed) async {
-      if (completed && _onlinePlaylist.isNotEmpty) {
+      if (completed && _onlinePlaylist.isNotEmpty && !_playingFromQueue) {
         final nextIndex = _onlinePlaylistIndex + 1;
         if (nextIndex < _onlinePlaylist.length) {
           await playOnlinePlaylistAt(nextIndex);
@@ -237,18 +247,181 @@ class YouTubeService with ChangeNotifier {
 
   Future<int> fetchPlaylistAndAdd(String playlistUrl) async {
     try {
-      final playlistId = PlaylistId(playlistUrl);
-      final videos = await _yt.playlists.getVideos(playlistId).toList();
-      for (final video in videos) {
-        final audio = YouTubeAudio.fromVideo(video);
-        _onlinePlaylist.add(audio);
-      }
+      final audios = await _fetchPlaylist(playlistUrl);
+      _onlinePlaylist.addAll(audios);
       notifyListeners();
-      return videos.length;
+      return audios.length;
     } catch (e) {
       debugPrint('Error fetching playlist: $e');
       rethrow;
     }
+  }
+
+  /// Fetches a YouTube playlist's videos without touching the online playlist.
+  Future<List<YouTubeAudio>> fetchPlaylist(String playlistUrl) async {
+    try {
+      return await _fetchPlaylist(playlistUrl);
+    } catch (e) {
+      debugPrint('Error fetching playlist: $e');
+      rethrow;
+    }
+  }
+
+  static final RegExp _videoIdRegExp = RegExp(r'^[a-zA-Z0-9_-]{11}$');
+  static final RegExp _ytInitDataRegExp =
+      RegExp(r'var ytInitialData = (\{.*?\});</script>');
+
+  /// Fetches a YouTube playlist's videos. Handles both the new `lockupViewModel`
+  /// layout (videos not filtered out when the channel id is missing) and falls
+  /// back to the classic playlist API when the new layout isn't present.
+  Future<List<YouTubeAudio>> _fetchPlaylist(String playlistUrl) async {
+    final playlistId = PlaylistId(playlistUrl).value;
+    final audios = <YouTubeAudio>[];
+    final seenIds = <String>{};
+
+    final raw = await _ytHttpClient.getString(
+      'https://www.youtube.com/playlist?list=$playlistId&hl=en&persist_hl=1',
+    );
+    final initMatch = _ytInitDataRegExp.firstMatch(raw);
+    if (initMatch != null) {
+      final initial = json.decode(initMatch.group(1)!) as Map<String, dynamic>;
+      await _parsePlaylistPage(initial, audios, seenIds);
+
+      // Follow pagination until there are no more items.
+      var token = _findContinuationToken(initial);
+      final visitedTokens = <String>{};
+      while (token != null && visitedTokens.add(token)) {
+        final next = await _ytHttpClient.sendContinuation(
+          'browse',
+          token,
+          headers: {'x-youtube-client-name': '1'},
+        );
+        await _parsePlaylistPage(next, audios, seenIds);
+        final nextToken = _findContinuationToken(next);
+        if (nextToken == null || nextToken == token) break;
+        token = nextToken;
+      }
+    }
+
+    // Fallback for the classic layout / mixes that don't use lockupViewModels.
+    if (audios.isEmpty) {
+      try {
+        final videos = await _yt.playlists.getVideos(playlistId).toList();
+        for (final video in videos) {
+          if (!seenIds.add(video.id.value)) continue;
+          audios.add(YouTubeAudio.fromVideo(video));
+        }
+      } catch (e) {
+        debugPrint('Classic playlist fallback failed: $e');
+      }
+    }
+
+    return audios;
+  }
+
+  Future<void> _parsePlaylistPage(
+    Map<String, dynamic> page,
+    List<YouTubeAudio> audios,
+    Set<String> seenIds,
+  ) async {
+    final lockups = <dynamic>[];
+    _collectLockups(page, lockups);
+    for (final entry in lockups) {
+      final id = _string(entry, 'contentId');
+      if (id == null || !_videoIdRegExp.hasMatch(id) || !seenIds.add(id)) {
+        continue;
+      }
+
+      final lmv = entry['metadata']?['lockupMetadataViewModel'];
+      final titleNode = _read(lmv, 'title');
+      final rawTitle = _string(titleNode, 'content');
+      final title = (rawTitle ?? '').trim();
+      if (title.isEmpty) continue;
+
+      final author = _parseLockupAuthor(lmv);
+      final artistList = YouTubeArtistParser.parseArtistName(title, author);
+
+      audios.add(
+        YouTubeAudio(
+          id: id,
+          title: title,
+          author: artistList.isNotEmpty ? artistList.first : author,
+          artists: artistList,
+          thumbnailUrl: _parseLockupThumbnail(entry) ??
+              'https://i.ytimg.com/vi/$id/hqdefault.jpg',
+        ),
+      );
+    }
+  }
+
+  void _collectLockups(dynamic node, List<dynamic> out) {
+    if (node is Map<String, dynamic>) {
+      final lockup = node['lockupViewModel'];
+      if (lockup is Map<String, dynamic>) {
+        out.add(lockup);
+      }
+      for (final v in node.values) {
+        _collectLockups(v, out);
+      }
+    } else if (node is List) {
+      for (final v in node) {
+        _collectLockups(v, out);
+      }
+    }
+  }
+
+  String? _findContinuationToken(dynamic node) {
+    if (node is Map<String, dynamic>) {
+      final cc = node['continuationCommand'];
+      if (cc is Map<String, dynamic> && cc['token'] is String) {
+        return cc['token'] as String;
+      }
+      for (final v in node.values) {
+        final token = _findContinuationToken(v);
+        if (token != null) return token;
+      }
+    } else if (node is List) {
+      for (final v in node) {
+        final token = _findContinuationToken(v);
+        if (token != null) return token;
+      }
+    }
+    return null;
+  }
+
+  Object? _read(dynamic map, String key) =>
+      map is Map<String, dynamic> ? map[key] : null;
+
+  String? _string(dynamic map, String key) {
+    final value = _read(map, key);
+    return value is String ? value : null;
+  }
+
+  /// Extracts the first metadata row's first part as the artist name.
+  String _parseLockupAuthor(dynamic lmv) {
+    final metadata = _read(lmv, 'metadata');
+    final viewModel = _read(metadata, 'contentMetadataViewModel');
+    final rows = _read(viewModel, 'metadataRows');
+    if (rows is List && rows.isNotEmpty) {
+      final parts = _read(rows.first, 'metadataParts');
+      if (parts is List && parts.isNotEmpty) {
+        final text = _read(parts.first, 'text');
+        return _string(text, 'content') ?? '';
+      }
+    }
+    return '';
+  }
+
+  String? _parseLockupThumbnail(dynamic lockup) {
+    final contentImage = lockup['contentImage'];
+    final thumb = _read(contentImage, 'thumbnailViewModel');
+    final image = _read(thumb, 'image');
+    final sources = _read(image, 'sources');
+    if (sources is List && sources.isNotEmpty) {
+      final url = _string(sources.first, 'url');
+      if (url != null && url.isNotEmpty) return url;
+    }
+    return null;
   }
 
   Future<void> playOnlinePlaylistAt(int index) async {
@@ -307,19 +480,25 @@ class YouTubeService with ChangeNotifier {
   }
 
   // Play audio from YouTube (or local file if matching song exists)
-  Future<void> playAudio(YouTubeAudio audio) async {
+  Future<void> playAudio(
+    YouTubeAudio audio, {
+    bool trackOnline = true,
+  }) async {
     try {
       _stopOtherPlayer?.call();
 
       _currentAudio = audio;
+      _playingFromQueue = !trackOnline;
 
-      // Track in online playlist
-      final existingIndex = _onlinePlaylist.indexWhere((a) => a.id == audio.id);
-      if (existingIndex >= 0) {
-        _onlinePlaylistIndex = existingIndex;
-      } else {
-        _onlinePlaylist.add(audio);
-        _onlinePlaylistIndex = _onlinePlaylist.length - 1;
+      if (trackOnline) {
+        // Track in online playlist
+        final existingIndex = _onlinePlaylist.indexWhere((a) => a.id == audio.id);
+        if (existingIndex >= 0) {
+          _onlinePlaylistIndex = existingIndex;
+        } else {
+          _onlinePlaylist.add(audio);
+          _onlinePlaylistIndex = _onlinePlaylist.length - 1;
+        }
       }
 
       isLoading.value = true;
@@ -463,6 +642,7 @@ class YouTubeService with ChangeNotifier {
     await _player.stop();
     _currentAudio = null;
     _onlinePlaylistIndex = -1;
+    _playingFromQueue = false;
     notifyListeners();
   }
 

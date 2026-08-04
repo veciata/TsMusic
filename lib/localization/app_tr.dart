@@ -350,7 +350,32 @@ class AppLocalizationsTr extends AppLocalizations {
       'Müzik dosyalarınızı bulmak ve oynatmak için lütfen depolama erişim izni verin.';
 
   @override
+  String get introNotificationTitle => 'Bildirimler';
+
+  @override
+  String get introNotificationDesc =>
+      'İndirmeleriniz için bildirim almak ve oynatmayı kilit ekranından kontrol etmek için bildirimleri etkinleştirin.';
+
+  @override
+  String get introStorageLocationTitle => 'Müzik Nerede Saklansın';
+
+  @override
+  String get introStorageLocationDesc =>
+      'İndirilen şarkıların kaydedileceği yeri seçin. Bunu daha sonra Ayarlar\'dan değiştirebilirsiniz.';
+
+  @override
+  String get introThemeTitle => 'Temanızı Seçin';
+
+  @override
+  String get introThemeDesc =>
+      'Bir vurgu rengi seçin ve açık, koyu veya sistem teması tercih edin. Bunu istediğiniz zaman Ayarlar\'dan değiştirebilirsiniz.';
+
+  @override
   String get permissionRequired => 'Devam etmek için depolama izni gereklidir';
+
+  @override
+  String get notificationPermissionRequired =>
+      'Devam etmek için bildirim izni gereklidir';
 
   @override
   String get grantPermission => 'İzin Ver';
@@ -361,6 +386,10 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get permissionGrantedDesc =>
       'Artık müzik dosyalarınıza erişebilirsiniz. Devam etmek için İleri\'ye dokunun';
+
+  @override
+  String get notificationPermissionGrantedDesc =>
+      'Bildirimler etkinleştirildi. Devam etmek için İleri\'ye dokunun';
 
   @override
   String get songsMoved => 'şarkı taşındı';
