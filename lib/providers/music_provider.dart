@@ -213,18 +213,21 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
     return _player.state.playing;
   }
+
   Duration get position {
     if (_isCurrentSongYouTubeOnly()) {
       return _youTubeService?.player.state.position ?? Duration.zero;
     }
     return _player.state.position;
   }
+
   Duration get duration {
     if (_isCurrentSongYouTubeOnly()) {
       return _youTubeService?.player.state.duration ?? Duration.zero;
     }
     return _player.state.duration;
   }
+
   Song? get currentSong {
     final List<Song> activePlaylist = _isUsingTempPlaylist
         ? _tempPlaylist
@@ -1328,8 +1331,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (_isOnlineOnlySession) {
       final onlinePlaylist = _youTubeService!.onlinePlaylist;
       final currentIdx = _youTubeService!.onlinePlaylistIndex;
-      if (onlinePlaylist.isNotEmpty &&
-          currentIdx < onlinePlaylist.length - 1) {
+      if (onlinePlaylist.isNotEmpty && currentIdx < onlinePlaylist.length - 1) {
         await _youTubeService!.playOnlinePlaylistAt(currentIdx + 1);
         notifyListeners();
         return;
@@ -1832,9 +1834,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       final ytAudio = YouTubeAudio(
         id: song.youtubeId!,
         title: song.title,
-        author: song.artists.isNotEmpty
-            ? song.artists.first
-            : 'Unknown Artist',
+        author: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
         artists: song.artists,
         duration: Duration(milliseconds: song.duration),
         thumbnailUrl: song.albumArtUrl,

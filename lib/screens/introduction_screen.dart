@@ -135,8 +135,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
 
     if (currentPageData.isPermissionPage) {
       final permissionService = PermissionService();
-      final granted =
-          currentPageData.permissionType == _PermissionType.storage
+      final granted = currentPageData.permissionType == _PermissionType.storage
           ? await permissionService.requestStoragePermission()
           : await permissionService.requestNotificationPermission();
       if (granted) {
@@ -416,11 +415,7 @@ class _ThemePageView extends StatelessWidget {
               color: selectedColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(60),
             ),
-            child: Icon(
-              page.icon,
-              size: 60,
-              color: selectedColor,
-            ),
+            child: Icon(page.icon, size: 60, color: selectedColor),
           ),
           const SizedBox(height: 32),
           Text(
@@ -498,8 +493,7 @@ class _ThemePageView extends StatelessWidget {
               ),
             ],
             selected: {selectedMode},
-            onSelectionChanged: (selection) =>
-                onModeChanged(selection.first),
+            onSelectionChanged: (selection) => onModeChanged(selection.first),
           ),
         ],
       ),

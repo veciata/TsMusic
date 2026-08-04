@@ -223,17 +223,15 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     if (navigator == null) return;
     final navContext = navigator.context;
     try {
-      ScaffoldMessenger.of(navContext).showSnackBar(
-        const SnackBar(content: Text('Fetching playlist...')),
-      );
+      ScaffoldMessenger.of(
+        navContext,
+      ).showSnackBar(const SnackBar(content: Text('Fetching playlist...')));
       final count = await ytService.fetchPlaylistAndAdd(link.playlistId!);
       if (count > 0) {
         await ytService.playOnlinePlaylistAt(0);
         mainNavKey.currentState?.goToDownloads();
         ScaffoldMessenger.of(navContext).showSnackBar(
-          SnackBar(
-            content: Text('Playing playlist ($count songs)'),
-          ),
+          SnackBar(content: Text('Playing playlist ($count songs)')),
         );
       } else {
         ScaffoldMessenger.of(navContext).showSnackBar(
@@ -244,9 +242,9 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       }
     } catch (e) {
       debugPrint('Error playing playlist: $e');
-      ScaffoldMessenger.of(navContext).showSnackBar(
-        SnackBar(content: Text('Error playing playlist: $e')),
-      );
+      ScaffoldMessenger.of(
+        navContext,
+      ).showSnackBar(SnackBar(content: Text('Error playing playlist: $e')));
     }
   }
 
@@ -260,9 +258,9 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       listen: false,
     );
     try {
-      ScaffoldMessenger.of(navContext).showSnackBar(
-        const SnackBar(content: Text('Fetching playlist...')),
-      );
+      ScaffoldMessenger.of(
+        navContext,
+      ).showSnackBar(const SnackBar(content: Text('Fetching playlist...')));
       final audios = await ytService.fetchPlaylist(
         link.playlistId != null
             ? 'https://www.youtube.com/playlist?list=${link.playlistId}'
@@ -284,9 +282,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
         await musicProvider.addOnlineSongToPlaylist(
           youtubeId: audio.id,
           title: audio.title,
-          artists: audio.artists.isNotEmpty
-              ? audio.artists
-              : [audio.author],
+          artists: audio.artists.isNotEmpty ? audio.artists : [audio.author],
           duration: audio.duration?.inMilliseconds ?? 0,
           thumbnailUrl: audio.thumbnailUrl,
           playlistId: playlistId,
@@ -295,15 +291,13 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
 
       mainNavKey.currentState?.goToDownloads();
       ScaffoldMessenger.of(navContext).showSnackBar(
-        SnackBar(
-          content: Text('Playlist saved (${audios.length} songs)'),
-        ),
+        SnackBar(content: Text('Playlist saved (${audios.length} songs)')),
       );
     } catch (e) {
       debugPrint('Error saving playlist: $e');
-      ScaffoldMessenger.of(navContext).showSnackBar(
-        SnackBar(content: Text('Error saving playlist: $e')),
-      );
+      ScaffoldMessenger.of(
+        navContext,
+      ).showSnackBar(SnackBar(content: Text('Error saving playlist: $e')));
     }
   }
 

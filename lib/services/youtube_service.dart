@@ -264,8 +264,9 @@ class YouTubeService with ChangeNotifier {
   }
 
   static final RegExp _videoIdRegExp = RegExp(r'^[a-zA-Z0-9_-]{11}$');
-  static final RegExp _ytInitDataRegExp =
-      RegExp(r'var ytInitialData = (\{.*?\});</script>');
+  static final RegExp _ytInitDataRegExp = RegExp(
+    r'var ytInitialData = (\{.*?\});</script>',
+  );
 
   /// Fetches a YouTube playlist's videos. Handles both the new `lockupViewModel`
   /// layout (videos not filtered out when the channel id is missing) and falls
@@ -343,7 +344,8 @@ class YouTubeService with ChangeNotifier {
           title: title,
           author: artistList.isNotEmpty ? artistList.first : author,
           artists: artistList,
-          thumbnailUrl: _parseLockupThumbnail(entry) ??
+          thumbnailUrl:
+              _parseLockupThumbnail(entry) ??
               'https://i.ytimg.com/vi/$id/hqdefault.jpg',
         ),
       );
@@ -476,10 +478,7 @@ class YouTubeService with ChangeNotifier {
   }
 
   // Play audio from YouTube (or local file if matching song exists)
-  Future<void> playAudio(
-    YouTubeAudio audio, {
-    bool trackOnline = true,
-  }) async {
+  Future<void> playAudio(YouTubeAudio audio, {bool trackOnline = true}) async {
     try {
       _stopOtherPlayer?.call();
 
@@ -488,7 +487,9 @@ class YouTubeService with ChangeNotifier {
 
       if (trackOnline) {
         // Track in online playlist
-        final existingIndex = _onlinePlaylist.indexWhere((a) => a.id == audio.id);
+        final existingIndex = _onlinePlaylist.indexWhere(
+          (a) => a.id == audio.id,
+        );
         if (existingIndex >= 0) {
           _onlinePlaylistIndex = existingIndex;
         } else {
