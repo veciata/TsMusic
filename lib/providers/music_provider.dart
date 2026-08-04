@@ -53,6 +53,23 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     service.localSongsCallback = () => librarySongs;
     // ignore: cascade_invocations
     service.addListener(_onYouTubeServiceStateChanged);
+    // Advance the unified queue when a YouTube-only queue song finishes
+    service.player.stream.completed.listen((completed) async {
+      if (completed) {
+        await _onYouTubeQueueSongCompleted();
+      }
+    });
+  }
+
+  Future<void> _onYouTubeQueueSongCompleted() async {
+    if (!_isCurrentSongYouTubeOnly()) return;
+    final activePlaylist = _getActivePlaylist();
+    if (activePlaylist.isEmpty) return;
+    if (_loopMode == PlaylistMode.single) {
+      await _setAudioSource(activePlaylist[_currentIndex]);
+      return;
+    }
+    await next();
   }
 
   void _onYouTubeServiceStateChanged() {
@@ -190,9 +207,24 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   PlaylistMode get loopMode => _loopMode;
   Stream<Duration> get positionStream => _player.stream.position;
   Stream<bool> get playingStream => _player.stream.playing;
-  bool get isPlaying => _player.state.playing;
-  Duration get position => _player.state.position;
-  Duration get duration => _player.state.duration;
+  bool get isPlaying {
+    if (_isCurrentSongYouTubeOnly()) {
+      return _youTubeService?.isPlaying ?? false;
+    }
+    return _player.state.playing;
+  }
+  Duration get position {
+    if (_isCurrentSongYouTubeOnly()) {
+      return _youTubeService?.player.state.position ?? Duration.zero;
+    }
+    return _player.state.position;
+  }
+  Duration get duration {
+    if (_isCurrentSongYouTubeOnly()) {
+      return _youTubeService?.player.state.duration ?? Duration.zero;
+    }
+    return _player.state.duration;
+  }
   Song? get currentSong {
     final List<Song> activePlaylist = _isUsingTempPlaylist
         ? _tempPlaylist
@@ -338,6 +370,28 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   List<Song> _getActivePlaylist() =>
       _isUsingTempPlaylist ? _tempPlaylist : _playlist;
 
+  /// A song stored in a playlist purely as a YouTube link (no local file).
+  bool _isYouTubeOnlySong(Song song) =>
+      song.url.startsWith('yt:') && (song.youtubeId?.isNotEmpty ?? false);
+
+  /// Whether the current queue item is a YouTube-only link song.
+  bool _isCurrentSongYouTubeOnly() {
+    final activePlaylist = _getActivePlaylist();
+    if (activePlaylist.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= activePlaylist.length) {
+      return false;
+    }
+    return _isYouTubeOnlySong(activePlaylist[_currentIndex]);
+  }
+
+  /// True when YouTube audio is playing outside the main queue (search/artist
+  /// streaming session) rather than from a song in the local queue.
+  bool get _isOnlineOnlySession =>
+      _youTubeService?.currentAudio != null &&
+      _playlist.isEmpty &&
+      _tempPlaylist.isEmpty;
+
   /// Save current playback state for resume after app restart
   Future<void> _savePlaybackState() async {
     try {
@@ -408,6 +462,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           // Player.open() auto-plays in media_kit — pause immediately
           await _player.pause();
           await _player.seek(Duration(milliseconds: savedPosition));
+          await _ensureRestoredPaused();
 
           final song = _playlist[_currentIndex];
           requestThumbnail(song, priority: 0);
@@ -418,6 +473,27 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('Error restoring playback state: $e');
+    }
+  }
+
+  /// Forces the active player to stay paused after restoring the last session.
+  /// `_setAudioSource` may auto-start playback for YouTube-only or missing-file
+  /// fallback paths, so we explicitly pause whatever player became active.
+  Future<void> _ensureRestoredPaused() async {
+    final song = currentSong;
+    if (song != null && _isYouTubeOnlySong(song)) {
+      await _youTubeService?.pause();
+      return;
+    }
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      if (_youTubeService?.playingFromQueue ?? false) {
+        await _youTubeService?.pause();
+      } else {
+        await audioHandler.pause();
+      }
+    } else {
+      await _player.pause();
     }
   }
 
@@ -663,6 +739,11 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> seek(Duration position) async {
+    if (_isCurrentSongYouTubeOnly() && _youTubeService != null) {
+      await _youTubeService!.player.seek(position);
+      notifyListeners();
+      return;
+    }
     final audioHandler = AudioNotificationService.audioHandler;
     if (audioHandler != null) {
       await audioHandler.seek(position);
@@ -1243,10 +1324,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> next() async {
-    if (_youTubeService?.currentAudio != null) {
+    // Pure online session (search/artist streaming) keeps its own playlist
+    if (_isOnlineOnlySession) {
       final onlinePlaylist = _youTubeService!.onlinePlaylist;
       final currentIdx = _youTubeService!.onlinePlaylistIndex;
-      if (onlinePlaylist.isNotEmpty && currentIdx < onlinePlaylist.length - 1) {
+      if (onlinePlaylist.isNotEmpty &&
+          currentIdx < onlinePlaylist.length - 1) {
         await _youTubeService!.playOnlinePlaylistAt(currentIdx + 1);
         notifyListeners();
         return;
@@ -1254,10 +1337,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _stopOnlineAndResumeLocal();
       return;
     }
+
     final List<Song> currentPlaylist = _isUsingTempPlaylist
         ? _tempPlaylist
         : _playlist;
     if (currentPlaylist.isEmpty) return;
+
     if (_shuffleEnabled) {
       int nextIndex = _currentIndex;
       final random = Random();
@@ -1268,18 +1353,22 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     } else {
       _currentIndex = (_currentIndex + 1) % currentPlaylist.length;
     }
-    await _setAudioSource(currentPlaylist[_currentIndex]);
-    await _player.play();
+    final nextSong = currentPlaylist[_currentIndex];
+    await _setAudioSource(nextSong);
+    if (!_isYouTubeOnlySong(nextSong)) {
+      await _player.play();
+    }
     await _updateNotification();
     if (!_isUsingTempPlaylist) {
       await _updateNowPlayingPlaylist();
     }
-    requestThumbnail(currentPlaylist[_currentIndex], priority: 0);
+    requestThumbnail(nextSong, priority: 0);
     notifyListeners();
   }
 
   Future<void> previous() async {
-    if (_youTubeService?.currentAudio != null) {
+    // Pure online session (search/artist streaming) keeps its own playlist
+    if (_isOnlineOnlySession) {
       final onlinePlaylist = _youTubeService!.onlinePlaylist;
       final currentIdx = _youTubeService!.onlinePlaylistIndex;
       if (onlinePlaylist.isNotEmpty && currentIdx > 0) {
@@ -1290,23 +1379,37 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       await _stopOnlineAndResumeLocal();
       return;
     }
+
     final List<Song> currentPlaylist = _isUsingTempPlaylist
         ? _tempPlaylist
         : _playlist;
     if (currentPlaylist.isEmpty) return;
     _currentIndex = (_currentIndex - 1) % currentPlaylist.length;
     if (_currentIndex < 0) _currentIndex = currentPlaylist.length - 1;
-    await _setAudioSource(currentPlaylist[_currentIndex]);
-    await _player.play();
+    final prevSong = currentPlaylist[_currentIndex];
+    await _setAudioSource(prevSong);
+    if (!_isYouTubeOnlySong(prevSong)) {
+      await _player.play();
+    }
     await _updateNotification();
     if (!_isUsingTempPlaylist) {
       await _updateNowPlayingPlaylist();
     }
-    requestThumbnail(currentPlaylist[_currentIndex], priority: 0);
+    requestThumbnail(prevSong, priority: 0);
     notifyListeners();
   }
 
   Future<void> togglePlayPause() async {
+    // Route controls to the online player when a YouTube-only queue song is active
+    if (_isCurrentSongYouTubeOnly() && _youTubeService != null) {
+      if (_youTubeService!.isPlaying) {
+        await _youTubeService!.pause();
+      } else {
+        await _youTubeService!.play();
+      }
+      notifyListeners();
+      return;
+    }
     final audioHandler = AudioNotificationService.audioHandler;
     if (audioHandler != null) {
       if (_player.state.playing) {
@@ -1700,6 +1803,12 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     final audioHandler = AudioNotificationService.audioHandler;
     debugPrint('_setAudioSource: audioHandler=${audioHandler != null}');
 
+    // Stop any queue-mode YouTube playback when switching to a local song
+    if (!_isYouTubeOnlySong(song) &&
+        (_youTubeService?.playingFromQueue ?? false)) {
+      await _youTubeService?.stop();
+    }
+
     // Check if this is a local file that exists
     final isLocalFile = song.url.startsWith('/') || song.url.contains(':');
     bool fileExists = false;
@@ -1711,6 +1820,27 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         // If we can't check, assume it doesn't exist
         fileExists = false;
       }
+    }
+
+    // YouTube-only song stored as a link in a playlist — route through the
+    // same online player so the whole queue is controlled uniformly.
+    if (_isYouTubeOnlySong(song) && _youTubeService != null) {
+      debugPrint(
+        '_setAudioSource: Playing YouTube-only queue song: ${song.youtubeId}',
+      );
+      await audioHandler?.stop();
+      final ytAudio = YouTubeAudio(
+        id: song.youtubeId!,
+        title: song.title,
+        author: song.artists.isNotEmpty
+            ? song.artists.first
+            : 'Unknown Artist',
+        artists: song.artists,
+        duration: Duration(milliseconds: song.duration),
+        thumbnailUrl: song.albumArtUrl,
+      );
+      await _youTubeService!.playAudio(ytAudio, trackOnline: false);
+      return;
     }
 
     // If local file doesn't exist, try YouTube fallback (search if no ID)

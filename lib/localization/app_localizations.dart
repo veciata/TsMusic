@@ -161,6 +161,12 @@ class AppLocalizations {
   String get introWelcomeDesc => throw UnimplementedError();
   String get introStorageTitle => throw UnimplementedError();
   String get introStorageDesc => throw UnimplementedError();
+  String get introNotificationTitle => throw UnimplementedError();
+  String get introNotificationDesc => throw UnimplementedError();
+  String get introStorageLocationTitle => throw UnimplementedError();
+  String get introStorageLocationDesc => throw UnimplementedError();
+  String get introThemeTitle => throw UnimplementedError();
+  String get introThemeDesc => throw UnimplementedError();
   String get introSearchTitle => throw UnimplementedError();
   String get introSearchDesc => throw UnimplementedError();
   String get introDownloadTitle => throw UnimplementedError();
@@ -170,9 +176,11 @@ class AppLocalizations {
   String get getStarted => throw UnimplementedError();
   String get next => throw UnimplementedError();
   String get permissionRequired => throw UnimplementedError();
+  String get notificationPermissionRequired => throw UnimplementedError();
   String get grantPermission => throw UnimplementedError();
   String get permissionGranted => throw UnimplementedError();
   String get permissionGrantedDesc => throw UnimplementedError();
+  String get notificationPermissionGrantedDesc => throw UnimplementedError();
 
   // Theme settings
   String get highContrastAccent => throw UnimplementedError();

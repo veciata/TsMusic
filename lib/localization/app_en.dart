@@ -353,7 +353,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'To find and play your music files, please grant storage access permission.';
 
   @override
+  String get introNotificationTitle => 'Notifications';
+
+  @override
+  String get introNotificationDesc =>
+      'Enable notifications to get alerts for your downloads and control playback from the lock screen.';
+
+  @override
+  String get introStorageLocationTitle => 'Where to Store Music';
+
+  @override
+  String get introStorageLocationDesc =>
+      'Choose where downloaded songs are saved. You can change this later in Settings.';
+
+  @override
+  String get introThemeTitle => 'Choose Your Theme';
+
+  @override
+  String get introThemeDesc =>
+      'Pick an accent color and choose light, dark or system theme. You can change this anytime in Settings.';
+
+  @override
   String get permissionRequired => 'Storage permission is required to continue';
+
+  @override
+  String get notificationPermissionRequired =>
+      'Notification permission is required to continue';
 
   @override
   String get grantPermission => 'Grant Permission';
@@ -364,6 +389,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get permissionGrantedDesc =>
       'You can now access your music files. Tap Next to continue.';
+
+  @override
+  String get notificationPermissionGrantedDesc =>
+      'Notifications are now enabled. Tap Next to continue.';
 
   @override
   String get whatsNew => "What's New";

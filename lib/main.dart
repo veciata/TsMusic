@@ -29,12 +29,14 @@ import 'package:tsmusic/core/services/error_tracking_service.dart';
 import 'package:tsmusic/core/services/clipboard_service.dart';
 import 'package:tsmusic/widgets/youtube_link_bottom_sheet.dart';
 
+import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/services/download_notification_service.dart';
 import 'package:tsmusic/services/home_widget_service.dart';
 import 'package:tsmusic/providers/update_notification_provider.dart';
 import 'package:tsmusic/widgets/update_notification_modal.dart';
 
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -177,10 +179,11 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
 
   Future<void> _checkClipboard() async {
     final link = await _clipboardService.checkClipboard();
-    if (link == null || !mounted) return;
+    final navigator = rootNavigatorKey.currentState;
+    if (link == null || navigator == null || !mounted) return;
 
     showYouTubeLinkBottomSheet(
-      context,
+      navigator.context,
       link: link,
       onSelected: (action) {
         switch (action) {
@@ -188,28 +191,118 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
             _handleYouTubeDownload(link);
           case YouTubeLinkAction.search:
             _handleYouTubeSearch(link);
+          case YouTubeLinkAction.savePlaylist:
+            _saveYouTubePlaylist(link);
         }
       },
     );
   }
 
   void _handleYouTubeDownload(YouTubeLinkResult link) {
-    final ytService = Provider.of<YouTubeService>(context, listen: false);
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final navigator = rootNavigatorKey.currentState;
+    if (navigator == null) return;
+    final navContext = navigator.context;
+    final ytService = Provider.of<YouTubeService>(navContext, listen: false);
+    final settings = Provider.of<SettingsProvider>(navContext, listen: false);
     if (link.isPlaylist) {
-      mainNavKey.currentState?.goToDownloads();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Playlist download not yet supported. Open the video to download.',
-          ),
-        ),
-      );
+      _playYouTubePlaylist(ytService, link);
     } else if (link.videoId != null) {
       ytService.downloadAudio(
         videoId: link.videoId!,
         preferredFormat: settings.audioFormat,
         downloadLocation: settings.downloadLocation,
+      );
+    }
+  }
+
+  Future<void> _playYouTubePlaylist(
+    YouTubeService ytService,
+    YouTubeLinkResult link,
+  ) async {
+    final navigator = rootNavigatorKey.currentState;
+    if (navigator == null) return;
+    final navContext = navigator.context;
+    try {
+      ScaffoldMessenger.of(navContext).showSnackBar(
+        const SnackBar(content: Text('Fetching playlist...')),
+      );
+      final count = await ytService.fetchPlaylistAndAdd(link.playlistId!);
+      if (count > 0) {
+        await ytService.playOnlinePlaylistAt(0);
+        mainNavKey.currentState?.goToDownloads();
+        ScaffoldMessenger.of(navContext).showSnackBar(
+          SnackBar(
+            content: Text('Playing playlist ($count songs)'),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(navContext).showSnackBar(
+          const SnackBar(
+            content: Text('This playlist is empty or could not be read.'),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error playing playlist: $e');
+      ScaffoldMessenger.of(navContext).showSnackBar(
+        SnackBar(content: Text('Error playing playlist: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveYouTubePlaylist(YouTubeLinkResult link) async {
+    final navigator = rootNavigatorKey.currentState;
+    if (navigator == null) return;
+    final navContext = navigator.context;
+    final ytService = Provider.of<YouTubeService>(navContext, listen: false);
+    final musicProvider = Provider.of<music_provider.MusicProvider>(
+      navContext,
+      listen: false,
+    );
+    try {
+      ScaffoldMessenger.of(navContext).showSnackBar(
+        const SnackBar(content: Text('Fetching playlist...')),
+      );
+      final audios = await ytService.fetchPlaylist(
+        link.playlistId != null
+            ? 'https://www.youtube.com/playlist?list=${link.playlistId}'
+            : link.url,
+      );
+      if (audios.isEmpty) {
+        ScaffoldMessenger.of(navContext).showSnackBar(
+          const SnackBar(
+            content: Text('This playlist is empty or could not be read.'),
+          ),
+        );
+        return;
+      }
+
+      final db = DatabaseHelper();
+      final playlistId = await db.createPlaylist(link.url);
+
+      for (final audio in audios) {
+        await musicProvider.addOnlineSongToPlaylist(
+          youtubeId: audio.id,
+          title: audio.title,
+          artists: audio.artists.isNotEmpty
+              ? audio.artists
+              : [audio.author],
+          duration: audio.duration?.inMilliseconds ?? 0,
+          thumbnailUrl: audio.thumbnailUrl,
+          playlistId: playlistId,
+        );
+      }
+
+      mainNavKey.currentState?.goToDownloads();
+      ScaffoldMessenger.of(navContext).showSnackBar(
+        SnackBar(
+          content: Text('Playlist saved (${audios.length} songs)'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error saving playlist: $e');
+      ScaffoldMessenger.of(navContext).showSnackBar(
+        SnackBar(content: Text('Error saving playlist: $e')),
       );
     }
   }
@@ -268,6 +361,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
             theme: lightTheme.copyWith(textTheme: textTheme),
             darkTheme: darkTheme.copyWith(textTheme: textTheme),
             themeMode: themeProvider.themeMode,
+            navigatorKey: rootNavigatorKey,
             locale: settingsProvider.locale,
             localizationsDelegates: const [
               AppLocalizations.delegate,
