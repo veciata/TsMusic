@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.3] - 2026-09-06
+
+### Changed / Değiştirildi
+- Android build toolchain modernized: Gradle 9.1.0, Android Gradle Plugin 9.0.1, Kotlin 2.3.20.  
+  Android derleme araçları güncellendi: Gradle 9.1.0, Android Gradle Plugin 9.0.1, Kotlin 2.3.20.
+- Migrated all deprecated Flutter APIs to their modern replacements (RadioGroup, ReorderableListView.onReorderItem, PopScope, platformDispatcher, Color.toARGB32, Color.withValues).  
+  Kullanımdan kaldırılan Flutter API'leri modern karşılıklarıyla değiştirildi (RadioGroup, ReorderableListView.onReorderItem, PopScope, platformDispatcher, Color.toARGB32, Color.withValues).
+- Full static-analysis cleanup: 196 analyzer issues resolved down to zero.  
+  Statik analiz temizliği tamamlandı: 196 analizci sorunu sıfıra indirildi.
+
 ## [1.2.1] - 2026-05-31
 
 ### Fixed / Düzeltildi
