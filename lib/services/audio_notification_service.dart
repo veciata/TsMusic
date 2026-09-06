@@ -309,10 +309,7 @@ class AudioNotificationService {
             onSkipToPrevious: onSkipToPrevious,
             onOnlineMediaChanged: onOnlineMediaChanged,
           ),
-          config: getNotificationSettings(
-            notificationColor: notificationColor,
-            fontSize: null, // Reserved for future implementation
-          ),
+          config: getNotificationSettings(notificationColor: notificationColor),
         );
         debugPrint(
           'AudioNotificationService: AudioService.init() returned handler=$_audioHandler',
@@ -351,7 +348,7 @@ class AudioNotificationService {
 
   static Future<void> dispose() async {
     await _audioHandler?.disposePlayer();
-    await AudioService.stop();
+    await _audioHandler?.stop();
     _audioHandler = null;
   }
 }

@@ -15,7 +15,7 @@ class ThemeProvider with ChangeNotifier {
 
   VoidCallback? _onWidgetUpdateNeeded;
 
-  void setOnWidgetUpdateNeeded(VoidCallback callback) {
+  set onWidgetUpdateNeeded(VoidCallback callback) {
     _onWidgetUpdateNeeded = callback;
   }
 
@@ -43,7 +43,7 @@ class ThemeProvider with ChangeNotifier {
     _isDarkMode =
         _themeMode == ThemeMode.dark ||
         (_themeMode == ThemeMode.system &&
-            WidgetsBinding.instance.window.platformBrightness ==
+            WidgetsBinding.instance.platformDispatcher.platformBrightness ==
                 Brightness.dark);
   }
 
@@ -62,7 +62,7 @@ class ThemeProvider with ChangeNotifier {
     _primaryColor = color;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_primaryColorKey, color.value);
+    await prefs.setInt(_primaryColorKey, color.toARGB32());
 
     notifyListeners();
     _onWidgetUpdateNeeded?.call();

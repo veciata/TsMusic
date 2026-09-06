@@ -222,19 +222,20 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     final navigator = rootNavigatorKey.currentState;
     if (navigator == null) return;
     final navContext = navigator.context;
+    final messenger = ScaffoldMessenger.of(navContext);
     try {
-      ScaffoldMessenger.of(
-        navContext,
-      ).showSnackBar(const SnackBar(content: Text('Fetching playlist...')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Fetching playlist...')),
+      );
       final count = await ytService.fetchPlaylistAndAdd(link.playlistId!);
       if (count > 0) {
         await ytService.playOnlinePlaylistAt(0);
         mainNavKey.currentState?.goToDownloads();
-        ScaffoldMessenger.of(navContext).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Playing playlist ($count songs)')),
         );
       } else {
-        ScaffoldMessenger.of(navContext).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('This playlist is empty or could not be read.'),
           ),
@@ -242,9 +243,9 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       }
     } catch (e) {
       debugPrint('Error playing playlist: $e');
-      ScaffoldMessenger.of(
-        navContext,
-      ).showSnackBar(SnackBar(content: Text('Error playing playlist: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error playing playlist: $e')),
+      );
     }
   }
 
@@ -252,22 +253,23 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     final navigator = rootNavigatorKey.currentState;
     if (navigator == null) return;
     final navContext = navigator.context;
+    final messenger = ScaffoldMessenger.of(navContext);
     final ytService = Provider.of<YouTubeService>(navContext, listen: false);
     final musicProvider = Provider.of<music_provider.MusicProvider>(
       navContext,
       listen: false,
     );
     try {
-      ScaffoldMessenger.of(
-        navContext,
-      ).showSnackBar(const SnackBar(content: Text('Fetching playlist...')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Fetching playlist...')),
+      );
       final audios = await ytService.fetchPlaylist(
         link.playlistId != null
             ? 'https://www.youtube.com/playlist?list=${link.playlistId}'
             : link.url,
       );
       if (audios.isEmpty) {
-        ScaffoldMessenger.of(navContext).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('This playlist is empty or could not be read.'),
           ),
@@ -290,14 +292,14 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       }
 
       mainNavKey.currentState?.goToDownloads();
-      ScaffoldMessenger.of(navContext).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Playlist saved (${audios.length} songs)')),
       );
     } catch (e) {
       debugPrint('Error saving playlist: $e');
-      ScaffoldMessenger.of(
-        navContext,
-      ).showSnackBar(SnackBar(content: Text('Error saving playlist: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error saving playlist: $e')),
+      );
     }
   }
 
@@ -422,9 +424,9 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       // Connect YouTube service to MusicProvider for notification integration
       musicProv.setYouTubeService(youTubeService);
       // Set up widget auto-update — fires on every notifyListeners
-      musicProv.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
+      musicProv.onWidgetUpdateNeeded = () => _onWidgetUpdate(musicProv);
       // Set up theme widget auto-update — fires when theme/color changes
-      themeProvider.setOnWidgetUpdateNeeded(() => _onWidgetUpdate(musicProv));
+      themeProvider.onWidgetUpdateNeeded = () => _onWidgetUpdate(musicProv);
       // Load from database first, then scan for new music in background
       _initializeMusic(musicProv);
       // Check for GitHub releases and show update modal if new ones found.

@@ -9,11 +9,9 @@ class MetadataEnrichmentService {
   ///
   /// Returns an [EnrichmentResult] with an updated song and optional genre
   /// when enrichment is successful, or `null` when no enrichment can be made.
-  Future<EnrichmentResult?> enrichSong(Song song) async {
-    // TODO: Implement actual enrichment logic.
-    // For now, return null to indicate no enrichment available.
-    return null;
-  }
+  // TODO: Implement actual enrichment logic.
+  // For now, return null to indicate no enrichment available.
+  Future<EnrichmentResult?> enrichSong(Song song) async => null;
 }
 
 class EnrichmentResult {

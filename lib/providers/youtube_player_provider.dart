@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/core/services/error_tracking_service.dart';
 
 /// Separate provider for YouTube audio playback
 /// This keeps YouTube music separate from the main music player
@@ -74,6 +75,12 @@ class YouTubePlayerProvider extends ChangeNotifier {
           );
     } catch (e) {
       debugPrint('Error playing YouTube audio: $e');
+      ErrorTrackingService().recordError(
+        e,
+        StackTrace.current,
+        context: 'YouTube online playback failed',
+        extras: {'videoId': audio.id, 'title': audio.title},
+      );
       rethrow;
     } finally {
       _clearLoading();

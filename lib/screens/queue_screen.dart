@@ -115,7 +115,9 @@ class QueueScreen extends StatelessWidget {
                       Text(
                         '${localQueue.length} songs',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                       ),
                     ],
@@ -166,7 +168,9 @@ class QueueScreen extends StatelessWidget {
                       Text(
                         '${onlineSongs.length} songs',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                       ),
                     ],
@@ -207,97 +211,95 @@ class QueueScreen extends StatelessWidget {
     required VoidCallback onTap,
     required VoidCallback onRemove,
     void Function(int, int)? onReorder,
-  }) {
-    return Dismissible(
-      key: ValueKey('queue_${isOnline ? 'yt_' : ''}${song.id}_$index'),
-      background: Container(
-        color: Colors.red,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      secondaryBackground: Container(
-        color: Colors.red,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      onDismissed: (_) {
-        onRemove();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Removed: ${song.title}')));
-      },
-      child: ListTile(
-        tileColor: isCurrent
-            ? (isOnline
-                  ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
-                  : theme.colorScheme.primaryContainer.withOpacity(0.5))
-            : null,
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isCurrent
-                ? (isOnline
-                      ? theme.colorScheme.tertiary.withOpacity(0.2)
-                      : theme.colorScheme.primary.withOpacity(0.2))
-                : theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: isCurrent
-              ? Icon(
-                  Icons.equalizer,
-                  color: isOnline
-                      ? theme.colorScheme.tertiary
-                      : theme.colorScheme.primary,
-                )
-              : Icon(
-                  isOnline ? Icons.cloud : Icons.music_note,
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                ),
+  }) => Dismissible(
+    key: ValueKey('queue_${isOnline ? 'yt_' : ''}${song.id}_$index'),
+    background: Container(
+      color: Colors.red,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: const Icon(Icons.delete, color: Colors.white),
+    ),
+    secondaryBackground: Container(
+      color: Colors.red,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: const Icon(Icons.delete, color: Colors.white),
+    ),
+    onDismissed: (_) {
+      onRemove();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Removed: ${song.title}')));
+    },
+    child: ListTile(
+      tileColor: isCurrent
+          ? (isOnline
+                ? theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3)
+                : theme.colorScheme.primaryContainer.withValues(alpha: 0.5))
+          : null,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isCurrent
+              ? (isOnline
+                    ? theme.colorScheme.tertiary.withValues(alpha: 0.2)
+                    : theme.colorScheme.primary.withValues(alpha: 0.2))
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
         ),
-        title: Text(
-          song.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: isCurrent
-              ? TextStyle(
-                  color: isOnline
-                      ? theme.colorScheme.tertiary
-                      : theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                )
-              : null,
-        ),
-        subtitle: Row(
-          children: [
-            if (isOnline)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Icon(
-                  Icons.cloud,
-                  size: 12,
-                  color: theme.colorScheme.tertiary.withOpacity(0.6),
-                ),
+        child: isCurrent
+            ? Icon(
+                Icons.equalizer,
+                color: isOnline
+                    ? theme.colorScheme.tertiary
+                    : theme.colorScheme.primary,
+              )
+            : Icon(
+                isOnline ? Icons.cloud : Icons.music_note,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
               ),
-            Expanded(
-              child: Text(
-                song.artists.isNotEmpty
-                    ? song.artists.join(' & ')
-                    : 'Unknown Artist',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+      ),
+      title: Text(
+        song.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: isCurrent
+            ? TextStyle(
+                color: isOnline
+                    ? theme.colorScheme.tertiary
+                    : theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              )
+            : null,
+      ),
+      subtitle: Row(
+        children: [
+          if (isOnline)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(
+                Icons.cloud,
+                size: 12,
+                color: theme.colorScheme.tertiary.withValues(alpha: 0.6),
               ),
             ),
-          ],
-        ),
-        trailing: Icon(
-          isOnline ? Icons.music_note : Icons.drag_handle,
-          color: theme.colorScheme.onSurface.withOpacity(0.4),
-        ),
-        onTap: onTap,
+          Expanded(
+            child: Text(
+              song.artists.isNotEmpty
+                  ? song.artists.join(' & ')
+                  : 'Unknown Artist',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
-    );
-  }
+      trailing: Icon(
+        isOnline ? Icons.music_note : Icons.drag_handle,
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+      ),
+      onTap: onTap,
+    ),
+  );
 }

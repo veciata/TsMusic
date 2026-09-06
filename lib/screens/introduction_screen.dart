@@ -437,7 +437,7 @@ class _ThemePageView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: app_theme.availableColors.map((color) {
-              final isSelected = color.value == selectedColor.value;
+              final isSelected = color == selectedColor;
               return Expanded(
                 child: Center(
                   child: GestureDetector(
@@ -548,38 +548,45 @@ class _DownloadLocationPageView extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ..._locations.map((location) {
-            final isSelected = location == selected;
-            return ListTile(
-              leading: Icon(
-                location == 'internal'
-                    ? Icons.phone_android
-                    : location == 'downloads'
-                    ? Icons.download_for_offline_outlined
-                    : Icons.library_music_outlined,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              title: Text(
-                settings.getDownloadLocationName(location),
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-              ),
-              trailing: Radio<String>(
-                value: location,
-                groupValue: selected,
-                onChanged: (value) {
-                  if (value != null) onChanged(value);
-                },
-              ),
-              onTap: () => onChanged(location),
-            );
-          }),
+          RadioGroup<String>(
+            groupValue: selected,
+            onChanged: (value) {
+              if (value != null) onChanged(value);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ..._locations.map((location) {
+                  final isSelected = location == selected;
+                  return ListTile(
+                    leading: Icon(
+                      location == 'internal'
+                          ? Icons.phone_android
+                          : location == 'downloads'
+                          ? Icons.download_for_offline_outlined
+                          : Icons.library_music_outlined,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    title: Text(
+                      settings.getDownloadLocationName(location),
+                      style: TextStyle(
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                    trailing: Radio<String>(value: location),
+                    onTap: () => onChanged(location),
+                  );
+                }),
+              ],
+            ),
+          ),
         ],
       ),
     );

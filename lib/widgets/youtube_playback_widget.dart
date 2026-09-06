@@ -34,7 +34,7 @@ class YouTubePlaybackWidget extends StatelessWidget {
     final youTubeService = Provider.of<YouTubeService>(context);
 
     final downloadProgress = youTubeService.activeDownloads
-        .where((d) => d.videoId == audio.id)
+        .where((d) => d.videoId == audio.id && d.error == null)
         .firstOrNull;
 
     final musicProvider = Provider.of<music_provider.MusicProvider>(

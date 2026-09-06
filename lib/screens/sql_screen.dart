@@ -573,7 +573,7 @@ class _TablesTab extends StatelessWidget {
           radius: 14,
           backgroundColor: Theme.of(
             context,
-          ).colorScheme.primary.withOpacity(0.1),
+          ).colorScheme.primary.withValues(alpha: 0.1),
           child: Text(
             '$count',
             style: TextStyle(

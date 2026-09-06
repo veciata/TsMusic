@@ -96,11 +96,6 @@ class PermissionHelper {
   // Global key for navigation
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  // Initialize the navigator key with a navigator
-  static void initializeNavigatorKey(GlobalKey<NavigatorState> key) {
-    navigatorKey = key;
-  }
-
   // Check if device is Android 13 or higher
   static Future<bool> isAndroid13OrHigher() async {
     try {
@@ -328,9 +323,7 @@ class PermissionHelper {
     }
   }
 
-  static Future<bool> _isAndroid() async {
-    return true; // In a real app, you'd check the platform here
-  }
+  static Future<bool> _isAndroid() async => true;
 
   static Future<bool> _isAndroid13OrHigher() async {
     if (!(await _isAndroid())) {

@@ -23,31 +23,30 @@ class SongSearchService {
     required SongSortOption sortBy,
     bool ascending = true,
   }) {
-    final sorted = List<Song>.from(songs);
-
-    sorted.sort((a, b) {
-      int compare;
-      switch (sortBy) {
-        case SongSortOption.title:
-          compare = a.title.compareTo(b.title);
-          break;
-        case SongSortOption.artist:
-          final artistA = a.artists.isNotEmpty ? a.artists.first : '';
-          final artistB = b.artists.isNotEmpty ? b.artists.first : '';
-          compare = artistA.compareTo(artistB);
-          break;
-        case SongSortOption.album:
-          compare = (a.album ?? '').compareTo(b.album ?? '');
-          break;
-        case SongSortOption.duration:
-          compare = a.duration.compareTo(b.duration);
-          break;
-        case SongSortOption.dateAdded:
-          compare = a.dateAdded.compareTo(b.dateAdded);
-          break;
-      }
-      return ascending ? compare : -compare;
-    });
+    final sorted = List<Song>.from(songs)
+      ..sort((a, b) {
+        int compare;
+        switch (sortBy) {
+          case SongSortOption.title:
+            compare = a.title.compareTo(b.title);
+            break;
+          case SongSortOption.artist:
+            final artistA = a.artists.isNotEmpty ? a.artists.first : '';
+            final artistB = b.artists.isNotEmpty ? b.artists.first : '';
+            compare = artistA.compareTo(artistB);
+            break;
+          case SongSortOption.album:
+            compare = (a.album ?? '').compareTo(b.album ?? '');
+            break;
+          case SongSortOption.duration:
+            compare = a.duration.compareTo(b.duration);
+            break;
+          case SongSortOption.dateAdded:
+            compare = a.dateAdded.compareTo(b.dateAdded);
+            break;
+        }
+        return ascending ? compare : -compare;
+      });
 
     return sorted;
   }

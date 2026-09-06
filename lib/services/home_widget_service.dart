@@ -23,7 +23,7 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<bool>('widget_is_dark_mode', isDarkMode);
       await HomeWidget.saveWidgetData<int>(
         'widget_primary_color',
-        primaryColor?.value ?? 0xFF1DB954,
+        primaryColor?.toARGB32() ?? 0xFF1DB954,
       );
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
     } catch (_) {}
@@ -78,7 +78,7 @@ class HomeWidgetService {
       );
       await HomeWidget.saveWidgetData<int>(
         'widget_primary_color',
-        primaryColor?.value ?? 0xFF1DB954,
+        primaryColor?.toARGB32() ?? 0xFF1DB954,
       );
 
       final queueItems = (queue ?? [])

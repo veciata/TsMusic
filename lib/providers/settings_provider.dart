@@ -178,9 +178,8 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
-  String getPlaybackModeName(PlaybackMode mode, AppLocalizations l10n) {
-    return mode == PlaybackMode.online ? l10n.online : l10n.local;
-  }
+  String getPlaybackModeName(PlaybackMode mode, AppLocalizations l10n) =>
+      mode == PlaybackMode.online ? l10n.online : l10n.local;
 
   String getLanguageName(Locale locale) {
     if (locale.languageCode == 'tr') {

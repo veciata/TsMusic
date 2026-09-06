@@ -193,7 +193,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           selectedSongs.toList(),
                         );
                         await _loadSongs();
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -203,7 +203,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           );
                         }
                       } catch (e) {
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(
                             context,
                           ).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -226,6 +226,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       listen: false,
     );
     await musicProvider.loadPlaylistAsQueue(widget.playlistId);
+    if (!mounted) return;
     Navigator.pop(context);
   }
 
@@ -279,10 +280,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             )
           : ReorderableListView.builder(
               itemCount: _songs.length,
-              onReorder: (oldIndex, newIndex) async {
-                if (oldIndex < newIndex) {
-                  newIndex -= 1;
-                }
+              onReorderItem: (oldIndex, newIndex) async {
                 final song = _songs.removeAt(oldIndex);
                 _songs.insert(newIndex, song);
                 setState(() {});
@@ -332,14 +330,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   ),
                   onTap: _isEditMode
                       ? null
-                      : () {
-                          final musicProvider =
-                              Provider.of<music_provider.MusicProvider>(
-                                context,
-                                listen: false,
-                              );
-                          musicProvider.playSong(song);
-                        },
+                      : () => Provider.of<music_provider.MusicProvider>(
+                          context,
+                          listen: false,
+                        ).playSong(song),
                 );
               },
             ),

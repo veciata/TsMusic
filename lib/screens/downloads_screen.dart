@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -205,9 +206,21 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Widget _buildDownloadItem(dynamic download) => Card(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     child: ListTile(
-      leading: const Icon(Icons.downloading, size: 32),
+      leading: Icon(
+        download.error != null ? Icons.error_outline : Icons.downloading,
+        size: 32,
+        color: download.error != null
+            ? Theme.of(context).colorScheme.error
+            : null,
+      ),
       title: Text(download.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: download.cancelRequested
+      trailing: download.error != null
+          ? IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Dismiss',
+              onPressed: () => _dismissFailedDownload(download.videoId),
+            )
+          : download.cancelRequested
           ? const Padding(
               padding: EdgeInsets.only(right: 12.0),
               child: SizedBox(
@@ -228,37 +241,40 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: download.progress > 0 ? download.progress : null,
-            minHeight: 4,
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              download.cancelRequested
-                  ? Colors.orange
-                  : Theme.of(context).primaryColor,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                download.progress > 0
-                    ? '${(download.progress * 100).toStringAsFixed(1)}%'
-                    : 'Downloading...',
-                style: Theme.of(context).textTheme.bodySmall,
+          if (download.error == null)
+            LinearProgressIndicator(
+              value: download.progress > 0 ? download.progress : null,
+              minHeight: 4,
+              backgroundColor: Colors.grey[300],
+              valueColor: AlwaysStoppedAnimation<Color>(
+                download.cancelRequested
+                    ? Colors.orange
+                    : Theme.of(context).primaryColor,
               ),
-              if (download.cancelRequested)
-                const Text(
-                  'Canceling...',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
+            ),
+          if (download.error == null) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  download.progress > 0
+                      ? '${(download.progress * 100).toStringAsFixed(1)}%'
+                      : 'Downloading...',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-            ],
-          ),
+                if (download.cancelRequested)
+                  const Text(
+                    'Canceling...',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (download.error != null) ...[
             const SizedBox(height: 4),
             Text(
@@ -275,6 +291,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       ),
     ),
   );
+
+  void _dismissFailedDownload(String videoId) {
+    _youTubeService.dismissDownload(videoId);
+    setState(() {});
+  }
 
   Widget _buildSongItem(Song song) => Card(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -409,16 +430,26 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Move to...'),
-        children: ['internal', 'downloads', 'music']
-            .where((loc) => loc != currentLocation)
-            .map(
-              (loc) => RadioListTile<String>(
-                title: Text(loc[0].toUpperCase() + loc.substring(1)),
-                value: loc,
-                onChanged: (value) => Navigator.pop(context, value),
-              ),
-            )
-            .toList(),
+        children: [
+          RadioGroup<String>(
+            groupValue: currentLocation,
+            onChanged: (value) {
+              if (value != null) Navigator.pop(context, value);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ['internal', 'downloads', 'music']
+                  .where((loc) => loc != currentLocation)
+                  .map(
+                    (loc) => RadioListTile<String>(
+                      title: Text(loc[0].toUpperCase() + loc.substring(1)),
+                      value: loc,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
       ),
     );
 
@@ -427,9 +458,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     try {
       final sourceFile = File(song.url);
       if (!await sourceFile.exists()) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('File not found')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('File not found')));
+        }
         return;
       }
 
@@ -444,6 +477,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       await sourceFile.copy(targetFile.path);
       await sourceFile.delete();
 
+      if (!mounted) return;
       final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
         listen: false,
@@ -458,14 +492,18 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         'downloads': 'Downloads folder',
         'music': 'Music folder',
       };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Moved to ${locationLabels[targetLocation]}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Moved to ${locationLabels[targetLocation]}')),
+        );
+      }
     } catch (e) {
       debugPrint('Error relocating song: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to move: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to move: $e')));
+      }
     }
   }
 
@@ -495,16 +533,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         if (await file.exists()) {
           await file.delete();
         }
+        if (!mounted) return;
         final musicProvider = Provider.of<music_provider.MusicProvider>(
           context,
           listen: false,
         );
         await musicProvider.deleteSong(song);
-        _scanLocalFiles();
+        unawaited(_scanLocalFiles());
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+        }
       }
     }
   }
@@ -542,6 +583,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             if (await file.exists()) {
               await file.delete();
             }
+            if (!mounted) return;
             final musicProvider = Provider.of<music_provider.MusicProvider>(
               context,
               listen: false,
@@ -553,7 +595,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         }
       }
       _selectedSongs.clear();
-      _scanLocalFiles();
+      unawaited(_scanLocalFiles());
     }
   }
 
@@ -571,65 +613,67 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         context,
         listen: false,
       );
-      _youTubeService
-          .downloadAudio(
-            videoId: videoId,
-            preferredFormat: settingsProvider.audioFormat,
-            downloadLocation: settingsProvider.downloadLocation,
-            onProgress: (progress) {
-              if (mounted) {
+      unawaited(
+        _youTubeService
+            .downloadAudio(
+              videoId: videoId,
+              preferredFormat: settingsProvider.audioFormat,
+              downloadLocation: settingsProvider.downloadLocation,
+              onProgress: (progress) {
+                if (mounted) {
+                  setState(() {
+                    _downloadProgress[videoId] = progress;
+                  });
+                }
+              },
+            )
+            .then((result) async {
+              if (result != null && mounted) {
+                Provider.of<music_provider.MusicProvider>(
+                  context,
+                  listen: false,
+                ).addDownloadedSongToLibrary(result.song);
+                unawaited(_scanLocalFiles());
                 setState(() {
-                  _downloadProgress[videoId] = progress;
+                  _downloadProgress.remove(videoId);
                 });
               }
-            },
-          )
-          .then((result) async {
-            if (result != null && mounted) {
-              Provider.of<music_provider.MusicProvider>(
-                context,
-                listen: false,
-              ).addDownloadedSongToLibrary(result.song);
-              _scanLocalFiles();
-              setState(() {
-                _downloadProgress.remove(videoId);
-              });
-            }
-          })
-          .catchError((error) {
-            if (mounted) {
-              setState(() {
-                _downloadProgress.remove(videoId);
-              });
-              final errorStr = error.toString().toLowerCase();
-              final isHtmlError =
-                  errorStr.contains('youtube_html_error') ||
-                  errorStr.contains('html') ||
-                  errorStr.contains('ip') ||
-                  errorStr.contains('consent') ||
-                  errorStr.contains('blocked') ||
-                  errorStr.contains('unavailable');
+            })
+            .catchError((error) {
+              if (mounted) {
+                setState(() {
+                  _downloadProgress.remove(videoId);
+                });
+                final errorStr = error.toString().toLowerCase();
+                final isHtmlError =
+                    errorStr.contains('youtube_html_error') ||
+                    errorStr.contains('html') ||
+                    errorStr.contains('ip') ||
+                    errorStr.contains('consent') ||
+                    errorStr.contains('blocked') ||
+                    errorStr.contains('unavailable');
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          isHtmlError
-                              ? 'Download unavailable. Please try again later.'
-                              : 'Download failed: $error',
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            isHtmlError
+                                ? 'Download unavailable. Please try again later.'
+                                : 'Download failed: $error',
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    behavior: SnackBarBehavior.floating,
                   ),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          });
+                );
+              }
+            }),
+      );
     }
   }
 }

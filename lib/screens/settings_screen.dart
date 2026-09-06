@@ -84,7 +84,7 @@ class ColorSelector extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -103,36 +103,38 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
       title: Text(l10n.playerStyle),
       content: SizedBox(
         width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: PlayerStyle.values.map((style) {
-            final isSelected = style == themeProvider.playerStyle;
-            return ListTile(
-              title: Text(
-                themeProvider.getPlayerStyleName(style),
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+        child: RadioGroup<PlayerStyle>(
+          groupValue: themeProvider.playerStyle,
+          onChanged: (PlayerStyle? newStyle) {
+            if (newStyle != null) {
+              themeProvider.setPlayerStyle(newStyle);
+              Navigator.of(context).pop();
+            }
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: PlayerStyle.values.map((style) {
+              final isSelected = style == themeProvider.playerStyle;
+              return ListTile(
+                title: Text(
+                  themeProvider.getPlayerStyleName(style),
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                 ),
-              ),
-              leading: Radio<PlayerStyle>(
-                value: style,
-                groupValue: themeProvider.playerStyle,
-                onChanged: (PlayerStyle? newStyle) {
-                  if (newStyle != null) {
-                    themeProvider.setPlayerStyle(newStyle);
-                    Navigator.of(context).pop();
-                  }
+                leading: Radio<PlayerStyle>(value: style),
+                onTap: () {
+                  themeProvider.setPlayerStyle(style);
+                  Navigator.of(context).pop();
                 },
-              ),
-              onTap: () {
-                themeProvider.setPlayerStyle(style);
-                Navigator.of(context).pop();
-              },
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
       actions: [
@@ -157,36 +159,38 @@ void _showDownloadLocationDialog(
       title: Text(l10n.selectDownloadLocation),
       content: SizedBox(
         width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: locations.map((location) {
-            final isSelected = location == settingsProvider.downloadLocation;
-            return ListTile(
-              title: Text(
-                settingsProvider.getDownloadLocationName(location),
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+        child: RadioGroup<String>(
+          groupValue: settingsProvider.downloadLocation,
+          onChanged: (String? newLocation) {
+            if (newLocation != null) {
+              settingsProvider.setDownloadLocation(newLocation);
+              Navigator.of(context).pop();
+            }
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: locations.map((location) {
+              final isSelected = location == settingsProvider.downloadLocation;
+              return ListTile(
+                title: Text(
+                  settingsProvider.getDownloadLocationName(location),
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                 ),
-              ),
-              leading: Radio<String>(
-                value: location,
-                groupValue: settingsProvider.downloadLocation,
-                onChanged: (String? newLocation) {
-                  if (newLocation != null) {
-                    settingsProvider.setDownloadLocation(newLocation);
-                    Navigator.of(context).pop();
-                  }
+                leading: Radio<String>(value: location),
+                onTap: () {
+                  settingsProvider.setDownloadLocation(location);
+                  Navigator.of(context).pop();
                 },
-              ),
-              onTap: () {
-                settingsProvider.setDownloadLocation(location);
-                Navigator.of(context).pop();
-              },
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
       actions: [
@@ -210,36 +214,38 @@ void _showAudioFormatDialog(
       title: Text(l10n.selectAudioFormat),
       content: SizedBox(
         width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: AudioFormat.values.map((format) {
-            final isSelected = format == settingsProvider.audioFormat;
-            return ListTile(
-              title: Text(
-                settingsProvider.getAudioFormatName(format),
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+        child: RadioGroup<AudioFormat>(
+          groupValue: settingsProvider.audioFormat,
+          onChanged: (AudioFormat? newFormat) {
+            if (newFormat != null) {
+              settingsProvider.setAudioFormat(newFormat);
+              Navigator.of(context).pop();
+            }
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: AudioFormat.values.map((format) {
+              final isSelected = format == settingsProvider.audioFormat;
+              return ListTile(
+                title: Text(
+                  settingsProvider.getAudioFormatName(format),
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                 ),
-              ),
-              leading: Radio<AudioFormat>(
-                value: format,
-                groupValue: settingsProvider.audioFormat,
-                onChanged: (AudioFormat? newFormat) {
-                  if (newFormat != null) {
-                    settingsProvider.setAudioFormat(newFormat);
-                    Navigator.of(context).pop();
-                  }
+                leading: Radio<AudioFormat>(value: format),
+                onTap: () {
+                  settingsProvider.setAudioFormat(format);
+                  Navigator.of(context).pop();
                 },
-              ),
-              onTap: () {
-                settingsProvider.setAudioFormat(format);
-                Navigator.of(context).pop();
-              },
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
       actions: [
@@ -263,37 +269,41 @@ void _showPlaybackModeDialog(
       title: Text(l10n.defaultPlaybackMode),
       content: SizedBox(
         width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: PlaybackMode.values.map((mode) {
-            final isSelected = mode == settingsProvider.defaultPlaybackMode;
-            final name = mode == PlaybackMode.online ? l10n.online : l10n.local;
-            return ListTile(
-              title: Text(
-                name,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+        child: RadioGroup<PlaybackMode>(
+          groupValue: settingsProvider.defaultPlaybackMode,
+          onChanged: (PlaybackMode? newMode) {
+            if (newMode != null) {
+              settingsProvider.setDefaultPlaybackMode(newMode);
+              Navigator.of(context).pop();
+            }
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: PlaybackMode.values.map((mode) {
+              final isSelected = mode == settingsProvider.defaultPlaybackMode;
+              final name = mode == PlaybackMode.online
+                  ? l10n.online
+                  : l10n.local;
+              return ListTile(
+                title: Text(
+                  name,
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                 ),
-              ),
-              leading: Radio<PlaybackMode>(
-                value: mode,
-                groupValue: settingsProvider.defaultPlaybackMode,
-                onChanged: (PlaybackMode? newMode) {
-                  if (newMode != null) {
-                    settingsProvider.setDefaultPlaybackMode(newMode);
-                    Navigator.of(context).pop();
-                  }
+                leading: Radio<PlaybackMode>(value: mode),
+                onTap: () {
+                  settingsProvider.setDefaultPlaybackMode(mode);
+                  Navigator.of(context).pop();
                 },
-              ),
-              onTap: () {
-                settingsProvider.setDefaultPlaybackMode(mode);
-                Navigator.of(context).pop();
-              },
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
       actions: [
@@ -317,36 +327,38 @@ void _showLanguageDialog(
       title: Text(l10n.selectLanguage),
       content: SizedBox(
         width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: AppLocalizations.supportedLocales.map((locale) {
-            final isSelected = locale == settingsProvider.locale;
-            return ListTile(
-              title: Text(
-                settingsProvider.getLanguageName(locale),
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+        child: RadioGroup<Locale>(
+          groupValue: settingsProvider.locale,
+          onChanged: (Locale? newLocale) {
+            if (newLocale != null) {
+              settingsProvider.setLanguage(newLocale);
+              Navigator.of(context).pop();
+            }
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: AppLocalizations.supportedLocales.map((locale) {
+              final isSelected = locale == settingsProvider.locale;
+              return ListTile(
+                title: Text(
+                  settingsProvider.getLanguageName(locale),
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                 ),
-              ),
-              leading: Radio<Locale>(
-                value: locale,
-                groupValue: settingsProvider.locale,
-                onChanged: (Locale? newLocale) {
-                  if (newLocale != null) {
-                    settingsProvider.setLanguage(newLocale);
-                    Navigator.of(context).pop();
-                  }
+                leading: Radio<Locale>(value: locale),
+                onTap: () {
+                  settingsProvider.setLanguage(locale);
+                  Navigator.of(context).pop();
                 },
-              ),
-              onTap: () {
-                settingsProvider.setLanguage(locale);
-                Navigator.of(context).pop();
-              },
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
       actions: [
@@ -633,8 +645,7 @@ class SettingsScreen extends StatelessWidget {
                       .map(
                         (color) => ColorSelector(
                           color: color,
-                          isSelected:
-                              themeProvider.primaryColor.value == color.value,
+                          isSelected: themeProvider.primaryColor == color,
                           onTap: () => themeProvider.setPrimaryColor(color),
                         ),
                       )
@@ -654,8 +665,7 @@ class SettingsScreen extends StatelessWidget {
                   'Download YouTube songs when they start playing',
                 ),
                 value: settingsProvider.autoDownloadOnPlay,
-                onChanged: (value) =>
-                    settingsProvider.setAutoDownloadOnPlay(value),
+                onChanged: settingsProvider.setAutoDownloadOnPlay,
                 secondary: const Icon(Icons.cloud_download),
               ),
               const Divider(height: 1),

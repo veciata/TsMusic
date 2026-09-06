@@ -10,6 +10,9 @@ analyzer:
     - '**/*.mocks.dart'
     - '**/generated_plugin_registrant.dart'
     - '**/generated_*'
+    - build/**
+    - android/**
+    - ios/**
   strong-mode:
     implicit-casts: false
     implicit-dynamic: false

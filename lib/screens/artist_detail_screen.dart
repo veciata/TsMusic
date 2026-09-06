@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -249,6 +248,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
       try {
         await context.read<music_provider.MusicProvider>().deleteSong(song);
         if (mounted) {
@@ -302,6 +302,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
       setState(() => _isMultiSelectMode = false);
       final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
@@ -327,20 +328,18 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     }
   }
 
-  Widget _buildArtistInitialFallback() {
-    return Container(
-      color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-      alignment: Alignment.center,
-      child: Text(
-        widget.artistName.isNotEmpty ? widget.artistName[0].toUpperCase() : '?',
-        style: const TextStyle(
-          fontSize: 64,
-          fontWeight: FontWeight.bold,
-          color: Colors.white54,
-        ),
+  Widget _buildArtistInitialFallback() => Container(
+    color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+    alignment: Alignment.center,
+    child: Text(
+      widget.artistName.isNotEmpty ? widget.artistName[0].toUpperCase() : '?',
+      style: const TextStyle(
+        fontSize: 64,
+        fontWeight: FontWeight.bold,
+        color: Colors.white54,
       ),
-    );
-  }
+    ),
+  );
 
   @override
   void dispose() {

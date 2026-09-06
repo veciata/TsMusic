@@ -4,6 +4,7 @@ import 'package:path/path.dart' as path;
 import 'package:media_kit/media_kit.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/database/database_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:tsmusic/utils/artist_parser.dart';
 
 String normalizeStoragePath(String filePath) {
@@ -54,7 +55,7 @@ class MusicScannerService {
         await _scanDirectory(downloadsDir);
       }
     } catch (e) {
-      print('Error scanning for music: $e');
+      debugPrint('Error scanning for music: $e');
     }
   }
 
@@ -72,7 +73,7 @@ class MusicScannerService {
         }
       }
     } catch (e) {
-      print('Error scanning directory ${dir.path}: $e');
+      debugPrint('Error scanning directory ${dir.path}: $e');
     }
   }
 
@@ -101,7 +102,7 @@ class MusicScannerService {
       // Insert into database
       await _insertSongToDatabase(file, metadata, normalizedPath);
     } catch (e) {
-      print('Error processing file ${file.path}: $e');
+      debugPrint('Error processing file ${file.path}: $e');
     }
   }
 
@@ -182,21 +183,19 @@ class MusicScannerService {
 
       // Add all artists to song
       for (final artistId in artistIds) {
-        await txn.insert(
-          DatabaseHelper.tableSongArtist,
-          {'song_id': songId, 'artist_id': artistId},
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(DatabaseHelper.tableSongArtist, {
+          'song_id': songId,
+          'artist_id': artistId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
       // Add tag if in tsmusic folder
       if (file.path.contains('/Music/tsmusic/')) {
         final tagId = await _getOrCreateTag(txn, 'tsmusic');
-        await txn.insert(
-          DatabaseHelper.tableSongTags,
-          {'song_id': songId, 'tag_id': tagId},
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(DatabaseHelper.tableSongTags, {
+          'song_id': songId,
+          'tag_id': tagId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     });
   }

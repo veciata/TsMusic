@@ -38,13 +38,13 @@ class GitHubReleaseService {
 
       final List<dynamic> jsonList =
           json.decode(response.body) as List<dynamic>;
-      final releases = jsonList
-          .map((j) => GitHubRelease.fromJson(j as Map<String, dynamic>))
-          .where((r) => !r.isPrerelease)
-          .toList();
-
       // Sort by published date ascending (oldest first).
-      releases.sort((a, b) => a.publishedAt.compareTo(b.publishedAt));
+      final releases =
+          jsonList
+              .map((j) => GitHubRelease.fromJson(j as Map<String, dynamic>))
+              .where((r) => !r.isPrerelease)
+              .toList()
+            ..sort((a, b) => a.publishedAt.compareTo(b.publishedAt));
       return releases;
     } catch (e) {
       debugPrint('Failed to fetch GitHub releases: $e');

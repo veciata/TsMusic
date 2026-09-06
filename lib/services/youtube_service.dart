@@ -16,6 +16,7 @@ import 'package:tsmusic/models/song.dart' as ts;
 import 'package:tsmusic/utils/youtube_artist_parser.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
 import 'package:tsmusic/services/download_notification_service.dart';
+import 'package:tsmusic/core/services/error_tracking_service.dart';
 
 /// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
 /// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
@@ -88,6 +89,7 @@ class DownloadProgress {
   bool isDownloading;
   String? error;
   bool cancelRequested;
+  bool failed;
   StreamSubscription<List<int>>? subscription;
   final Completer<void>? completer;
 
@@ -98,6 +100,7 @@ class DownloadProgress {
     this.isDownloading = true,
     this.error,
     this.cancelRequested = false,
+    this.failed = false,
     this.subscription,
     this.completer,
   });
@@ -147,13 +150,19 @@ class YouTubeService with ChangeNotifier {
 
   List<YouTubeAudio> get nextSuggestions => List.unmodifiable(_nextSuggestions);
 
-  void setLocalSongsCallback(List<ts.Song> Function() callback) {
+  set localSongsCallback(List<ts.Song> Function() callback) {
     _getLocalSongs = callback;
   }
 
   // Getters
   List<DownloadProgress> get activeDownloads =>
       _activeDownloads.values.toList();
+
+  bool isDownloading(String videoId) {
+    final d = _activeDownloads[videoId];
+    return d != null && d.isDownloading && d.error == null;
+  }
+
   YouTubeAudio? get currentAudio => _currentAudio;
   bool get isPlaying => _player.state.playing;
   Player get player => _player;
@@ -164,7 +173,7 @@ class YouTubeService with ChangeNotifier {
 
   static YouTubeService? get instance => _instance;
 
-  void setStopOtherPlayerCallback(Function() callback) {
+  set stopOtherPlayerCallback(Function() callback) {
     _stopOtherPlayer = callback;
   }
 
@@ -194,11 +203,11 @@ class YouTubeService with ChangeNotifier {
           await playOnlinePlaylistAt(nextIndex);
         } else if (_autoSuggestEnabled) {
           // Queue exhausted and auto-suggest on: suggest next
-          _updateSuggestions();
+          unawaited(_updateSuggestions());
         }
       }
       if (completed) {
-        _updateSuggestions();
+        unawaited(_updateSuggestions());
       }
     });
   }
@@ -662,9 +671,9 @@ class YouTubeService with ChangeNotifier {
 
   void _updateDownloadProgress(String videoId, double progress) {
     if (_activeDownloads.containsKey(videoId)) {
-      final download = _activeDownloads[videoId]!;
-      download.progress = progress;
-      download.isDownloading = progress < 1.0;
+      final download = _activeDownloads[videoId]!
+        ..progress = progress
+        ..isDownloading = progress < 1.0;
       _notifyProgressUpdate();
 
       final downloadNotification = DownloadNotificationService();
@@ -705,24 +714,35 @@ class YouTubeService with ChangeNotifier {
     final d = _activeDownloads[videoId];
     if (d == null) return false;
 
-    d.cancelRequested = true;
-    d.isDownloading = false;
+    d
+      ..cancelRequested = true
+      ..isDownloading = false;
 
     // Immediately remove from the list to update UI
     _activeDownloads.remove(videoId);
     _notifyProgressUpdate();
 
     // Background cancellation
-    Future.microtask(() async {
-      try {
-        await d.subscription?.cancel();
-        debugPrint('cancelDownload: Subscription cancelled for $videoId');
-      } catch (e) {
-        debugPrint('Error during background subscription cancellation: $e');
-      }
-    });
+    unawaited(
+      Future.microtask(() async {
+        try {
+          await d.subscription?.cancel();
+          debugPrint('cancelDownload: Subscription cancelled for $videoId');
+        } catch (e) {
+          debugPrint('Error during background subscription cancellation: $e');
+        }
+      }),
+    );
 
     return true;
+  }
+
+  /// Removes a finished/failed download entry from the active list so the
+  /// user can clear an error from the downloads screen.
+  void dismissDownload(String videoId) {
+    if (!_activeDownloads.containsKey(videoId)) return;
+    _activeDownloads.remove(videoId);
+    _notifyProgressUpdate();
   }
 
   Future<List<YouTubeAudio>> searchAudio(String query) async {
@@ -789,12 +809,17 @@ class YouTubeService with ChangeNotifier {
     AudioFormat preferredFormat = AudioFormat.auto,
     String downloadLocation = 'internal',
   }) async {
-    if (_activeDownloads.containsKey(videoId)) {
+    if (_activeDownloads.containsKey(videoId) && isDownloading(videoId)) {
       debugPrint(
         'downloadAudio: Download for videoId: $videoId is already in progress. Ignoring duplicate request.',
       );
       return null;
     }
+
+    // A previous attempt ended in failure/cancel. Remove its stale entry so
+    // the retry can start cleanly and show progress again.
+    _activeDownloads.remove(videoId);
+    _notifyProgressUpdate();
 
     Video video;
     try {
@@ -802,9 +827,21 @@ class YouTubeService with ChangeNotifier {
     } catch (e) {
       debugPrint('downloadAudio: Failed to fetch video info: $e');
       _addActiveDownload(videoId, 'Unknown');
-      _activeDownloads[videoId]?.error = 'Failed to fetch video information';
+      final failed = _activeDownloads[videoId];
+      if (failed != null) {
+        failed
+          ..error = 'Failed to fetch video information'
+          ..isDownloading = false
+          ..failed = true;
+      }
       _notifyProgressUpdate();
-      _completeDownload(videoId);
+      unawaited(DownloadNotificationService().cancelDownloadNotification());
+      ErrorTrackingService().recordError(
+        e,
+        StackTrace.current,
+        context: 'YouTube download: fetch video info failed',
+        extras: {'videoId': videoId},
+      );
       throw Exception('youtube_html_error');
     }
     _addActiveDownload(videoId, video.title);
@@ -1064,29 +1101,45 @@ class YouTubeService with ChangeNotifier {
       return DownloadResult(filePath: finalFile.path, song: song);
     } catch (e) {
       debugPrint('downloadAudio: Download $videoId failed with error: $e');
-      _completeDownload(videoId);
-      final download = _activeDownloads[videoId];
-      if (download != null) {
-        download.isDownloading = false;
-        // Check if this is an HTML/IP error
-        final errorStr = e.toString().toLowerCase();
-        final isHtmlError =
-            errorStr.contains('youtube_html_error') ||
-            errorStr.contains('html') ||
-            errorStr.contains('ip') ||
-            errorStr.contains('consent') ||
-            errorStr.contains('blocked') ||
-            errorStr.contains('unavailable');
 
-        if (isHtmlError) {
-          download.error = 'youtube_html_error';
-        } else {
-          download.error = download.cancelRequested
-              ? 'Canceled'
-              : 'Download failed';
-        }
-        _notifyProgressUpdate();
+      // Classify the error FIRST while the download entry still exists so the
+      // failure is preserved and shown in the UI instead of silently vanishing.
+      final download = _activeDownloads[videoId];
+      final errorStr = e.toString().toLowerCase();
+      final isHtmlError =
+          errorStr.contains('youtube_html_error') ||
+          errorStr.contains('html') ||
+          errorStr.contains('ip') ||
+          errorStr.contains('consent') ||
+          errorStr.contains('blocked') ||
+          errorStr.contains('unavailable');
+
+      // Report to error tracking so download failures are collectable.
+      ErrorTrackingService().recordError(
+        e,
+        StackTrace.current,
+        context: 'YouTube download failed: $videoId',
+        extras: {
+          'videoId': videoId,
+          'title': download?.title,
+          'isHtmlError': isHtmlError,
+        },
+      );
+
+      if (download != null) {
+        // Mark the failure but KEEP the entry in _activeDownloads so the
+        // downloads screen shows the error rather than the item vanishing.
+        download
+          ..isDownloading = false
+          ..failed = true
+          ..error = isHtmlError
+              ? 'youtube_html_error'
+              : (download.cancelRequested ? 'Canceled' : 'Download failed');
       }
+      _notifyProgressUpdate();
+
+      // Never fire the "Download Complete" notification on a failure.
+      unawaited(DownloadNotificationService().cancelDownloadNotification());
       rethrow;
     } finally {
       debugPrint('downloadAudio: Exiting download for videoId: $videoId');

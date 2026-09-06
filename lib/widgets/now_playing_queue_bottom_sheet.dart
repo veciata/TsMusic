@@ -379,6 +379,7 @@ extension on BuildContext {
 }
 
 Future<void> _pastePlaylist(BuildContext context) async {
+  final yt = context._youTubeService;
   final data = await Clipboard.getData(Clipboard.kTextPlain);
   final rawText = data?.text;
   if (rawText == null || rawText.trim().isEmpty) {
@@ -404,7 +405,6 @@ Future<void> _pastePlaylist(BuildContext context) async {
   }
 
   try {
-    final yt = context._youTubeService;
     final count = await yt.fetchPlaylistAndAdd(text);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -453,7 +453,7 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
   @override
   Widget build(BuildContext context) {
     final activeDownloadsList = widget.youTubeService.activeDownloads
-        .where((d) => d.videoId == widget.song.youtubeId)
+        .where((d) => d.videoId == widget.song.youtubeId && d.error == null)
         .toList();
     final activeDownloads = activeDownloadsList.isNotEmpty
         ? activeDownloadsList.first
@@ -505,7 +505,7 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
             setState(_checkDownloaded);
           }
         } catch (e) {
-          if (mounted) {
+          if (context.mounted) {
             ScaffoldMessenger.of(
               context,
             ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
