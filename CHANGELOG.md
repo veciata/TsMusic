@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.4] - 2026-09-15
+
+### Fixed / Düzeltildi
+- Fixed audio downloads stopping at ~1 MiB on networks where YouTube enforces a range cap on unsigned DASH streams; downloads now use VOD HLS (m3u8) which bypasses the limitation entirely.
+  YouTube DASH akışlarının imzasız istekleri 1 MiB civarında kısıtlayan ağlarda ses indirmelerin takılması düzeltildi; artık HLS (m3u8) kullanılarak bu sınırlama tamamen aşılıyor.
+- Bumped `youtube_explode_dart` to ^3.1.0 and applied safe dependency updates within current majors.
+  `youtube_explode_dart` ^3.1.0'a güncellendi ve ana major sınırlar içinde güvenli bağımlılık güncellemeleri uygulandı.
+
 ## [1.3.3] - 2026-09-06
 
 ### Changed / Değiştirildi

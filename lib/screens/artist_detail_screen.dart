@@ -69,6 +69,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   }
 
   void _onScroll() {
+    if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.8) {
       _loadMoreYouTubeSongs();

@@ -60,6 +60,14 @@ PERFORMANCE_OPTIMIZATIONS.md
 # Environment files (local secrets)
 .env
 
+# Downloaded music / diagnostic artifacts
+downloads/
+tool/
+test/unit/chunked_http_download_test.dart
+test/unit/full_host_download_test.dart
+test/unit/hls_download_test.dart
+test/unit/live_download_check_test.dart
+
 # Database files
 ruvector.db
 /node_modules

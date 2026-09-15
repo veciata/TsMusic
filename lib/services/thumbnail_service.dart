@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/services/youtube_client.dart';
 
 class _PriorityItem {
   final Song song;
@@ -34,7 +35,9 @@ class ThumbnailService {
 
   ThumbnailService({http.Client? httpClient, YoutubeExplode? yt})
     : _httpClient = httpClient ?? http.Client(),
-      _yt = yt ?? YoutubeExplode() {
+      _yt =
+          yt ??
+          YoutubeExplode(httpClient: ModernUserAgentHttpClient(httpClient)) {
     _instance = this;
     _initDir();
   }

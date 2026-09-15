@@ -53,7 +53,7 @@ class _SlidingTextState extends State<SlidingText>
   Future<void> _startScrolling() async {
     while (mounted && _needsScroll) {
       await Future.delayed(Duration(seconds: widget.pauseDuration.toInt()));
-      if (!mounted) return;
+      if (!mounted || !_scrollController.hasClients) return;
 
       final maxScroll = max(0.0, _textWidth - _containerWidth + 10);
       final slideDuration = Duration(
@@ -65,7 +65,7 @@ class _SlidingTextState extends State<SlidingText>
         curve: Curves.linear,
       );
 
-      if (!mounted) return;
+      if (!mounted || !_scrollController.hasClients) return;
       await Future.delayed(const Duration(seconds: 1));
 
       final returnDuration = Duration(

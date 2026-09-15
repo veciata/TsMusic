@@ -192,6 +192,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onScroll() {
+    if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       if (_searchController.text.isNotEmpty &&
