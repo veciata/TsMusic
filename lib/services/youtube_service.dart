@@ -1613,6 +1613,11 @@ class YouTubeService with ChangeNotifier {
     }
 
     final workerCount = min(_youtubeHlsConcurrentSegments, segmentUrls.length);
+    final downloadStartedAt = DateTime.now();
+    debugPrint(
+      'HLS: downloading ${segmentUrls.length} segments '
+      '($totalBytes target bytes) with $workerCount workers',
+    );
     await Future.wait(List.generate(workerCount, (_) => worker()));
 
     if (errors.isNotEmpty) {
@@ -1642,6 +1647,11 @@ class YouTubeService with ChangeNotifier {
     // Guarantee a final 100% report even when the throttle window (100ms)
     // skipped the last per-segment emission.
     onProgress?.call(1.0);
+    debugPrint(
+      'HLS: downloaded ${segmentUrls.length} segments in '
+      '${DateTime.now().difference(downloadStartedAt).inMilliseconds} ms '
+      '($receivedBytes bytes, $workerCount concurrent workers)',
+    );
     return receivedBytes;
   }
 
