@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kIsWeb, ChangeNotifier;
@@ -48,12 +49,17 @@ const _youtubeVisionosUserAgent =
 const _youtubePlayerApiUrl =
     'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
 
+/// Number of concurrent segment downloads. HLS audio is many small independent
+/// files, so fetching them in parallel is dramatically faster than the old
+/// sequential walk, while still landing far below YouTube's per-URL limits.
+const _youtubeHlsConcurrentSegments = 6;
+
 /// Resolved VOD-HLS audio for a video: the media segment URLs and the total
 /// byte size of the chosen audio group (parsed from the playlist's clen).
-class _HlsAudio {
+class HlsAudio {
   final List<String> segments;
   final int totalBytes;
-  _HlsAudio({required this.segments, required this.totalBytes});
+  HlsAudio({required this.segments, required this.totalBytes});
 }
 
 class DownloadResult {
@@ -640,7 +646,7 @@ class YouTubeService with ChangeNotifier {
       // Prefer the audio-only HLS media playlist: its segments download as
       // independent files, so playback streams to the end even on networks
       // where unsigned DASH streams are range-capped at ~1 MiB.
-      final hls = await _getHlsPlaylistUrl(videoId);
+      final hls = await getHlsPlaylistUrl(videoId);
       if (hls != null) {
         debugPrint('✅ Got YouTube HLS stream URL (clen=${hls.totalBytes})');
         _audioUrlCache.put(videoId, hls.url);
@@ -1071,13 +1077,13 @@ class YouTubeService with ChangeNotifier {
       // Falls back to the DASH chunked downloader below when unavailable.
       if (audioExtension == 'm4a') {
         try {
-          final hls = await _fetchHlsAudioSegments(videoId);
+          final hls = await fetchHlsAudioSegments(videoId);
           if (hls != null) {
             debugPrint(
               'downloadAudio: Using HLS path for $videoId '
               '(${hls.segments.length} segments, ${hls.totalBytes} bytes)',
             );
-            await _downloadHlsSegments(
+            await downloadHlsSegments(
               videoId: videoId,
               segmentUrls: hls.segments,
               file: finalFile,
@@ -1372,7 +1378,7 @@ class YouTubeService with ChangeNotifier {
   /// best EXT-X-MEDIA audio group from the master playlist). Media-playlist
   /// URLs stream cleanly in mpv/media_kit, unlike the range-capped DASH URLs.
   /// Returns null when HLS is unavailable for the video.
-  Future<({String url, int totalBytes})?> _getHlsPlaylistUrl(
+  Future<({String url, int totalBytes})?> getHlsPlaylistUrl(
     String videoId,
   ) async {
     try {
@@ -1470,9 +1476,9 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  Future<_HlsAudio?> _fetchHlsAudioSegments(String videoId) async {
+  Future<HlsAudio?> fetchHlsAudioSegments(String videoId) async {
     try {
-      final playlist = await _getHlsPlaylistUrl(videoId);
+      final playlist = await getHlsPlaylistUrl(videoId);
       if (playlist == null) return null;
       final bestAudioUrl = playlist.url;
 
@@ -1506,17 +1512,21 @@ class YouTubeService with ChangeNotifier {
         'HLS: resolved ${segmentUrls.length} audio segments '
         '(${playlist.totalBytes} target bytes)',
       );
-      return _HlsAudio(segments: segmentUrls, totalBytes: playlist.totalBytes);
+      return HlsAudio(segments: segmentUrls, totalBytes: playlist.totalBytes);
     } catch (e) {
       debugPrint('HLS: resolution failed: $e');
       return null;
     }
   }
 
-  /// Downloads the HLS audio segments into [file], reporting progress against
-  /// [totalBytes]. Returns the number of bytes written. Throws when a segment
-  /// keeps failing, so callers can fall back to the DASH path.
-  Future<int> _downloadHlsSegments({
+  /// Downloads the HLS audio segments into [file] in parallel (up to
+  /// [_youtubeHlsConcurrentSegments] at once), reporting progress against
+  /// [totalBytes]. Segments are independent files, so a worker pool fetches
+  /// them concurrently and the bytes are reassembled in index order, which is
+  /// much faster than the old sequential walk. Returns the number of bytes
+  /// written. Throws when a segment keeps failing, so callers can fall back to
+  /// the DASH path.
+  Future<int> downloadHlsSegments({
     required String videoId,
     required List<String> segmentUrls,
     required File file,
@@ -1524,73 +1534,115 @@ class YouTubeService with ChangeNotifier {
     void Function(double)? onProgress,
   }) async {
     final downloadProgress = _activeDownloads[videoId];
-    final sink = file.openWrite();
-    var receivedBytes = 0;
-    var lastProgressUpdate = DateTime.now();
     const segmentTimeout = Duration(seconds: 30);
     const bodyTimeout = Duration(seconds: 60);
+    const maxAttempts = 3;
 
-    try {
-      for (final segmentUrl in segmentUrls) {
-        if (downloadProgress?.cancelRequested == true) break;
-
-        var attempts = 0;
-        while (true) {
-          attempts++;
-          try {
-            final request = http.Request('GET', Uri.parse(segmentUrl))
-              ..headers.addAll(_youtubePlaybackHttpHeaders())
-              ..headers['User-Agent'] = _youtubeVisionosUserAgent;
-            final response = await _httpClient
-                .send(request)
-                .timeout(segmentTimeout);
-            if (response.statusCode == 200 || response.statusCode == 206) {
-              await for (final chunk in response.stream.timeout(bodyTimeout)) {
-                if (downloadProgress?.cancelRequested == true) break;
-                sink.add(chunk);
-                receivedBytes += chunk.length;
-
-                final now = DateTime.now();
-                if (now.difference(lastProgressUpdate).inMilliseconds > 100 &&
-                    totalBytes > 0) {
-                  lastProgressUpdate = now;
-                  final progress = (receivedBytes / totalBytes)
-                      .clamp(0.0, 1.0)
-                      .toDouble();
-                  _updateDownloadProgress(videoId, progress);
-                  onProgress?.call(progress);
-                }
-              }
-              break;
+    // Fetch a single segment into memory with bounded retries.
+    Future<Uint8List> fetchSegment(int index, String url) async {
+      var attempts = 0;
+      while (true) {
+        attempts++;
+        try {
+          final request = http.Request('GET', Uri.parse(url))
+            ..headers.addAll(_youtubePlaybackHttpHeaders())
+            ..headers['User-Agent'] = _youtubeVisionosUserAgent;
+          final response = await _httpClient
+              .send(request)
+              .timeout(segmentTimeout);
+          if (response.statusCode == 200 || response.statusCode == 206) {
+            final builder = BytesBuilder(copy: false);
+            await for (final chunk in response.stream.timeout(bodyTimeout)) {
+              if (downloadProgress?.cancelRequested == true) break;
+              builder.add(chunk);
             }
-            if (attempts >= 3) {
-              throw HttpException(
-                'HLS segment rejected with HTTP ${response.statusCode}',
-              );
-            }
-            debugPrint(
-              'downloadAudio: HLS segment HTTP ${response.statusCode} '
-              '(attempt $attempts); retrying',
-            );
-            await Future<void>.delayed(const Duration(milliseconds: 800));
-          } catch (e) {
-            if (attempts >= 3) rethrow;
-            debugPrint(
-              'downloadAudio: HLS segment failed (attempt $attempts): $e',
+            return builder.takeBytes();
+          }
+          if (attempts >= maxAttempts) {
+            throw HttpException(
+              'HLS segment $index rejected with HTTP '
+              '${response.statusCode}',
             );
           }
+          debugPrint(
+            'downloadAudio: HLS segment HTTP ${response.statusCode} '
+            '(attempt $attempts, segment $index); retrying',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 800));
+        } catch (e) {
+          if (attempts >= maxAttempts) rethrow;
+          debugPrint(
+            'downloadAudio: HLS segment $index failed (attempt $attempts): $e',
+          );
         }
       }
+    }
 
+    // Worker pool: claim the next index synchronously (atomic on the
+    // single-threaded event loop), download it, and record the bytes.
+    final results = <int, Uint8List>{};
+    var receivedBytes = 0;
+    var nextIndex = 0;
+    var lastProgressUpdate = DateTime.now();
+    final errors = <Object>[];
+
+    Future<void> worker() async {
+      while (nextIndex < segmentUrls.length &&
+          errors.isEmpty &&
+          !(downloadProgress?.cancelRequested == true)) {
+        final index = nextIndex++;
+        try {
+          final bytes = await fetchSegment(index, segmentUrls[index]);
+          results[index] = bytes;
+          receivedBytes += bytes.length;
+
+          final now = DateTime.now();
+          if (now.difference(lastProgressUpdate).inMilliseconds > 100 &&
+              totalBytes > 0) {
+            lastProgressUpdate = now;
+            final progress = (receivedBytes / totalBytes)
+                .clamp(0.0, 1.0)
+                .toDouble();
+            _updateDownloadProgress(videoId, progress);
+            onProgress?.call(progress);
+          }
+        } catch (e) {
+          errors.add(e);
+        }
+      }
+    }
+
+    final workerCount = min(_youtubeHlsConcurrentSegments, segmentUrls.length);
+    await Future.wait(List.generate(workerCount, (_) => worker()));
+
+    if (errors.isNotEmpty) {
+      throw errors.first;
+    }
+
+    // Reassemble segments in playlist order. Cancellations leave cleanup to
+    // the caller, so skip writing when the user asked to stop.
+    if (downloadProgress?.cancelRequested == true) {
+      return receivedBytes;
+    }
+
+    final sink = file.openWrite();
+    try {
+      for (var i = 0; i < segmentUrls.length; i++) {
+        final bytes = results[i];
+        if (bytes != null) sink.add(bytes);
+      }
       await sink.flush();
       await sink.close();
-      return receivedBytes;
     } catch (e) {
       try {
         await sink.close();
       } catch (_) {}
       rethrow;
     }
+    // Guarantee a final 100% report even when the throttle window (100ms)
+    // skipped the last per-segment emission.
+    onProgress?.call(1.0);
+    return receivedBytes;
   }
 
   Future<Directory> _getMusicDirectory(String downloadLocation) async {
