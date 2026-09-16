@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.5] - 2026-09-16
+
+### Fixed / Düzeltildi
+- Playing songs online no longer gets stuck when your connection restricts large downloads; playback uses a smarter streaming method that works even on restricted networks.
+  İnternet bağlantınız büyük indirmeleri kısıtladığında çevrimiçi şarkı çalma takılmıyor artık; oynatma, kısıtlı ağlarda bile çalışan daha akıllı bir yöntem kullanıyor.
+
+### Improved / Geliştirildi
+- Downloads are faster: each song is fetched in 6 parts at the same time instead of one after another.
+  İndirmeler daha hızlı: her şarkı tek tek yerine aynı anda 6 parça halinde indiriliyor.
+- Artist pictures are remembered on your device. Once a picture loads, it shows instantly next time — no repeated downloads.
+  Sanatçı fotoğrafları cihazınızda saklanıyor. Bir kez yüklendikten sonra bir daha ki sefere anında gösteriliyor — tekrar tekrar indirilmiyor.
+
 ## [1.3.4] - 2026-09-15
 
 ### Fixed / Düzeltildi
