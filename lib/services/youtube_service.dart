@@ -637,6 +637,19 @@ class YouTubeService with ChangeNotifier {
 
       debugPrint('🔧 Getting YouTube stream URL: $videoId');
 
+      // Prefer the audio-only HLS media playlist: its segments download as
+      // independent files, so playback streams to the end even on networks
+      // where unsigned DASH streams are range-capped at ~1 MiB.
+      final hls = await _getHlsPlaylistUrl(videoId);
+      if (hls != null) {
+        debugPrint('✅ Got YouTube HLS stream URL (clen=${hls.totalBytes})');
+        _audioUrlCache.put(videoId, hls.url);
+        return hls.url;
+      }
+      debugPrint(
+        'ℹ️ HLS unavailable for $videoId, falling back to DASH stream',
+      );
+
       final manifest = await _getManifestWithFallbacks(videoId);
 
       final audioStreams = manifest.audioOnly.toList();
@@ -1354,7 +1367,14 @@ class YouTubeService with ChangeNotifier {
   /// Requests the video with the YouTube visionos player client (as used by
   /// yt-dlp) and resolves the VOD-HLS audio: the best-audio media playlist and
   /// its segment URLs. Returns null when HLS is not available for the video.
-  Future<_HlsAudio?> _fetchHlsAudioSegments(String videoId) async {
+  /// Resolves the audio-only HLS media playlist URL for [videoId] using the
+  /// visionos player client (fresh visitorData + player request + picking the
+  /// best EXT-X-MEDIA audio group from the master playlist). Media-playlist
+  /// URLs stream cleanly in mpv/media_kit, unlike the range-capped DASH URLs.
+  /// Returns null when HLS is unavailable for the video.
+  Future<({String url, int totalBytes})?> _getHlsPlaylistUrl(
+    String videoId,
+  ) async {
     try {
       final visitorData = await _fetchVisionosVisitorData();
       if (visitorData == null || visitorData.isEmpty) {
@@ -1443,7 +1463,24 @@ class YouTubeService with ChangeNotifier {
         return null;
       }
 
+      return (url: bestAudioUrl, totalBytes: bestBytes);
+    } catch (e) {
+      debugPrint('HLS: resolution failed: $e');
+      return null;
+    }
+  }
+
+  Future<_HlsAudio?> _fetchHlsAudioSegments(String videoId) async {
+    try {
+      final playlist = await _getHlsPlaylistUrl(videoId);
+      if (playlist == null) return null;
+      final bestAudioUrl = playlist.url;
+
       // The group URI is the media playlist; collect its segment URLs.
+      final headers = {
+        ..._youtubePlaybackHttpHeaders(),
+        'User-Agent': _youtubeVisionosUserAgent,
+      };
       final mediaResponse = await _httpClient
           .get(Uri.parse(bestAudioUrl), headers: headers)
           .timeout(const Duration(seconds: 20));
@@ -1467,9 +1504,9 @@ class YouTubeService with ChangeNotifier {
 
       debugPrint(
         'HLS: resolved ${segmentUrls.length} audio segments '
-        '($bestBytes target bytes)',
+        '(${playlist.totalBytes} target bytes)',
       );
-      return _HlsAudio(segments: segmentUrls, totalBytes: bestBytes);
+      return _HlsAudio(segments: segmentUrls, totalBytes: playlist.totalBytes);
     } catch (e) {
       debugPrint('HLS: resolution failed: $e');
       return null;
