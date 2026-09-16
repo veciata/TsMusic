@@ -10,11 +10,11 @@ import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/services/artist_image_cache.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/widgets/mini_player_widget.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
-import 'package:tsmusic/utils/lru_cache.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
 import 'package:tsmusic/widgets/song_thumbnail.dart';
 import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
@@ -44,14 +44,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   bool _isOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final ScrollController _scrollController = ScrollController();
-  late final LRUCache<String, String> _artistImageCache;
   final Set<int> _selectedLocalSongs = {};
   bool _isMultiSelectMode = false;
 
   @override
   void initState() {
     super.initState();
-    _artistImageCache = LRUCache<String, String>(maxCapacity: 100);
     _youTubeService = context.read<YouTubeService>();
     _youtubePlayer = context.read<YouTubePlayerProvider>();
     _youtubePlayer.registerScreen('artist_screen');
@@ -79,15 +77,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   Future<void> _fetchArtistImageIfNeeded() async {
     if (widget.artistImageUrlNotifier.value != null) return;
 
-    final cachedUrl = _artistImageCache.get(widget.artistName);
-    if (cachedUrl != null) {
-      setState(() {
-        widget.artistImageUrlNotifier.value = cachedUrl;
-      });
-      return;
-    }
-
-    // First try local song thumbnails / album art
     final musicProvider = context.read<music_provider.MusicProvider>();
     final localSongs = musicProvider.librarySongs
         .where(
@@ -96,37 +85,17 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           ),
         )
         .toList();
-    for (final song in localSongs) {
-      if (song.localThumbnailPath != null) {
-        _artistImageCache.put(widget.artistName, song.localThumbnailPath!);
-        setState(() {
-          widget.artistImageUrlNotifier.value = song.localThumbnailPath;
-        });
-        return;
-      }
-      if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
-        _artistImageCache.put(widget.artistName, song.albumArtUrl!);
-        setState(() {
-          widget.artistImageUrlNotifier.value = song.albumArtUrl;
-        });
-        return;
-      }
-    }
 
-    // Fallback to YouTube search
-    try {
-      final results = await _youTubeService.searchAudio(widget.artistName);
-      for (final song in results) {
-        if (song.thumbnailUrl != null && song.thumbnailUrl!.isNotEmpty) {
-          _artistImageCache.put(widget.artistName, song.thumbnailUrl!);
-          setState(() {
-            widget.artistImageUrlNotifier.value = song.thumbnailUrl;
-          });
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching artist image: $e');
+    // Shared, persistent cache: reuses a previously stored picture when one
+    // exists and only fetches (then persists) a new one on a cache miss.
+    final image = await context.read<ArtistImageCache>().ensureArtistImage(
+      widget.artistName,
+      localSongs: localSongs,
+    );
+    if (image != null && mounted) {
+      setState(() {
+        widget.artistImageUrlNotifier.value = image;
+      });
     }
   }
 
@@ -365,15 +334,26 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
               background: ValueListenableBuilder<String?>(
                 valueListenable: widget.artistImageUrlNotifier,
                 builder: (context, url, child) {
-                  if (url != null) {
-                    return CachedNetworkImage(
-                      imageUrl: url,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) =>
-                          _buildArtistInitialFallback(),
-                      errorWidget: (context, url, error) =>
-                          _buildArtistInitialFallback(),
-                    );
+                  if (url != null && url.isNotEmpty) {
+                    if (url.startsWith('http')) {
+                      return CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            _buildArtistInitialFallback(),
+                        errorWidget: (context, url, error) =>
+                            _buildArtistInitialFallback(),
+                      );
+                    }
+                    final file = File(url);
+                    if (file.existsSync()) {
+                      return Image.file(
+                        file,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildArtistInitialFallback(),
+                      );
+                    }
                   }
                   return _buildArtistInitialFallback();
                 },

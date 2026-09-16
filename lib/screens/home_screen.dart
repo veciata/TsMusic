@@ -10,6 +10,7 @@ import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/models/playlist_item.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/services/artist_image_cache.dart';
 import 'package:tsmusic/utils/format_utils.dart';
 import 'package:tsmusic/widgets/song_thumbnail.dart';
 import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
@@ -615,21 +616,10 @@ class _HomeScreenState extends State<HomeScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.2),
-                  backgroundImage: imageUrl != null
-                      ? NetworkImage(imageUrl)
-                      : null,
-                  child: imageUrl == null
-                      ? Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Theme.of(context).colorScheme.primary,
-                        )
-                      : null,
+                _ArtistTileAvatar(
+                  artistName: artistName,
+                  songs: artistSongs,
+                  initialUrl: imageUrl,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -1052,5 +1042,76 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
     }
+  }
+}
+
+/// Artist avatar for the Artists grid. Shows a fast initial image when one is
+/// already known (album art / hint), otherwise asks the shared
+/// [ArtistImageCache] — which reuses the persisted copy when it exists and only
+/// fetches (and stores) it once when missing. Because the cache is a
+/// [ChangeNotifier], other screens picking up the same artist image get it
+/// from disk instead of re-downloading.
+class _ArtistTileAvatar extends StatefulWidget {
+  const _ArtistTileAvatar({
+    required this.artistName,
+    required this.songs,
+    this.initialUrl,
+  });
+
+  final String artistName;
+  final List<Song> songs;
+  final String? initialUrl;
+
+  @override
+  State<_ArtistTileAvatar> createState() => _ArtistTileAvatarState();
+}
+
+class _ArtistTileAvatarState extends State<_ArtistTileAvatar> {
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = widget.initialUrl;
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    final cache = context.read<ArtistImageCache>();
+    final cached = await cache.ensureArtistImage(
+      widget.artistName,
+      localSongs: widget.songs,
+    );
+    if (cached != null && mounted && cached != _url) {
+      setState(() => _url = cached);
+    }
+  }
+
+  ImageProvider<Object>? _imageProvider(String url) {
+    if (!url.startsWith('http')) {
+      final file = File(url);
+      if (file.existsSync()) return FileImage(file);
+      return null;
+    }
+    return NetworkImage(url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = _url == null ? null : _imageProvider(_url!);
+    return CircleAvatar(
+      radius: 40,
+      backgroundColor: Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.2),
+      backgroundImage: provider,
+      child: provider == null
+          ? Icon(
+              Icons.person,
+              size: 40,
+              color: Theme.of(context).colorScheme.primary,
+            )
+          : null,
+    );
   }
 }

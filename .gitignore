@@ -67,6 +67,7 @@ test/unit/chunked_http_download_test.dart
 test/unit/full_host_download_test.dart
 test/unit/hls_download_test.dart
 test/unit/live_download_check_test.dart
+test/unit/parallel_speed_check_test.dart
 
 # Database files
 ruvector.db
