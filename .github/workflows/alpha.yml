@@ -44,7 +44,11 @@ jobs:
           # to `flutter build apk --debug` used to silently publish a debug-signed
           # APK (different applicationId, so the in-app updater cannot see it)
           # under the alpha name.
-          flutter build apk --release --no-sound-null-safety \
+          # No --no-sound-null-safety: the option was removed from Flutter, so
+          # passing it failed the build. The old `|| flutter build apk --debug`
+          # fallback swallowed that failure and published a debug-signed APK
+          # under the alpha name, which hid this for several releases.
+          flutter build apk --release \
             --build-name=${{ steps.versioning.outputs.v_name }} \
             --build-number=${{ steps.versioning.outputs.v_num }}
 
