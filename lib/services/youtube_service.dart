@@ -4,24 +4,25 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'
-    show debugPrint, kIsWeb, ChangeNotifier;
+import 'package:flutter/foundation.dart' show kIsWeb, ChangeNotifier;
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as path;
 import 'package:tsmusic/services/youtube_client.dart';
-import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/data/repositories/song_repository.dart';
 import 'package:tsmusic/models/audio_format.dart';
+import 'package:tsmusic/models/download_result.dart';
 import 'package:tsmusic/models/song.dart' as ts;
 import 'package:tsmusic/utils/youtube_artist_parser.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
 import 'package:tsmusic/services/download_notification_service.dart';
+import 'package:tsmusic/services/download_queue.dart';
 import 'package:tsmusic/core/services/error_tracking_service.dart';
+import 'package:tsmusic/core/services/playback_diagnostics.dart';
+import 'package:tsmusic/domain/playback/playback_end_signal.dart';
 
-/// YouTube googlevideo akışları libmpv'nin varsayılan User-Agent'ı ile 403 döner;
-/// tarayıcı benzeri başlıklar ve [Referer] gerekir (youtube_explode ile uyumlu).
 Map<String, String> _youtubePlaybackHttpHeaders() => {
   'User-Agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -31,42 +32,20 @@ Map<String, String> _youtubePlaybackHttpHeaders() => {
   'Accept': '*/*',
   'Accept-Language': 'en-US,en;q=0.5',
 };
-
-/// Chunk size for audio downloads. YouTube's CDN throttles/stalls a single
-/// full-file Range request for unsigned c=ANDROID streams, while small
-/// (<=1 MiB) ranged requests succeed. Keep chunks well under the 2 MiB range
-/// that starts getting rejected with HTTP 403.
 const _youtubeDownloadChunkSize = 1024 * 1024;
-
-/// YouTube inspects ranges of unsigned c=ANDROID DASH streams and refuses
-/// anything past ~1 MiB on bot-checked networks, so the DASH downloader above
-/// caps out there. The visionos player client instead provides VOD HLS (m3u8):
-/// its audio is served as many small independent segments which download
-/// reliably even under that same enforcement. These constants mirror what
-/// yt-dlp uses for its working `visionos` player request.
 const _youtubeVisionosUserAgent =
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
 const _youtubePlayerApiUrl =
     'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
-
-/// Number of concurrent segment downloads. HLS audio is many small independent
-/// files, so fetching them in parallel is dramatically faster than the old
-/// sequential walk, while still landing far below YouTube's per-URL limits.
 const _youtubeHlsConcurrentSegments = 6;
 
-/// Resolved VOD-HLS audio for a video: the media segment URLs and the total
-/// byte size of the chosen audio group (parsed from the playlist's clen).
 class HlsAudio {
   final List<String> segments;
   final int totalBytes;
   HlsAudio({required this.segments, required this.totalBytes});
 }
 
-class DownloadResult {
-  final String filePath;
-  final ts.Song song;
-  DownloadResult({required this.filePath, required this.song});
-}
+
 
 class YouTubeAudio {
   final String id;
@@ -76,7 +55,6 @@ class YouTubeAudio {
   final Duration? duration;
   final String? thumbnailUrl;
   final String? audioUrl;
-
   YouTubeAudio({
     required this.id,
     required this.title,
@@ -86,7 +64,6 @@ class YouTubeAudio {
     this.thumbnailUrl,
     this.audioUrl,
   });
-
   factory YouTubeAudio.fromVideo(Video video) {
     Duration? safeDuration;
     try {
@@ -97,12 +74,10 @@ class YouTubeAudio {
     } catch (e) {
       safeDuration = null;
     }
-
     final artistList = YouTubeArtistParser.parseArtistName(
       video.title,
       video.author,
     );
-
     return YouTubeAudio(
       id: video.id.value,
       title: video.title,
@@ -124,7 +99,6 @@ class DownloadProgress {
   bool failed;
   StreamSubscription<List<int>>? subscription;
   final Completer<void>? completer;
-
   DownloadProgress({
     required this.videoId,
     required this.title,
@@ -140,39 +114,133 @@ class DownloadProgress {
 
 class YouTubeService with ChangeNotifier {
   static YouTubeService? _instance;
-
   final YoutubeExplode _yt;
   final http.Client _httpClient;
   final YoutubeHttpClient _ytHttpClient;
   final Player _player;
-
+  final SongRepository _songRepository;
+  final bool _ownsPlayer;
   final Map<String, DownloadProgress> _activeDownloads = {};
   YouTubeAudio? _currentAudio;
-
+  bool _onlineSessionActive = false;
   final List<YouTubeAudio> _onlinePlaylist = [];
   int _onlinePlaylistIndex = -1;
-
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final Map<String, VideoSearchList> _searchPages = {};
-
-  // Caches for performance optimization
-  late final LRUCache<String, List<YouTubeAudio>>
-  _searchResultsCache; // Cache search results
-  late final LRUCache<String, String> _audioUrlCache; // Cache audio stream URLs
-
-  Function()? _stopOtherPlayer;
+  late final LRUCache<String, List<YouTubeAudio>> _searchResultsCache;
+  late final LRUCache<String, String> _audioUrlCache;
+  static const Duration _streamUrlCacheTtl = Duration(minutes: 2);
+  final Map<String, int> _audioUrlFetchedAt = {};
   List<ts.Song> Function()? _getLocalSongs;
-
-  // True when the current audio belongs to the main player queue (e.g. a
-  // YouTube-only song stored in a playlist). In this mode the service does
-  // not track the online playlist or auto-advance it.
   bool _playingFromQueue = false;
-
   bool get playingFromQueue => _playingFromQueue;
-
-  // Auto-suggest state
   bool _autoSuggestEnabled = false;
   List<YouTubeAudio> _nextSuggestions = [];
+  final Map<String, int> _streamFastFailRetries = {};
+
+  /// Batch downloads that outlive the screen which started them.
+  ///
+  /// Owned here rather than by a dialog so the user can leave the playlist and
+  /// watch the batch on the downloads page. Downloading one track at a time is
+  /// deliberate: parallel HLS range requests to YouTube draw 403s, which is
+  /// what the per-track download tests hit when they run live.
+  late final DownloadQueue downloadQueue = DownloadQueue(
+    download: (videoId, onProgress) => downloadAudio(
+      videoId: videoId,
+      onProgress: onProgress,
+      preferredFormat: _queueAudioFormat,
+      downloadLocation: _queueDownloadLocation,
+    ),
+    downloadedVideoIds: () => _songRepository.getDownloadedYouTubeIds(),
+  );
+
+  AudioFormat _queueAudioFormat = AudioFormat.auto;
+  String _queueDownloadLocation = 'internal';
+
+  /// Records the settings a new batch should use.
+  ///
+  /// Taken when the batch is queued rather than per track so a batch is not
+  /// half-downloaded in one format and half in another if the user changes
+  /// settings while it runs.
+  void configureDownloadQueue({
+    required AudioFormat audioFormat,
+    required String downloadLocation,
+  }) {
+    _queueAudioFormat = audioFormat;
+    _queueDownloadLocation = downloadLocation;
+  }
+
+  /// The YouTube ids already saved on the device, across every list.
+  Future<Set<String>> downloadedVideoIds() =>
+      _songRepository.getDownloadedYouTubeIds();
+
+  final Map<String, ts.Song> _downloadedSongs = {};
+
+  /// Whether [videoId] is already saved on the device.
+  ///
+  /// Backed by the database, not by whichever song list happens to be loaded.
+  /// The in-memory lists only contain downloads made while that list was open,
+  /// so checking them reported false negatives and re-downloaded tracks.
+  bool isVideoDownloaded(String videoId) => _downloadedSongs.containsKey(videoId);
+
+  /// The saved song for [videoId], or null if it is not on the device.
+  ts.Song? downloadedSongFor(String videoId) => _downloadedSongs[videoId];
+
+  /// Refreshes the in-memory view of what is on the device.
+  ///
+  /// Call after downloads finish so icons elsewhere (search results, the queue
+  /// sheet) stop offering to re-download something that is already saved.
+  Future<void> refreshDownloadedVideoIds() async {
+    final songs = await _songRepository.getDownloadedYouTubeSongs();
+    _downloadedSongs
+      ..clear()
+      ..addEntries(
+        songs
+            .where((song) => (song.youtubeId ?? '').isNotEmpty)
+            .map((song) => MapEntry(song.youtubeId!, song)),
+      );
+    notifyListeners();
+  }
+
+  /// Per-HLS-segment progress for the current track, so a `completed` event
+  /// can be judged against the track's real length.
+  final TrackProgressAccumulator _onlineProgress = TrackProgressAccumulator();
+
+  /// Detects an online track that stopped advancing before finishing.
+  final PlaybackStallWatchdog _onlineStall = PlaybackStallWatchdog();
+  Timer? _onlineStallTimer;
+  int _onlineStallStartedAt = 0;
+  static const Duration _streamFastFailRetryWindow = Duration(minutes: 5);
+
+  /// Serialises every operation that drives the shared [Player].
+  ///
+  /// `stop -> open -> play` must never overlap with another cycle. mpv's core is
+  /// torn down and rebuilt by each `open`, so two overlapping cycles use a core
+  /// that is being replaced underneath them. Measured on a device, the service
+  /// watchdog and the provider watchdog both fired on the same stall, each
+  /// re-resolved the URL and re-entered [playAudio]; libmpv then died with
+  /// SIGSEGV in its `mpv/mpv core` thread, killing the app partway through the
+  /// track.
+  Future<void> _playerOpQueue = Future<void>.value();
+
+  /// Runs [action] after every previously queued player operation has settled.
+  Future<T> _withPlayerLock<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    final previous = _playerOpQueue;
+    _playerOpQueue = () async {
+      try {
+        await previous;
+      } catch (_) {
+        // A failed predecessor must not wedge the queue.
+      }
+      try {
+        completer.complete(await action());
+      } catch (error, stack) {
+        completer.completeError(error, stack);
+      }
+    }();
+    return completer.future;
+  }
 
   bool get autoSuggestEnabled => _autoSuggestEnabled;
   set autoSuggestEnabled(bool value) {
@@ -181,15 +249,12 @@ class YouTubeService with ChangeNotifier {
   }
 
   List<YouTubeAudio> get nextSuggestions => List.unmodifiable(_nextSuggestions);
-
   set localSongsCallback(List<ts.Song> Function() callback) {
     _getLocalSongs = callback;
   }
 
-  // Getters
   List<DownloadProgress> get activeDownloads =>
       _activeDownloads.values.toList();
-
   bool isDownloading(String videoId) {
     final d = _activeDownloads[videoId];
     return d != null && d.isDownloading && d.error == null;
@@ -198,48 +263,33 @@ class YouTubeService with ChangeNotifier {
   YouTubeAudio? get currentAudio => _currentAudio;
   bool get isPlaying => _player.state.playing;
   Player get player => _player;
-
-  // Online playlist
   List<YouTubeAudio> get onlinePlaylist => List.unmodifiable(_onlinePlaylist);
   int get onlinePlaylistIndex => _onlinePlaylistIndex;
-
   static YouTubeService? get instance => _instance;
-
-  set stopOtherPlayerCallback(Function() callback) {
-    _stopOtherPlayer = callback;
-  }
-
-  // Public constructor
-  YouTubeService({YoutubeExplode? yt, http.Client? httpClient, Player? player})
-    : _yt =
-          yt ??
-          YoutubeExplode(httpClient: ModernUserAgentHttpClient(httpClient)),
-      _httpClient = httpClient ?? http.Client(),
-      _ytHttpClient = YoutubeHttpClient(httpClient),
-      _player = player ?? Player() {
+  YouTubeService({
+    YoutubeExplode? yt,
+    http.Client? httpClient,
+    Player? player,
+    SongRepository? songRepository,
+  }) : _yt =
+           yt ??
+           YoutubeExplode(httpClient: ModernUserAgentHttpClient(httpClient)),
+       _httpClient = httpClient ?? http.Client(),
+       _ytHttpClient = YoutubeHttpClient(httpClient),
+       _player = player ?? Player(),
+       _ownsPlayer = player == null,
+       _songRepository = songRepository ?? SongRepository() {
     _instance = this;
-    // Initialize caches with max capacity
     _searchResultsCache = LRUCache<String, List<YouTubeAudio>>(
       maxCapacity: 100,
     );
     _audioUrlCache = LRUCache<String, String>(maxCapacity: 200);
     _init();
   }
-
-  // Manifest strategy for youtube_explode_dart 3.1.0. Passing an explicit
-  // list disables the package's own client selection, so don't hardcode one:
-  // the old androidVr/tv chain is now rejected by YouTube's bot-check ("The
-  // page needs to be reloaded"), while the package defaults (androidSdkless,
-  // retrying with tv) still work. Try defaults first, then an explicit pair
-  // as a last resort.
   Future<StreamManifest> _getManifestWithFallbacks(String videoId) async {
     try {
       return await _yt.videos.streamsClient.getManifest(videoId);
     } catch (e) {
-      debugPrint(
-        'Package-default manifest clients failed ($e); retrying with '
-        'explicit clients.',
-      );
       return _yt.videos.streamsClient.getManifest(
         videoId,
         ytClients: const [YoutubeApiClient.androidVr, YoutubeApiClient.tv],
@@ -252,12 +302,55 @@ class YouTubeService with ChangeNotifier {
       notifyListeners();
     });
     _player.stream.completed.listen((completed) async {
-      if (completed && _onlinePlaylist.isNotEmpty && !_playingFromQueue) {
+      if (!completed) return;
+      if (_onlinePlaylist.isNotEmpty &&
+          !_playingFromQueue &&
+          _onlineSessionActive) {
+        final state = _player.state;
+        final duration = state.duration;
+        final position = state.position;
+        if (_onlinePlaylistIndex < 0 ||
+            _onlinePlaylistIndex >= _onlinePlaylist.length) {
+          return;
+        }
+        final audio = _onlinePlaylist[_onlinePlaylistIndex];
+        // `completed` fires once per HLS segment, so position/duration cover
+        // only that segment. Judge against the track length plus the progress
+        // already banked. A boundary can say "track over" or "keep going"; it
+        // cannot say "stream died", since mpv also reports a short position
+        // and `playing == false` at every healthy boundary.
+        final signal = PlaybackEndSignal(
+          position: position,
+          expectedDuration: audio.duration ?? Duration.zero,
+          progressBeforeEvent: _onlineProgress.banked,
+          isPlaying: state.playing,
+        );
+        final verdict = signal.classify();
+
+        PlaybackDiagnostics.trackCompleted(
+          videoId: audio.id,
+          positionMs: position.inMilliseconds,
+          expectedDurationMs: audio.duration?.inMilliseconds,
+          playerDurationMs: duration.inMilliseconds,
+          branch: 'service-${signal.label}',
+          retries: _streamFastFailRetries.length,
+        );
+
+        switch (verdict) {
+          case TrackEndVerdict.continueTrack:
+            // Segment boundary, not the end of the track. Keep playing.
+            _onlineProgress.bank(position);
+            return;
+
+          case TrackEndVerdict.finished:
+            _onlineProgress.reset();
+            _stopStallWatch();
+        }
+        _streamFastFailRetries.remove(audio.id);
         final nextIndex = _onlinePlaylistIndex + 1;
         if (nextIndex < _onlinePlaylist.length) {
           await playOnlinePlaylistAt(nextIndex);
         } else if (_autoSuggestEnabled) {
-          // Queue exhausted and auto-suggest on: suggest next
           unawaited(_updateSuggestions());
         }
       }
@@ -265,6 +358,77 @@ class YouTubeService with ChangeNotifier {
         unawaited(_updateSuggestions());
       }
     });
+  }
+
+  /// Starts watching [audio] for a stall, retrying it once on a fresh URL if
+  /// playback stops advancing partway through.
+  ///
+  /// This is the only place allowed to conclude that an online stream died. A
+  /// `completed` boundary cannot: at every healthy boundary mpv reports a short
+  /// position and briefly reports `playing == false` while handing off to the
+  /// next segment, which made a boundary-based check misread 23 of 43
+  /// boundaries on a track that played to 221s of its 239s.
+  void _startStallWatch(YouTubeAudio audio) {
+    _stopStallWatch();
+    _onlineStallTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      // During queue playback the provider owns stall recovery. Both watchdogs
+      // watch the same signal with the same timeouts, so they fire on the same
+      // tick; letting both recover means two concurrent re-resolves and two
+      // concurrent opens of the same track on the shared player.
+      if (_playingFromQueue) return;
+      // Observe accumulated progress, not the raw player position: for HLS the
+      // player position resets at every segment boundary, so watching it
+      // directly would read each boundary as a stall.
+      final detected = _onlineStall.observe(
+        Duration(
+          milliseconds:
+              DateTime.now().millisecondsSinceEpoch - _onlineStallStartedAt,
+        ),
+        _onlineProgress.banked + _player.state.position,
+        isBuffering: _player.state.buffering,
+      );
+      if (!detected) return;
+      if (!_onlineStall.isTruncated(
+        expectedDuration: audio.duration ?? Duration.zero,
+        banked: _onlineProgress.banked,
+      )) {
+        return;
+      }
+      final retryAt = _streamFastFailRetries[audio.id];
+      final alreadyRetried =
+          retryAt != null &&
+          DateTime.now().millisecondsSinceEpoch - retryAt <
+              _streamFastFailRetryWindow.inMilliseconds;
+      if (alreadyRetried) return;
+      _streamFastFailRetries[audio.id] = DateTime.now().millisecondsSinceEpoch;
+      invalidateStreamCache(audio.id);
+      PlaybackDiagnostics.playbackFailed(
+        videoId: audio.id,
+        error: 'stalled partway through track',
+        origin: 'service-watchdog',
+      );
+      await _retryFailedStream(audio);
+    });
+  }
+
+  /// Cancels the stall watchdog, if running.
+  void _stopStallWatch() {
+    _onlineStallTimer?.cancel();
+    _onlineStallTimer = null;
+  }
+
+  Future<void> _retryFailedStream(YouTubeAudio audio) async {
+    try {
+      // Deliberately no forceDash: the DASH path buffers indefinitely on this
+      // network (measured 0ms after 120s), so retrying HLS on a fresh URL is
+      // the only recovery that can work.
+      await playAudio(audio);
+    } catch (e) {
+      final nextIndex = _onlinePlaylistIndex + 1;
+      if (nextIndex >= 0 && nextIndex < _onlinePlaylist.length) {
+        await playOnlinePlaylistAt(nextIndex);
+      }
+    }
   }
 
   Future<void> _updateSuggestions() async {
@@ -285,7 +449,6 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  // ===== ONLINE PLAYLIST MANAGEMENT =====
   void addToOnlinePlaylist(YouTubeAudio audio) {
     _onlinePlaylist.add(audio);
     notifyListeners();
@@ -309,6 +472,24 @@ class YouTubeService with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> playOnlinePlaylist(
+    List<YouTubeAudio> audios, {
+    int startIndex = 0,
+  }) async {
+    _onlinePlaylist
+      ..clear()
+      ..addAll(audios);
+    _onlinePlaylistIndex = -1;
+    notifyListeners();
+    if (audios.isEmpty) return;
+    final int index = startIndex < 0
+        ? 0
+        : startIndex >= audios.length
+        ? audios.length - 1
+        : startIndex;
+    await playOnlinePlaylistAt(index);
+  }
+
   Future<int> fetchPlaylistAndAdd(String playlistUrl) async {
     try {
       final audios = await _fetchPlaylist(playlistUrl);
@@ -316,18 +497,33 @@ class YouTubeService with ChangeNotifier {
       notifyListeners();
       return audios.length;
     } catch (e) {
-      debugPrint('Error fetching playlist: $e');
       rethrow;
     }
   }
 
-  /// Fetches a YouTube playlist's videos without touching the online playlist.
   Future<List<YouTubeAudio>> fetchPlaylist(String playlistUrl) async {
     try {
       return await _fetchPlaylist(playlistUrl);
     } catch (e) {
-      debugPrint('Error fetching playlist: $e');
       rethrow;
+    }
+  }
+
+  Future<String?> fetchPlaylistTitle(String playlistUrl) async {
+    try {
+      final playlist = await _yt.playlists.get(playlistUrl);
+      return playlist.title.isNotEmpty ? playlist.title : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<YouTubeAudio?> getAudioByVideoId(String videoId) async {
+    try {
+      final video = await _yt.videos.get(videoId);
+      return YouTubeAudio.fromVideo(video);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -335,15 +531,14 @@ class YouTubeService with ChangeNotifier {
   static final RegExp _ytInitDataRegExp = RegExp(
     r'var ytInitialData = (\{.*?\});</script>',
   );
-
-  /// Fetches a YouTube playlist's videos. Handles both the new `lockupViewModel`
-  /// layout (videos not filtered out when the channel id is missing) and falls
-  /// back to the classic playlist API when the new layout isn't present.
-  Future<List<YouTubeAudio>> _fetchPlaylist(String playlistUrl) async {
+  Future<List<YouTubeAudio>> _fetchPlaylist(
+    String playlistUrl, {
+    int? maxItems,
+  }) async {
     final playlistId = PlaylistId(playlistUrl).value;
     final audios = <YouTubeAudio>[];
     final seenIds = <String>{};
-
+    bool reachedMax() => maxItems != null && audios.length >= maxItems;
     final raw = await _ytHttpClient.getString(
       'https://www.youtube.com/playlist?list=$playlistId&hl=en&persist_hl=1',
     );
@@ -351,11 +546,9 @@ class YouTubeService with ChangeNotifier {
     if (initMatch != null) {
       final initial = json.decode(initMatch.group(1)!) as Map<String, dynamic>;
       await _parsePlaylistPage(initial, audios, seenIds);
-
-      // Follow pagination until there are no more items.
       var token = _findContinuationToken(initial);
       final visitedTokens = <String>{};
-      while (token != null && visitedTokens.add(token)) {
+      while (token != null && visitedTokens.add(token) && !reachedMax()) {
         final next = await _ytHttpClient.sendContinuation(
           'browse',
           token,
@@ -367,8 +560,6 @@ class YouTubeService with ChangeNotifier {
         token = nextToken;
       }
     }
-
-    // Fallback for the classic layout / mixes that don't use lockupViewModels.
     if (audios.isEmpty) {
       try {
         final videos = await _yt.playlists.getVideos(playlistId).toList();
@@ -376,11 +567,8 @@ class YouTubeService with ChangeNotifier {
           if (!seenIds.add(video.id.value)) continue;
           audios.add(YouTubeAudio.fromVideo(video));
         }
-      } catch (e) {
-        debugPrint('Classic playlist fallback failed: $e');
-      }
+      } catch (e) {}
     }
-
     return audios;
   }
 
@@ -396,16 +584,13 @@ class YouTubeService with ChangeNotifier {
       if (id == null || !_videoIdRegExp.hasMatch(id) || !seenIds.add(id)) {
         continue;
       }
-
       final lmv = entry['metadata']?['lockupMetadataViewModel'];
       final titleNode = _read(lmv, 'title');
       final rawTitle = _string(titleNode, 'content');
       final title = (rawTitle ?? '').trim();
       if (title.isEmpty) continue;
-
       final author = _parseLockupAuthor(lmv);
       final artistList = YouTubeArtistParser.parseArtistName(title, author);
-
       audios.add(
         YouTubeAudio(
           id: id,
@@ -457,13 +642,11 @@ class YouTubeService with ChangeNotifier {
 
   Object? _read(dynamic map, String key) =>
       map is Map<String, dynamic> ? map[key] : null;
-
   String? _string(dynamic map, String key) {
     final value = _read(map, key);
     return value is String ? value : null;
   }
 
-  /// Extracts the first metadata row's first part as the artist name.
   String _parseLockupAuthor(dynamic lmv) {
     final metadata = _read(lmv, 'metadata');
     final viewModel = _read(metadata, 'contentMetadataViewModel');
@@ -499,15 +682,11 @@ class YouTubeService with ChangeNotifier {
   ts.Song? _findLocalMatch(YouTubeAudio audio) {
     final localSongs = _getLocalSongs?.call() ?? [];
     if (localSongs.isEmpty) return null;
-
-    // First try matching by youtubeId
     final byYtId = localSongs.cast<ts.Song?>().firstWhere(
       (s) => s!.youtubeId == audio.id,
       orElse: () => null,
     );
     if (byYtId != null) return byYtId;
-
-    // Fallback: match by title + first artist
     final title = audio.title.toLowerCase().trim();
     final artist = audio.artists.isNotEmpty
         ? audio.artists.first.toLowerCase().trim()
@@ -538,23 +717,32 @@ class YouTubeService with ChangeNotifier {
         thumbnailUrl: song.albumArtUrl,
       );
     }
-    // Fallback: pick from online playlist history
     if (_onlinePlaylist.length > 1) {
       return _onlinePlaylist[0];
     }
     throw Exception('No songs available for suggestion');
   }
 
-  // Play audio from YouTube (or local file if matching song exists)
-  Future<void> playAudio(YouTubeAudio audio, {bool trackOnline = true}) async {
-    try {
-      _stopOtherPlayer?.call();
+  /// Opens [audio] and starts playback, serialised against every other player
+  /// operation. See [_withPlayerLock] for why this must not be reentrant.
+  Future<void> playAudio(
+    YouTubeAudio audio, {
+    bool trackOnline = true,
+    bool forceDash = false,
+  }) => _withPlayerLock(
+    () =>
+        _playAudioLocked(audio, trackOnline: trackOnline, forceDash: forceDash),
+  );
 
+  Future<void> _playAudioLocked(
+    YouTubeAudio audio, {
+    bool trackOnline = true,
+    bool forceDash = false,
+  }) async {
+    try {
       _currentAudio = audio;
       _playingFromQueue = !trackOnline;
-
       if (trackOnline) {
-        // Track in online playlist
         final existingIndex = _onlinePlaylist.indexWhere(
           (a) => a.id == audio.id,
         );
@@ -565,17 +753,13 @@ class YouTubeService with ChangeNotifier {
           _onlinePlaylistIndex = _onlinePlaylist.length - 1;
         }
       }
-
       isLoading.value = true;
       notifyListeners();
-
       await _player.stop();
-
-      // Check for local match first
       final localMatch = _findLocalMatch(audio);
       if (localMatch != null && File(localMatch.url).existsSync()) {
-        debugPrint('🎵 Playing local file: ${localMatch.url}');
         await _player.open(Media(localMatch.url));
+        _onlineSessionActive = true;
         await _player.play();
         _currentAudio = YouTubeAudio(
           id: audio.id,
@@ -590,28 +774,40 @@ class YouTubeService with ChangeNotifier {
         isLoading.value = false;
         return;
       }
-
-      final String? audioUrl = await _getAudioStream(audio.id);
-
+      final String? audioUrl = await _getAudioStream(
+        audio.id,
+        forceDash: forceDash,
+      );
       if (audioUrl == null) {
         throw Exception(
           'Ses akışı alınamadı. Lütfen daha sonra tekrar deneyin.',
         );
       }
-
-      debugPrint('Playing audio from URL: $audioUrl');
-
       try {
         final headers = _youtubePlaybackHttpHeaders();
         await _player.open(Media(audioUrl, httpHeaders: headers));
+        _onlineSessionActive = true;
         await _player.play();
-        debugPrint('✅ Audio playback started successfully');
       } catch (e) {
-        debugPrint('❌ Error setting audio source: $e');
+        PlaybackDiagnostics.playbackFailed(
+          videoId: audio.id,
+          error: e,
+          origin: trackOnline ? 'search' : 'queue',
+        );
         throw Exception('Ses çalınamadı: ${e.toString()}');
       }
-
-      // Update the current audio with the latest info
+      PlaybackDiagnostics.trackOpened(
+        videoId: audio.id,
+        origin: trackOnline ? 'search' : 'queue',
+        expectedDurationMs: audio.duration?.inMilliseconds,
+        playerDurationMs: _player.state.duration.inMilliseconds,
+        fromQueue: !trackOnline,
+      );
+      // New track: discard the previous track's progress and restart the watchdog.
+      _onlineProgress.reset();
+      _onlineStall.reset();
+      _onlineStallStartedAt = DateTime.now().millisecondsSinceEpoch;
+      _startStallWatch(audio);
       _currentAudio = YouTubeAudio(
         id: audio.id,
         title: audio.title,
@@ -621,49 +817,128 @@ class YouTubeService with ChangeNotifier {
         thumbnailUrl: audio.thumbnailUrl,
         audioUrl: audioUrl,
       );
-
       notifyListeners();
     } catch (e) {
-      debugPrint('Error playing YouTube audio: $e');
       rethrow;
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// İndirme ile aynı mantık: önce androidVr, sonra varsayılan; mümkünse m4a (mp4).
-  Future<String?> _getAudioStream(String videoId) async {
+  Future<String?> _getAudioStream(
+    String videoId, {
+    bool forceDash = false,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    var fromCache = false;
     try {
-      // Check cache first
       final cached = _audioUrlCache.get(videoId);
-      if (cached != null) {
-        debugPrint('✅ Using cached stream URL for videoId: $videoId');
+      final fetchedAt = _audioUrlFetchedAt[videoId];
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (cached != null &&
+          fetchedAt != null &&
+          nowMs - fetchedAt <= _streamUrlCacheTtl.inMilliseconds) {
+        fromCache = true;
+        PlaybackDiagnostics.resolved(
+          videoId: videoId,
+          resolver: 'cache',
+          url: cached,
+          fromCache: true,
+          resolveDuration: stopwatch.elapsed,
+        );
         return cached;
       }
-
-      debugPrint('🔧 Getting YouTube stream URL: $videoId');
-
-      // Prefer the audio-only HLS media playlist: its segments download as
-      // independent files, so playback streams to the end even on networks
-      // where unsigned DASH streams are range-capped at ~1 MiB.
-      final hls = await getHlsPlaylistUrl(videoId);
+      _audioUrlCache.remove(videoId);
+      _audioUrlFetchedAt.remove(videoId);
+      // No automatic DASH fallback, deliberately.
+      //
+      // When HLS resolution fails -- and it does fail for real reasons, e.g. a
+      // DNS lookup returning "No address associated with hostname" -- falling
+      // back to DASH looks like recovery but is not: measured on this network
+      // the DASH stream buffers at 0ms indefinitely (still 0ms after 120s), so
+      // the track silently never starts. That converts a clear, reportable
+      // failure into an indefinite hang, which is precisely the symptom users
+      // describe as "the song won't play". Retrying HLS and reporting a real
+      // error is strictly better than hanging on a format that cannot play.
+      if (forceDash) {
+        final dash = await _getDashStreamUrl(videoId);
+        if (dash != null) {
+          _audioUrlCache.put(videoId, dash);
+          _audioUrlFetchedAt[videoId] = DateTime.now().millisecondsSinceEpoch;
+          PlaybackDiagnostics.resolved(
+            videoId: videoId,
+            resolver: 'dash-forced',
+            url: dash,
+            fromCache: fromCache,
+            resolveDuration: stopwatch.elapsed,
+          );
+          return dash;
+        }
+      }
+      final hls = await _resolveHlsWithRetry(videoId);
       if (hls != null) {
-        debugPrint('✅ Got YouTube HLS stream URL (clen=${hls.totalBytes})');
         _audioUrlCache.put(videoId, hls.url);
+        _audioUrlFetchedAt[videoId] = DateTime.now().millisecondsSinceEpoch;
+        PlaybackDiagnostics.resolved(
+          videoId: videoId,
+          resolver: 'hls',
+          url: hls.url,
+          fromCache: fromCache,
+          resolveDuration: stopwatch.elapsed,
+        );
         return hls.url;
       }
-      debugPrint(
-        'ℹ️ HLS unavailable for $videoId, falling back to DASH stream',
+      PlaybackDiagnostics.resolveFailed(
+        videoId: videoId,
+        reason: 'hls unavailable after retries',
       );
+      return null;
+    } catch (e) {
+      PlaybackDiagnostics.resolveFailed(videoId: videoId, reason: e.toString());
+      return null;
+    }
+  }
 
+  void invalidateStreamCache(String videoId) {
+    _audioUrlCache.remove(videoId);
+    _audioUrlFetchedAt.remove(videoId);
+  }
+
+  /// Resolves the HLS media playlist, retrying with a short backoff.
+  ///
+  /// Resolution talks to youtube.com by hostname, and a single failed lookup is
+  /// enough to lose the track: the device in testing is configured with Private
+  /// DNS over TLS to 8.8.8.8 and intermittently returns
+  /// `No address associated with hostname (errno = 7)`. Retrying turns that blip
+  /// into a resolved stream instead of a dead track.
+  Future<({String url, int totalBytes})?> _resolveHlsWithRetry(
+    String videoId,
+  ) async {
+    const backoff = [Duration(seconds: 2), Duration(seconds: 5)];
+    for (var attempt = 0; attempt <= backoff.length; attempt++) {
+      final hls = await getHlsPlaylistUrl(videoId, forceRetry: attempt > 0);
+      if (hls != null) return hls;
+      if (attempt < backoff.length) {
+        PlaybackDiagnostics.resolved(
+          videoId: videoId,
+          resolver: 'hls-retry-${attempt + 1}',
+          url: '',
+          fromCache: false,
+          resolveDuration: Duration.zero,
+        );
+        await Future<void>.delayed(backoff[attempt]);
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _getDashStreamUrl(String videoId) async {
+    try {
       final manifest = await _getManifestWithFallbacks(videoId);
-
       final audioStreams = manifest.audioOnly.toList();
       if (audioStreams.isEmpty) {
-        debugPrint('❌ Ses akışı yok');
         return null;
       }
-
       final m4aStreams = audioStreams
           .where((s) => s.container.name == 'mp4')
           .toList();
@@ -676,27 +951,18 @@ class YouTubeService with ChangeNotifier {
               (a, b) =>
                   a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
             );
-
       final streamUrl = streamInfo.url.toString();
-      debugPrint('✅ Got YouTube stream URL (${streamInfo.container.name})');
-
-      // Cache the stream URL
-      _audioUrlCache.put(videoId, streamUrl);
-
       return streamUrl;
     } catch (e) {
-      debugPrint('❌ Stream extraction failed: $e');
       return null;
     }
   }
 
-  // Pause audio
   Future<void> pause() async {
     await _player.pause();
     notifyListeners();
   }
 
-  // Resume audio
   Future<void> play() async {
     if (_currentAudio != null) {
       await _player.play();
@@ -704,12 +970,23 @@ class YouTubeService with ChangeNotifier {
     }
   }
 
-  // Stop audio
-  Future<void> stop() async {
+  Future<void> stop() => _withPlayerLock(() async {
+    _stopStallWatch();
+    PlaybackDiagnostics.stopSampling();
     await _player.stop();
     _currentAudio = null;
+    _onlineSessionActive = false;
     _onlinePlaylistIndex = -1;
     _playingFromQueue = false;
+    notifyListeners();
+  });
+
+  void markLocalPlaybackStarted() {
+    // A local file is about to be opened on the same shared player, so the
+    // service must not start an online open on top of it.
+    _stopStallWatch();
+    if (!_onlineSessionActive) return;
+    _onlineSessionActive = false;
     notifyListeners();
   }
 
@@ -723,6 +1000,9 @@ class YouTubeService with ChangeNotifier {
       title: title,
       completer: Completer<void>(),
     );
+    // Mirror into the queue so single-track downloads show on the downloads
+    // page next to batch ones. The download itself is unchanged.
+    downloadQueue.beginExternalDownload(videoId, title);
     _notifyProgressUpdate();
   }
 
@@ -731,8 +1011,8 @@ class YouTubeService with ChangeNotifier {
       final download = _activeDownloads[videoId]!
         ..progress = progress
         ..isDownloading = progress < 1.0;
+      downloadQueue.reportExternalProgress(videoId, progress);
       _notifyProgressUpdate();
-
       final downloadNotification = DownloadNotificationService();
       if (progress > 0 && progress < 1.0) {
         final totalDownloads = _activeDownloads.length;
@@ -746,7 +1026,6 @@ class YouTubeService with ChangeNotifier {
   }
 
   void _completeDownload(String videoId) {
-    debugPrint('_completeDownload: Completing download for videoId: $videoId');
     if (_activeDownloads.containsKey(videoId)) {
       final download = _activeDownloads[videoId]!;
       final title = download.title;
@@ -754,11 +1033,8 @@ class YouTubeService with ChangeNotifier {
         download.completer!.complete();
       }
       _activeDownloads.remove(videoId);
+      downloadQueue.endExternalDownload(videoId);
       _notifyProgressUpdate();
-      debugPrint(
-        '_completeDownload: Download for videoId: $videoId completed and removed from active list.',
-      );
-
       final downloadNotification = DownloadNotificationService();
       if (_activeDownloads.isEmpty) {
         downloadNotification.cancelDownloadNotification();
@@ -770,32 +1046,21 @@ class YouTubeService with ChangeNotifier {
   Future<bool> cancelDownload(String videoId) async {
     final d = _activeDownloads[videoId];
     if (d == null) return false;
-
     d
       ..cancelRequested = true
       ..isDownloading = false;
-
-    // Immediately remove from the list to update UI
     _activeDownloads.remove(videoId);
     _notifyProgressUpdate();
-
-    // Background cancellation
     unawaited(
       Future.microtask(() async {
         try {
           await d.subscription?.cancel();
-          debugPrint('cancelDownload: Subscription cancelled for $videoId');
-        } catch (e) {
-          debugPrint('Error during background subscription cancellation: $e');
-        }
+        } catch (e) {}
       }),
     );
-
     return true;
   }
 
-  /// Removes a finished/failed download entry from the active list so the
-  /// user can clear an error from the downloads screen.
   void dismissDownload(String videoId) {
     if (!_activeDownloads.containsKey(videoId)) return;
     _activeDownloads.remove(videoId);
@@ -804,25 +1069,17 @@ class YouTubeService with ChangeNotifier {
 
   Future<List<YouTubeAudio>> searchAudio(String query) async {
     try {
-      // Check cache first
       final cached = _searchResultsCache.get(query);
       if (cached != null) {
-        debugPrint('✅ Using cached search results for: "$query"');
         return cached;
       }
-
-      debugPrint('🔍 Fetching fresh search results for: "$query"');
       final searchResults = await _yt.search.search(query);
       _searchPages[query] = searchResults;
       final videos = searchResults.whereType<Video>().toList();
       final audioList = videos.map(YouTubeAudio.fromVideo).toList();
-
-      // Cache the results
       _searchResultsCache.put(query, audioList);
-
       return audioList;
     } catch (e) {
-      debugPrint('Error searching YouTube: $e');
       rethrow;
     }
   }
@@ -837,9 +1094,34 @@ class YouTubeService with ChangeNotifier {
       final videos = next.whereType<Video>().toList();
       return videos.map(YouTubeAudio.fromVideo).toList();
     } catch (e) {
-      debugPrint('Error loading next page for "$query": $e');
       rethrow;
     }
+  }
+
+  Future<List<YouTubeAudio>> searchPlaylists(String query, {int? limit}) async {
+    final page = await _yt.search.searchContent(
+      query,
+      filter: TypeFilters.playlist,
+    );
+    final playlists = page.whereType<SearchPlaylist>().toList();
+    if (playlists.isEmpty) {
+      return searchAudio('$query mix');
+    }
+    final seenIds = <String>{};
+    final audios = <YouTubeAudio>[];
+    for (final playlist in playlists) {
+      try {
+        final fetched = await _fetchPlaylist(
+          'https://www.youtube.com/playlist?list=${playlist.id}',
+          maxItems: limit,
+        );
+        for (final audio in fetched) {
+          if (seenIds.add(audio.id)) audios.add(audio);
+          if (limit != null && audios.length >= limit) return audios;
+        }
+      } catch (e) {}
+    }
+    return audios;
   }
 
   Future<String?> getAudioStreamUrl(String videoId) async {
@@ -849,13 +1131,8 @@ class YouTubeService with ChangeNotifier {
       if (streams.isNotEmpty) {
         return streams.withHighestBitrate().url.toString();
       }
-      // Audio-only streams required - no video fallback
-      debugPrint(
-        'getAudioStreamUrl: No audio-only streams available for videoId: $videoId',
-      );
       return null;
     } catch (e) {
-      debugPrint('Error getting audio stream URL: $e');
       rethrow;
     }
   }
@@ -867,22 +1144,14 @@ class YouTubeService with ChangeNotifier {
     String downloadLocation = 'internal',
   }) async {
     if (_activeDownloads.containsKey(videoId) && isDownloading(videoId)) {
-      debugPrint(
-        'downloadAudio: Download for videoId: $videoId is already in progress. Ignoring duplicate request.',
-      );
       return null;
     }
-
-    // A previous attempt ended in failure/cancel. Remove its stale entry so
-    // the retry can start cleanly and show progress again.
     _activeDownloads.remove(videoId);
     _notifyProgressUpdate();
-
     Video video;
     try {
       video = await _yt.videos.get(videoId);
     } catch (e) {
-      debugPrint('downloadAudio: Failed to fetch video info: $e');
       _addActiveDownload(videoId, 'Unknown');
       final failed = _activeDownloads[videoId];
       if (failed != null) {
@@ -891,6 +1160,10 @@ class YouTubeService with ChangeNotifier {
           ..isDownloading = false
           ..failed = true;
       }
+      downloadQueue.endExternalDownload(
+        videoId,
+        error: 'Failed to fetch video information',
+      );
       _notifyProgressUpdate();
       unawaited(DownloadNotificationService().cancelDownloadNotification());
       ErrorTrackingService().recordError(
@@ -902,32 +1175,20 @@ class YouTubeService with ChangeNotifier {
       throw Exception('youtube_html_error');
     }
     _addActiveDownload(videoId, video.title);
-    debugPrint('downloadAudio: Starting download for videoId: $videoId');
-
     try {
       StreamManifest manifest;
       try {
-        // Fetch the manifest with a client strategy that matches what
-        // streaming uses (package defaults first).
         manifest = await _getManifestWithFallbacks(videoId);
       } catch (e) {
-        debugPrint('Failed to get manifest for video $videoId: $e');
         throw Exception('youtube_html_error');
       }
-
-      // Select stream based on preferred format
       StreamInfo streamInfo;
       final audioStreams = manifest.audioOnly.toList();
-
       if (audioStreams.isEmpty) {
         throw Exception('No audio streams available for video $videoId');
       }
-
-      // Select format based on user preference
       StreamInfo? selectedStream;
-
       if (preferredFormat == AudioFormat.m4a) {
-        // User wants M4A - find best m4a stream
         final m4aStreams = audioStreams
             .where((s) => s.container.name == 'mp4')
             .toList();
@@ -935,10 +1196,8 @@ class YouTubeService with ChangeNotifier {
           selectedStream = m4aStreams.reduce(
             (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
           );
-          debugPrint('downloadAudio: Selected m4a format as requested');
         }
       } else if (preferredFormat == AudioFormat.opus) {
-        // User wants OPUS - find best webm/opus stream
         final opusStreams = audioStreams
             .where((s) => s.container.name == 'webm')
             .toList();
@@ -946,10 +1205,8 @@ class YouTubeService with ChangeNotifier {
           selectedStream = opusStreams.reduce(
             (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
           );
-          debugPrint('downloadAudio: Selected opus format as requested');
         }
       } else if (preferredFormat == AudioFormat.mp3) {
-        // MP3 typically comes as m4a container or webm
         final mp3Streams = audioStreams
             .where(
               (s) => s.container.name == 'mp4' || s.container.name == 'webm',
@@ -959,11 +1216,8 @@ class YouTubeService with ChangeNotifier {
           selectedStream = mp3Streams.reduce(
             (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
           );
-          debugPrint('downloadAudio: Selected stream for MP3 preference');
         }
       }
-
-      // Auto mode or fallback: prefer m4a for Android compatibility, then highest bitrate
       if (selectedStream == null) {
         final m4aStreams = audioStreams
             .where((s) => s.container.name == 'mp4')
@@ -972,26 +1226,15 @@ class YouTubeService with ChangeNotifier {
           selectedStream = m4aStreams.reduce(
             (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
           );
-          debugPrint(
-            'downloadAudio: Auto mode - selected m4a for Android compatibility',
-          );
         } else {
-          // Fallback to highest bitrate available
           selectedStream = audioStreams.reduce(
             (a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
           );
-          debugPrint(
-            'downloadAudio: Auto mode - using highest bitrate ${selectedStream.container.name}',
-          );
         }
       }
-
       streamInfo = selectedStream;
-
       final musicDir = await _getMusicDirectory(downloadLocation);
       final safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-
-      // Use proper audio extension based on container format
       String audioExtension;
       if (streamInfo.container.name == 'mp4') {
         audioExtension = 'm4a';
@@ -1000,22 +1243,11 @@ class YouTubeService with ChangeNotifier {
       } else {
         audioExtension = streamInfo.container.name;
       }
-
-      // Check if this video is already downloaded (check by youtube_id in database)
-      final db = await DatabaseHelper().database;
-      final existingByVideoId = await db.query(
-        'songs',
-        where: 'youtube_id = ?',
-        whereArgs: [videoId],
-      );
-
-      if (existingByVideoId.isNotEmpty) {
-        final existingPath = existingByVideoId.first['file_path'] as String;
+      final existingSong = await _songRepository.getSongByYouTubeId(videoId);
+      if (existingSong != null) {
+        final existingPath = existingSong.url;
         final existingFile = File(existingPath);
         if (await existingFile.exists()) {
-          debugPrint(
-            'downloadAudio: Video $videoId already downloaded at $existingPath',
-          );
           _completeDownload(videoId);
           return DownloadResult(
             filePath: existingPath,
@@ -1033,18 +1265,12 @@ class YouTubeService with ChangeNotifier {
           );
         }
       }
-
-      // Simple filename: Title.extension (video ID stored in metadata, not filename)
       final finalFile = File(
         path.join(musicDir.path, '$safeTitle.$audioExtension'),
       );
-
       if (await finalFile.exists()) {
         final fileSize = await finalFile.length();
         if (fileSize > 0) {
-          debugPrint(
-            'downloadAudio: File already exists and is valid: ${finalFile.path}. Skipping.',
-          );
           _completeDownload(videoId);
           return DownloadResult(
             filePath: finalFile.path,
@@ -1061,28 +1287,14 @@ class YouTubeService with ChangeNotifier {
             ),
           );
         } else {
-          debugPrint(
-            'downloadAudio: Empty file found: ${finalFile.path}. Deleting and re-downloading.',
-          );
           await finalFile.delete();
         }
       }
-
       final downloadProgress = _activeDownloads[videoId];
-
-      // HLS (m3u8) downloads bypass the CDN's ~1 MiB Range cap on unsigned
-      // DASH streams, so prefer them whenever we expect an m4a (AAC) output.
-      // This mirrors the (working) yt-dlp visionos flow: fresh visitorData ->
-      // visionos player request -> master playlist -> best audio group.
-      // Falls back to the DASH chunked downloader below when unavailable.
       if (audioExtension == 'm4a') {
         try {
           final hls = await fetchHlsAudioSegments(videoId);
           if (hls != null) {
-            debugPrint(
-              'downloadAudio: Using HLS path for $videoId '
-              '(${hls.segments.length} segments, ${hls.totalBytes} bytes)',
-            );
             await downloadHlsSegments(
               videoId: videoId,
               segmentUrls: hls.segments,
@@ -1097,8 +1309,6 @@ class YouTubeService with ChangeNotifier {
               _completeDownload(videoId);
               return null;
             }
-            final hlsSize = await finalFile.length();
-            debugPrint('downloadAudio: HLS download completed: $hlsSize bytes');
             _updateDownloadProgress(videoId, 1.0);
             _completeDownload(videoId);
             return DownloadResult(
@@ -1116,44 +1326,20 @@ class YouTubeService with ChangeNotifier {
               ),
             );
           }
-          debugPrint(
-            'downloadAudio: HLS not available for $videoId; falling back to DASH',
-          );
         } catch (e) {
-          debugPrint(
-            'downloadAudio: HLS download failed ($e); falling back to DASH',
-          );
           if (await finalFile.exists()) {
             await finalFile.delete();
           }
         }
       }
-
-      debugPrint('downloadAudio: Getting stream for videoId: $videoId');
-
-      // Download via http-package ranged chunks below.
       final contentLength = streamInfo.size.totalBytes;
-      debugPrint(
-        'downloadAudio: Expected content length: $contentLength bytes',
-      );
-
       var receivedBytes = 0;
       var lastProgressUpdate = DateTime.now();
-
-      // HARDENING: YouTube's unsigned bot-check sometimes hands out a usable
-      // manifest but then throttles the CDN stream so no bytes ever arrive,
-      // which made downloads hang at 0% indefinitely. Watch for silence with
-      // a stall timeout, and retry once with a freshly fetched stream URL (the
-      // original URL is tokenized and single-use) before failing cleanly.
       const stallTimeout = Duration(seconds: 30);
       const maxStreamAttempts = 2;
       var streamInfoForAttempt = streamInfo;
-
       for (var attempt = 1; attempt <= maxStreamAttempts; attempt++) {
         if (attempt > 1) {
-          debugPrint(
-            'downloadAudio: Stream stalled, re-fetching manifest for videoId: $videoId',
-          );
           try {
             final retryManifest = await _getManifestWithFallbacks(videoId);
             final retryStreams = retryManifest.audioOnly.toList();
@@ -1165,57 +1351,35 @@ class YouTubeService with ChangeNotifier {
                   a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b,
             );
           } catch (e) {
-            debugPrint('downloadAudio: Retry manifest fetch failed: $e');
             throw Exception('youtube_html_error');
           }
         }
-
         try {
-          // Create a custom sink to track progress
           final sink = finalFile.openWrite();
-
-          // Chunked ranged download via the http package (more reliable than
-          // the package stream client: the fallback path is a single full-file
-          // request that the CDN throttles into a 30s hang).
-          //
-          // YouTube's unsigned bot-check sometimes hands out a usable
-          // manifest but then throttles the CDN stream; a full-range GET can
-          // then stall forever. Each chunk below is a fresh small Range
-          // request; if a chunk is rejected or stalls, we re-fetch the
-          // manifest for a fresh single-use URL (physical bytes are discarded
-          // after headers) and retry from the same offset.
           var activeStreamInfo = streamInfoForAttempt;
           var offset = 0;
           var consecutiveChunkFailures = 0;
           const maxChunkFailures = 3;
-
           while (offset < contentLength) {
             if (downloadProgress?.cancelRequested == true) break;
-
             final chunkEnd = min(
               offset + _youtubeDownloadChunkSize - 1,
               contentLength - 1,
             );
-
             try {
               final request = http.Request('GET', activeStreamInfo.url)
                 ..headers.addAll(_youtubePlaybackHttpHeaders())
                 ..headers['Range'] = 'bytes=$offset-$chunkEnd';
-
               final response = await _httpClient
                   .send(request)
                   .timeout(stallTimeout);
-
               if (response.statusCode == 200 || response.statusCode == 206) {
                 await for (final chunk in response.stream.timeout(
                   const Duration(seconds: 60),
                 )) {
                   if (downloadProgress?.cancelRequested == true) break;
-
                   sink.add(chunk);
                   receivedBytes += chunk.length;
-
-                  // Update progress every 100ms to avoid flooding
                   final now = DateTime.now();
                   if (now.difference(lastProgressUpdate).inMilliseconds > 100 &&
                       contentLength > 0) {
@@ -1223,32 +1387,20 @@ class YouTubeService with ChangeNotifier {
                     final progress = receivedBytes / contentLength;
                     _updateDownloadProgress(videoId, progress);
                     onProgress?.call(progress);
-                    debugPrint(
-                      'downloadAudio: Progress ${(progress * 100).toStringAsFixed(1)}%',
-                    );
                   }
                 }
                 offset = chunkEnd + 1;
                 consecutiveChunkFailures = 0;
               } else {
-                debugPrint(
-                  'downloadAudio: Chunk rejected with HTTP ${response.statusCode} at offset $offset; refreshing stream URL',
-                );
                 throw HttpException(
                   'Chunk rejected with HTTP ${response.statusCode}',
                 );
               }
             } catch (e) {
               consecutiveChunkFailures++;
-              debugPrint(
-                'downloadAudio: Chunk failed at offset $offset '
-                '(failure $consecutiveChunkFailures/$maxChunkFailures): $e',
-              );
               if (consecutiveChunkFailures >= maxChunkFailures) {
                 rethrow;
               }
-              // The googlevideo URL is single-use; refresh it for the next
-              // attempt before retrying the same offset.
               final retryManifest = await _getManifestWithFallbacks(videoId);
               final retryStreams = retryManifest.audioOnly.toList();
               if (retryStreams.isEmpty) {
@@ -1260,13 +1412,10 @@ class YouTubeService with ChangeNotifier {
               );
             }
           }
-
           await sink.flush();
           await sink.close();
           break;
-        } on Exception catch (e) {
-          debugPrint('downloadAudio: Stream failed (attempt $attempt): $e');
-          // Clean up partial file before a fresh retry (manifest re-fetch).
+        } on Exception {
           if (await finalFile.exists()) {
             await finalFile.delete();
           }
@@ -1275,12 +1424,6 @@ class YouTubeService with ChangeNotifier {
           }
         }
       }
-
-      final finalFileSize = await finalFile.length();
-      debugPrint(
-        'downloadAudio: Download completed. Final file size: $finalFileSize bytes',
-      );
-
       if (downloadProgress?.cancelRequested == true) {
         if (await finalFile.exists()) {
           await finalFile.delete();
@@ -1288,7 +1431,6 @@ class YouTubeService with ChangeNotifier {
         _completeDownload(videoId);
         return null;
       }
-
       final song = await _addDownloadedSongToLibrary(
         videoId: videoId,
         filePath: finalFile.path,
@@ -1297,16 +1439,10 @@ class YouTubeService with ChangeNotifier {
         duration: video.duration?.inMilliseconds ?? 0,
         thumbnailUrl: video.thumbnails.mediumResUrl,
       );
-
       _updateDownloadProgress(videoId, 1.0);
       _completeDownload(videoId);
-
       return DownloadResult(filePath: finalFile.path, song: song);
     } catch (e) {
-      debugPrint('downloadAudio: Download $videoId failed with error: $e');
-
-      // Classify the error FIRST while the download entry still exists so the
-      // failure is preserved and shown in the UI instead of silently vanishing.
       final download = _activeDownloads[videoId];
       final errorStr = e.toString().toLowerCase();
       final isHtmlError =
@@ -1316,8 +1452,6 @@ class YouTubeService with ChangeNotifier {
           errorStr.contains('consent') ||
           errorStr.contains('blocked') ||
           errorStr.contains('unavailable');
-
-      // Report to error tracking so download failures are collectable.
       ErrorTrackingService().recordError(
         e,
         StackTrace.current,
@@ -1328,10 +1462,7 @@ class YouTubeService with ChangeNotifier {
           'isHtmlError': isHtmlError,
         },
       );
-
       if (download != null) {
-        // Mark the failure but KEEP the entry in _activeDownloads so the
-        // downloads screen shows the error rather than the item vanishing.
         download
           ..isDownloading = false
           ..failed = true
@@ -1339,52 +1470,141 @@ class YouTubeService with ChangeNotifier {
               ? 'youtube_html_error'
               : (download.cancelRequested ? 'Canceled' : 'Download failed');
       }
+      downloadQueue.endExternalDownload(
+        videoId,
+        error: isHtmlError
+            ? 'youtube_html_error'
+            : (download?.cancelRequested == true
+                  ? 'Canceled'
+                  : 'Download failed'),
+      );
       _notifyProgressUpdate();
-
-      // Never fire the "Download Complete" notification on a failure.
       unawaited(DownloadNotificationService().cancelDownloadNotification());
       rethrow;
+    } finally {}
+  }
+
+  /// Visitor data for the visionOS InnerTube client.
+  ///
+  /// Cached, because [getHlsPlaylistUrl] needs it on *every* stream resolve and
+  /// each uncached call re-downloads the entire youtube.com homepage. That is a
+  /// multi-hundred-kilobyte request per track, which is what pushes the client
+  /// into YouTube's rate limiting: measured on a device after a session of
+  /// repeated resolves, HLS resolution started failing outright and playback
+  /// silently fell back to the DASH stream, which buffers indefinitely on this
+  /// network. One fetch per session is plenty.
+  /// Static because it is a property of the device, not of one service instance:
+  /// re-creating the service must not re-download the homepage.
+  static String? _visitorDataCache;
+  static DateTime? _visitorDataFetchedAt;
+
+  /// How long a good visitorData value stays usable.
+  static const Duration _visitorDataTtl = Duration(hours: 6);
+
+  /// How long to wait before re-attempting after a failed fetch, so a blocked
+  /// client retries at a human pace instead of once per track.
+  static const Duration _visitorDataRetryDelay = Duration(minutes: 2);
+
+  /// In-flight fetch, so concurrent resolves share one request instead of each
+  /// downloading the ~890KB homepage. Four `playAudio` calls racing on a queue
+  /// used to fire four simultaneous homepage downloads.
+  static Future<String?>? _visitorDataInFlight;
+
+  /// [forceRetry] bypasses the negative cache, so an intentional backoff retry
+  /// actually reaches the network instead of being short-circuited by the
+  /// cooldown meant for unrelated rapid calls.
+  Future<String?> _fetchVisionosVisitorData({bool forceRetry = false}) async {
+    final cached = _visitorDataCache;
+    final fetchedAt = _visitorDataFetchedAt;
+    if (cached != null && fetchedAt != null) {
+      final age = DateTime.now().difference(fetchedAt);
+      if (age < _visitorDataTtl) return cached;
+    } else if (fetchedAt != null && !forceRetry) {
+      // A previous attempt failed; don't hammer youtube.com again immediately.
+      final sinceFailure = DateTime.now().difference(fetchedAt);
+      if (sinceFailure < _visitorDataRetryDelay) return null;
+    }
+    final inFlight = _visitorDataInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _doFetchVisionosVisitorData();
+    _visitorDataInFlight = future;
+    try {
+      return await future;
     } finally {
-      debugPrint('downloadAudio: Exiting download for videoId: $videoId');
+      _visitorDataInFlight = null;
     }
   }
 
-  /// Harvests a fresh anonymous visitorData from the YouTube homepage. The
-  /// visionos player request is rejected with LOGIN_REQUIRED without one.
-  Future<String?> _fetchVisionosVisitorData() async {
-    try {
-      final response = await _httpClient
-          .get(
-            Uri.parse('https://www.youtube.com/'),
-            headers: {'User-Agent': _youtubeVisionosUserAgent},
-          )
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return null;
-      final match = RegExp(
-        r'"VISITOR_DATA":"([^"]+)"',
-      ).firstMatch(response.body);
-      return match?.group(1);
-    } catch (e) {
-      debugPrint('fetchVisitorData failed: $e');
-      return null;
+  Future<String?> _doFetchVisionosVisitorData() async {
+    final cached = _visitorDataCache;
+    final fetchedAt = _visitorDataFetchedAt;
+    if (cached != null && fetchedAt != null) {
+      final age = DateTime.now().difference(fetchedAt);
+      if (age < _visitorDataTtl) return cached;
+    } else if (fetchedAt != null) {
+      // A previous attempt failed; don't hammer youtube.com again immediately.
+      final sinceFailure = DateTime.now().difference(fetchedAt);
+      if (sinceFailure < _visitorDataRetryDelay) return null;
     }
+    // Two attempts: the homepage fetch is the single point of failure for all
+    // online playback, and it intermittently comes back without VISITOR_DATA (a
+    // throttled or variant response). One retry turns a transient miss into a
+    // success without meaningfully adding request volume.
+    String? lastReason;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      try {
+        final response = await _httpClient
+            .get(
+              Uri.parse('https://www.youtube.com/'),
+              headers: {
+                'User-Agent': _youtubeVisionosUserAgent,
+                // The rest of the client already sends these; matching them here
+                // keeps the homepage response on the same non-consent variant.
+                ..._youtubePlaybackHttpHeaders(),
+              },
+            )
+            .timeout(const Duration(seconds: 15));
+        final match = RegExp(
+          r'"VISITOR_DATA":"([^"]+)"',
+        ).firstMatch(response.body);
+        final value = match?.group(1);
+        if (value != null && value.isNotEmpty) {
+          _visitorDataCache = value;
+          _visitorDataFetchedAt = DateTime.now();
+          return value;
+        }
+        lastReason =
+            'http ${response.statusCode} bytes=${response.body.length} '
+            'no VISITOR_DATA';
+      } catch (e) {
+        lastReason = '$e';
+      }
+    }
+    _visitorDataFetchedAt = DateTime.now();
+    PlaybackDiagnostics.resolveFailed(
+      videoId: '<visitor-data>',
+      reason: 'visitorData fetch failed: $lastReason',
+    );
+    return null;
   }
 
-  /// Requests the video with the YouTube visionos player client (as used by
-  /// yt-dlp) and resolves the VOD-HLS audio: the best-audio media playlist and
-  /// its segment URLs. Returns null when HLS is not available for the video.
-  /// Resolves the audio-only HLS media playlist URL for [videoId] using the
-  /// visionos player client (fresh visitorData + player request + picking the
-  /// best EXT-X-MEDIA audio group from the master playlist). Media-playlist
-  /// URLs stream cleanly in mpv/media_kit, unlike the range-capped DASH URLs.
-  /// Returns null when HLS is unavailable for the video.
   Future<({String url, int totalBytes})?> getHlsPlaylistUrl(
-    String videoId,
-  ) async {
+    String videoId, {
+    bool forceRetry = false,
+  }) async {
     try {
-      final visitorData = await _fetchVisionosVisitorData();
+      final visitorData = await _fetchVisionosVisitorData(
+        forceRetry: forceRetry,
+      );
       if (visitorData == null || visitorData.isEmpty) {
-        debugPrint('HLS: no visitorData available');
+        PlaybackDiagnostics.resolveFailed(
+          videoId: videoId,
+          reason: 'no visitorData',
+        );
         return null;
       }
       final payload = {
@@ -1418,12 +1638,20 @@ class YouTubeService with ChangeNotifier {
           )
           .timeout(const Duration(seconds: 20));
       if (playerResponse.statusCode != 200) {
-        debugPrint('HLS: player request HTTP ${playerResponse.statusCode}');
+        PlaybackDiagnostics.resolveFailed(
+          videoId: videoId,
+          reason: 'player api http ${playerResponse.statusCode}',
+        );
         return null;
       }
       final player = jsonDecode(playerResponse.body) as Map<String, dynamic>;
-      if (player['playabilityStatus']?['status'] != 'OK') {
-        debugPrint('HLS: player not OK for $videoId');
+      final status = player['playabilityStatus']?['status'];
+      if (status != 'OK') {
+        PlaybackDiagnostics.resolveFailed(
+          videoId: videoId,
+          reason:
+              'playability=$status ${player['playabilityStatus']?['reason']}',
+        );
         return null;
       }
       final streaming = player['streamingData'] as Map<String, dynamic>?;
@@ -1431,19 +1659,14 @@ class YouTubeService with ChangeNotifier {
       if (hlsManifestUrl == null || hlsManifestUrl.isEmpty) {
         return null;
       }
-
       final headers = {
         ..._youtubePlaybackHttpHeaders(),
         'User-Agent': _youtubeVisionosUserAgent,
       };
-
-      // The hlsManifestUrl is a master playlist; audio renditions live in
-      // EXT-X-MEDIA groups (e.g. 233 = low, 234 = itag 140 high quality).
       final masterResponse = await _httpClient
           .get(Uri.parse(hlsManifestUrl), headers: headers)
           .timeout(const Duration(seconds: 20));
       if (masterResponse.statusCode != 200) return null;
-
       String? bestAudioUrl;
       var bestBytes = -1;
       for (final line in masterResponse.body.split('\n')) {
@@ -1465,13 +1688,15 @@ class YouTubeService with ChangeNotifier {
         }
       }
       if (bestAudioUrl == null) {
-        debugPrint('HLS: no audio group found in master playlist');
+        PlaybackDiagnostics.resolveFailed(
+          videoId: videoId,
+          reason: 'no audio rendition in master playlist',
+        );
         return null;
       }
-
       return (url: bestAudioUrl, totalBytes: bestBytes);
     } catch (e) {
-      debugPrint('HLS: resolution failed: $e');
+      PlaybackDiagnostics.resolveFailed(videoId: videoId, reason: '$e');
       return null;
     }
   }
@@ -1481,8 +1706,6 @@ class YouTubeService with ChangeNotifier {
       final playlist = await getHlsPlaylistUrl(videoId);
       if (playlist == null) return null;
       final bestAudioUrl = playlist.url;
-
-      // The group URI is the media playlist; collect its segment URLs.
       final headers = {
         ..._youtubePlaybackHttpHeaders(),
         'User-Agent': _youtubeVisionosUserAgent,
@@ -1491,7 +1714,6 @@ class YouTubeService with ChangeNotifier {
           .get(Uri.parse(bestAudioUrl), headers: headers)
           .timeout(const Duration(seconds: 20));
       if (mediaResponse.statusCode != 200) return null;
-
       final baseUrl = bestAudioUrl.substring(
         0,
         bestAudioUrl.lastIndexOf('/') + 1,
@@ -1507,25 +1729,12 @@ class YouTubeService with ChangeNotifier {
         );
       }
       if (segmentUrls.isEmpty) return null;
-
-      debugPrint(
-        'HLS: resolved ${segmentUrls.length} audio segments '
-        '(${playlist.totalBytes} target bytes)',
-      );
       return HlsAudio(segments: segmentUrls, totalBytes: playlist.totalBytes);
     } catch (e) {
-      debugPrint('HLS: resolution failed: $e');
       return null;
     }
   }
 
-  /// Downloads the HLS audio segments into [file] in parallel (up to
-  /// [_youtubeHlsConcurrentSegments] at once), reporting progress against
-  /// [totalBytes]. Segments are independent files, so a worker pool fetches
-  /// them concurrently and the bytes are reassembled in index order, which is
-  /// much faster than the old sequential walk. Returns the number of bytes
-  /// written. Throws when a segment keeps failing, so callers can fall back to
-  /// the DASH path.
   Future<int> downloadHlsSegments({
     required String videoId,
     required List<String> segmentUrls,
@@ -1537,8 +1746,6 @@ class YouTubeService with ChangeNotifier {
     const segmentTimeout = Duration(seconds: 30);
     const bodyTimeout = Duration(seconds: 60);
     const maxAttempts = 3;
-
-    // Fetch a single segment into memory with bounded retries.
     Future<Uint8List> fetchSegment(int index, String url) async {
       var attempts = 0;
       while (true) {
@@ -1564,28 +1771,18 @@ class YouTubeService with ChangeNotifier {
               '${response.statusCode}',
             );
           }
-          debugPrint(
-            'downloadAudio: HLS segment HTTP ${response.statusCode} '
-            '(attempt $attempts, segment $index); retrying',
-          );
           await Future<void>.delayed(const Duration(milliseconds: 800));
         } catch (e) {
           if (attempts >= maxAttempts) rethrow;
-          debugPrint(
-            'downloadAudio: HLS segment $index failed (attempt $attempts): $e',
-          );
         }
       }
     }
 
-    // Worker pool: claim the next index synchronously (atomic on the
-    // single-threaded event loop), download it, and record the bytes.
     final results = <int, Uint8List>{};
     var receivedBytes = 0;
     var nextIndex = 0;
     var lastProgressUpdate = DateTime.now();
     final errors = <Object>[];
-
     Future<void> worker() async {
       while (nextIndex < segmentUrls.length &&
           errors.isEmpty &&
@@ -1595,7 +1792,6 @@ class YouTubeService with ChangeNotifier {
           final bytes = await fetchSegment(index, segmentUrls[index]);
           results[index] = bytes;
           receivedBytes += bytes.length;
-
           final now = DateTime.now();
           if (now.difference(lastProgressUpdate).inMilliseconds > 100 &&
               totalBytes > 0) {
@@ -1613,23 +1809,13 @@ class YouTubeService with ChangeNotifier {
     }
 
     final workerCount = min(_youtubeHlsConcurrentSegments, segmentUrls.length);
-    final downloadStartedAt = DateTime.now();
-    debugPrint(
-      'HLS: downloading ${segmentUrls.length} segments '
-      '($totalBytes target bytes) with $workerCount workers',
-    );
     await Future.wait(List.generate(workerCount, (_) => worker()));
-
     if (errors.isNotEmpty) {
       throw errors.first;
     }
-
-    // Reassemble segments in playlist order. Cancellations leave cleanup to
-    // the caller, so skip writing when the user asked to stop.
     if (downloadProgress?.cancelRequested == true) {
       return receivedBytes;
     }
-
     final sink = file.openWrite();
     try {
       for (var i = 0; i < segmentUrls.length; i++) {
@@ -1644,14 +1830,7 @@ class YouTubeService with ChangeNotifier {
       } catch (_) {}
       rethrow;
     }
-    // Guarantee a final 100% report even when the throttle window (100ms)
-    // skipped the last per-segment emission.
     onProgress?.call(1.0);
-    debugPrint(
-      'HLS: downloaded ${segmentUrls.length} segments in '
-      '${DateTime.now().difference(downloadStartedAt).inMilliseconds} ms '
-      '($receivedBytes bytes, $workerCount concurrent workers)',
-    );
     return receivedBytes;
   }
 
@@ -1659,31 +1838,23 @@ class YouTubeService with ChangeNotifier {
     if (kIsWeb) {
       throw UnsupportedError('Downloads are not supported on Web.');
     }
-
     Directory? baseDir;
-
     if (Platform.isAndroid) {
       if (downloadLocation == 'downloads') {
-        // Use public Downloads folder
         baseDir = Directory('/storage/emulated/0/Download');
       } else if (downloadLocation == 'music') {
-        // Use public Music folder
         baseDir = Directory('/storage/emulated/0/Music');
       } else {
-        // internal - use app documents directory
         baseDir = await getApplicationDocumentsDirectory();
       }
     } else if (Platform.isIOS) {
-      // iOS only supports internal app storage
       baseDir = await getApplicationDocumentsDirectory();
     } else {
-      // Desktop platforms
       baseDir = await getDownloadsDirectory();
       if (baseDir == null) {
         throw Exception('Could not get downloads directory.');
       }
     }
-
     final musicDir = Directory(path.join(baseDir.path, 'tsmusic'));
     if (!await musicDir.exists()) {
       await musicDir.create(recursive: true);
@@ -1700,15 +1871,11 @@ class YouTubeService with ChangeNotifier {
     String? thumbnailUrl,
   }) async {
     try {
-      final dbHelper = DatabaseHelper();
-
-      // Download thumbnail if URL is provided
       String? thumbnailPath;
       if (thumbnailUrl != null) {
         thumbnailPath = await _downloadThumbnail(videoId, thumbnailUrl);
       }
-
-      return await dbHelper.addSongFromYouTube(
+      final song = await _songRepository.addSongFromYouTube(
         videoId: videoId,
         filePath: filePath,
         title: title,
@@ -1716,13 +1883,16 @@ class YouTubeService with ChangeNotifier {
         duration: duration,
         thumbnailPath: thumbnailPath,
       );
+      // The track is on the device now, so every "is this downloaded?" check
+      // must start saying yes. The batch queue reads this cache before it
+      // downloads, so leaving it stale would re-fetch the same track.
+      _downloadedSongs[videoId] = song;
+      return song;
     } catch (e) {
-      debugPrint('Error adding downloaded song to library: $e');
       rethrow;
     }
   }
 
-  /// Downloads a thumbnail image and saves it locally
   Future<String?> _downloadThumbnail(
     String videoId,
     String thumbnailUrl,
@@ -1732,26 +1902,19 @@ class YouTubeService with ChangeNotifier {
       final thumbnailFile = File(
         path.join(musicDir.path, '${videoId}_thumb.jpg'),
       );
-
-      // Check if thumbnail already exists
       if (await thumbnailFile.exists()) {
-        debugPrint('Thumbnail already exists: ${thumbnailFile.path}');
         return thumbnailFile.path;
       }
-
       final response = await _httpClient
           .get(Uri.parse(thumbnailUrl))
           .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         await thumbnailFile.writeAsBytes(response.bodyBytes);
-        debugPrint('Thumbnail downloaded: ${thumbnailFile.path}');
         return thumbnailFile.path;
       } else {
-        debugPrint('Failed to download thumbnail: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      debugPrint('Error downloading thumbnail: $e');
       return null;
     }
   }
@@ -1762,8 +1925,8 @@ class YouTubeService with ChangeNotifier {
       download.completer?.completeError('Service disposed');
     }
     _activeDownloads.clear();
-    _player.dispose();
-    _httpClient.close(); // Close the http client
+    if (_ownsPlayer) _player.dispose();
+    _httpClient.close();
     isLoading.dispose();
     super.dispose();
   }

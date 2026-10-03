@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:path/path.dart' as path;
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/library_view_model.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/models/song.dart' as model;
@@ -16,17 +17,24 @@ import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/core/services/error_tracking_service.dart';
 import 'package:tsmusic/screens/downloads_screen.dart';
-
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
-
   const SearchScreen({super.key, this.initialQuery});
-
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
-
 class _SearchScreenState extends State<SearchScreen> {
+  static const List<String> _mixTopics = [
+    'Gaming chill',
+    'Lofi beats',
+    'Deep focus',
+    'Workout',
+    'Study',
+    'Chill vibes',
+    'Retro synth',
+    'Trap',
+  ];
+  bool _showMixPicker = false;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late final YouTubeService _youTubeService;
@@ -40,7 +48,6 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _hasMoreYouTubeResults = true;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _searchDebounce;
-
   @override
   void initState() {
     super.initState();
@@ -49,13 +56,11 @@ class _SearchScreenState extends State<SearchScreen> {
     _youtubePlayer.registerScreen('search_screen');
     _searchFocusNode.requestFocus();
     _scrollController.addListener(_onScroll);
-
     final initialQuery = widget.initialQuery;
     if (initialQuery != null && initialQuery.isNotEmpty) {
       _searchController.text = initialQuery;
       _debouncedSearch(initialQuery);
     }
-
     _checkConnectivity();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
@@ -63,7 +68,6 @@ class _SearchScreenState extends State<SearchScreen> {
       _checkConnectivity();
     });
   }
-
   @override
   void dispose() {
     _youtubePlayer.unregisterScreen('search_screen');
@@ -76,7 +80,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchDebounce?.cancel();
     super.dispose();
   }
-
   Future<void> _checkConnectivity() async {
     try {
       final results = await Connectivity().checkConnectivity();
@@ -93,14 +96,12 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
-
   void _debouncedSearch(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       _searchYouTube(query);
     });
   }
-
   Future<void> _playAudio(YouTubeAudio audio) async {
     try {
       await _youtubePlayer.playAudio(audio);
@@ -118,10 +119,8 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
-
   Future<void> _handleDownload(YouTubeAudio audio) async {
     if (!mounted) return;
-
     final isDownloading = _youTubeService.isDownloading(audio.id);
     if (isDownloading) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +128,6 @@ class _SearchScreenState extends State<SearchScreen> {
       );
       return;
     }
-
     try {
       final settingsProvider = Provider.of<SettingsProvider>(
         context,
@@ -145,7 +143,6 @@ class _SearchScreenState extends State<SearchScreen> {
           context,
           listen: false,
         ).addDownloadedSongToLibrary(result.song);
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download completed: ${audio.title}')),
         );
@@ -160,7 +157,6 @@ class _SearchScreenState extends State<SearchScreen> {
             errorStr.contains('consent') ||
             errorStr.contains('blocked') ||
             errorStr.contains('unavailable');
-
         if (isHtmlError) {
           ErrorTrackingService().recordError(
             e,
@@ -169,7 +165,6 @@ class _SearchScreenState extends State<SearchScreen> {
             extras: {'videoId': audio.id, 'title': audio.title},
           );
         }
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -190,7 +185,6 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
-
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >=
@@ -202,7 +196,6 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
-
   Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
     if (_isOffline) {
       if (mounted) {
@@ -212,7 +205,6 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       return;
     }
-
     if (query.isEmpty) {
       if (mounted) {
         setState(() {
@@ -224,16 +216,12 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       return;
     }
-
     if (loadMore && (_isSearchingYouTube || !_hasMoreYouTubeResults)) return;
-
     if (mounted) setState(() => _isSearchingYouTube = true);
-
     try {
       final List<YouTubeAudio> response = loadMore
           ? await _youTubeService.searchAudioNextPage(query)
           : await _youTubeService.searchAudio(query);
-
       if (mounted) {
         setState(() {
           if (loadMore) {
@@ -261,7 +249,6 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) setState(() => _isSearchingYouTube = false);
     }
   }
-
   Widget _buildMixedResults(
     List<model.Song> localSongs,
     music_provider.MusicProvider provider,
@@ -269,33 +256,9 @@ class _SearchScreenState extends State<SearchScreen> {
     bool isPlaying,
   ) {
     final query = _searchController.text.toLowerCase();
-
     if (query.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search,
-              size: 64,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Search for songs...',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptySearchState(provider);
     }
-
     final filteredLocalSongs = localSongs
         .where(
           (song) =>
@@ -306,7 +269,6 @@ class _SearchScreenState extends State<SearchScreen> {
               (song.album?.toLowerCase().contains(query) ?? false),
         )
         .toList();
-
     final localYoutubeIds = localSongs
         .where((s) => s.youtubeId != null)
         .map((s) => s.youtubeId!)
@@ -314,16 +276,13 @@ class _SearchScreenState extends State<SearchScreen> {
     final localTitleSet = localSongs
         .map((s) => s.title.toLowerCase().trim())
         .toSet();
-
     final filteredYouTubeResults = _youtubeResults.where((yt) {
       if (localYoutubeIds.contains(yt.id)) return false;
       if (localTitleSet.contains(yt.title.toLowerCase().trim())) return false;
       return true;
     }).toList();
-
     final hasLocalResults = filteredLocalSongs.isNotEmpty;
     final hasOnlineResults = filteredYouTubeResults.isNotEmpty;
-
     return ListView(
       controller: _scrollController,
       children: [
@@ -418,7 +377,220 @@ class _SearchScreenState extends State<SearchScreen> {
       ],
     );
   }
-
+  Widget _buildEmptySearchState(music_provider.MusicProvider provider) {
+    final libraryVm = Provider.of<LibraryViewModel>(context);
+    final currentSong = provider.currentSong;
+    final isPlaying = provider.isPlaying;
+    return FutureBuilder<List<model.Song>>(
+      future: libraryVm.getRecentlyPlayed(limit: 12),
+      builder: (context, snapshot) {
+        final recent = snapshot.data ?? const <model.Song>[];
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Text(
+                'Explore',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: _buildMixCard(provider),
+            ),
+            if (recent.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Text(
+                  'Recently played',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ...recent.map(
+                (song) =>
+                    _buildLocalResultItem(song, provider, currentSong, isPlaying),
+              ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search,
+                      size: 64,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Search for songs...',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Play a few songs and we will recommend more like them.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+  Widget _buildMixCard(music_provider.MusicProvider provider) {
+    final hasMix = provider.isMixSession && provider.onlinePlaylist.isNotEmpty;
+    final showPicker = !hasMix || _showMixPicker;
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  hasMix ? Icons.graphic_eq : Icons.radio,
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasMix ? 'Current mix' : 'Ready for a fresh mix?',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        hasMix
+                            ? '${provider.onlinePlaylist.length} tracks · YouTube-backed'
+                            : 'Pick a vibe to start a curated YouTube mix',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasMix && !showPicker)
+                  TextButton(
+                    onPressed: () => setState(() => _showMixPicker = true),
+                    child: const Text('New mix'),
+                  ),
+                if (hasMix)
+                  TextButton(
+                    onPressed: () => _saveCurrentMix(provider),
+                    child: const Text('Save'),
+                  ),
+              ],
+            ),
+            if (showPicker) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final topic in _mixTopics)
+                    ActionChip(
+                      avatar: const Icon(Icons.play_circle_outline, size: 18),
+                      label: Text(topic),
+                      onPressed: () {
+                        setState(() => _showMixPicker = false);
+                        _startMixOf(provider, topic);
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  Future<void> _startMixOf(
+    music_provider.MusicProvider provider,
+    String topic,
+  ) async {
+    final count = await provider.startCuratedMix(topic);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          count > 0
+              ? 'Mix started with $count tracks'
+              : 'Could not find a mix for "$topic" right now',
+        ),
+      ),
+    );
+  }
+  Future<void> _saveCurrentMix(music_provider.MusicProvider provider) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save mix as playlist'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Playlist name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    final playlistId = await provider.saveTempQueueAsPlaylist(
+      name,
+      description: 'Generated mix',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          playlistId > 0
+              ? 'Saved "$name" to your playlists'
+              : 'Nothing to save',
+        ),
+      ),
+    );
+  }
   Widget _buildLocalResultItem(
     model.Song song,
     music_provider.MusicProvider provider,
@@ -428,7 +600,6 @@ class _SearchScreenState extends State<SearchScreen> {
     final isCurrent = provider.currentSong?.id == song.id;
     final isSongPlaying = provider.isPlaying && isCurrent;
     final l10n = AppLocalizations.of(context);
-
     return ListTile(
       leading: Icon(
         isCurrent && isSongPlaying ? Icons.play_arrow : Icons.music_note,
@@ -515,7 +686,6 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
-
   Future<void> _handleSongAction(
     String action,
     model.Song song,
@@ -530,7 +700,6 @@ class _SearchScreenState extends State<SearchScreen> {
         await _showDeleteConfirmation(song, provider);
     }
   }
-
   Future<void> _showMoveDialog(model.Song song) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
@@ -541,7 +710,6 @@ class _SearchScreenState extends State<SearchScreen> {
       {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
       {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music/tsmusic'},
     ];
-
     final selected = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -559,14 +727,12 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
-
     if (selected != null) {
       try {
         final targetDir = Directory(selected);
         if (!await targetDir.exists()) {
           await targetDir.create(recursive: true);
         }
-
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
         try {
@@ -589,7 +755,6 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
-
   Future<void> _showDeleteConfirmation(
     model.Song song,
     music_provider.MusicProvider provider,
@@ -613,7 +778,6 @@ class _SearchScreenState extends State<SearchScreen> {
         ],
       ),
     );
-
     if (confirmed == true) {
       try {
         await provider.deleteSong(song);
@@ -631,7 +795,6 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
-
   Widget _buildYouTubeResultItem(YouTubeAudio audio) {
     final musicProvider = context.read<music_provider.MusicProvider>();
     return YouTubePlaybackWidget(
@@ -647,23 +810,21 @@ class _SearchScreenState extends State<SearchScreen> {
         thumbnailUrl: audio.thumbnailUrl,
       ),
       onDelete: () async {
-        final song = musicProvider.songs
-            .where((s) => s.youtubeId == audio.id && s.tags.contains('tsmusic'))
-            .firstOrNull;
+        // From the database-backed cache, not the loaded song list: the list
+        // only holds downloads made while it was open.
+        final song = _youTubeService.downloadedSongFor(audio.id);
         if (song != null) {
           await _showDeleteConfirmation(song, musicProvider);
         }
       },
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final musicProvider = Provider.of<music_provider.MusicProvider>(context);
     final currentSong = musicProvider.currentSong;
     final isPlaying = musicProvider.isPlaying;
     final localSongs = musicProvider.songs;
-
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {

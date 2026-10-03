@@ -8,35 +8,52 @@ import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/services/download_queue.dart';
+import 'package:tsmusic/data/repositories/song_repository.dart';
 import 'package:tsmusic/services/download_notification_service.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
-
 import 'search_screen.dart';
-
 import 'package:animations/animations.dart';
-
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
-
   @override
   State<DownloadsScreen> createState() => _DownloadsScreenState();
 }
-
 class _DownloadsScreenState extends State<DownloadsScreen> {
   late YouTubeService _youTubeService;
   late SettingsProvider _settingsProvider;
   final Map<String, double> _downloadProgress = {};
   List<Song> _localFiles = [];
+
+  /// Everything downloaded from YouTube, read from the database.
+  ///
+  /// Kept as state rather than derived from the provider because the loaded
+  /// song list changes with whichever playlist is open.
+  List<Song> _downloadedSongs = [];
+  bool _downloadsLoaded = false;
+  String? _loadedForLocation;
+
+  Future<void> _loadDownloadedSongs({bool force = false}) async {
+    final location = _settingsProvider.downloadLocation;
+    if (!force && _downloadsLoaded && _loadedForLocation == location) return;
+    _loadedForLocation = location;
+    _downloadsLoaded = false;
+    final repository = context.read<SongRepository>();
+    final songs = await repository.getDownloadedYouTubeSongs();
+    if (!mounted) return;
+    setState(() {
+      _downloadedSongs = songs;
+      _downloadsLoaded = true;
+    });
+  }
   final Set<int> _selectedSongs = {};
   bool _isMultiSelectMode = false;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     final newSettingsProvider = Provider.of<SettingsProvider>(context);
-
     if (_localFiles.isEmpty ||
         (_settingsProvider.downloadLocation !=
             newSettingsProvider.downloadLocation)) {
@@ -45,29 +62,45 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     } else {
       _settingsProvider = newSettingsProvider;
     }
+    unawaited(_loadDownloadedSongs());
   }
-
   @override
   void initState() {
     super.initState();
     _youTubeService = Provider.of<YouTubeService>(context, listen: false);
     _youTubeService.addListener(_onDownloadsChanged);
+    // Re-read the database whenever a batch finishes a track, so the list grows
+    // as the batch runs instead of only on the next visit to this page.
+    _youTubeService.downloadQueue.addListener(_onQueueChanged);
     DownloadNotificationService().isDownloadsScreenVisible = true;
   }
 
+  /// True once the queue settles, so a burst of progress ticks does not cause a
+  /// database read per frame.
+  bool _queueWasBusy = false;
+
+  void _onQueueChanged() {
+    final busy = _youTubeService.downloadQueue.hasQueuedWork;
+    if (busy == _queueWasBusy) return;
+    _queueWasBusy = busy;
+    if (busy) {
+      setState(() {});
+      return;
+    }
+    unawaited(_loadDownloadedSongs(force: true));
+  }
   @override
   void dispose() {
     _youTubeService.removeListener(_onDownloadsChanged);
+    _youTubeService.downloadQueue.removeListener(_onQueueChanged);
     DownloadNotificationService().isDownloadsScreenVisible = false;
     super.dispose();
   }
-
   void _onDownloadsChanged() {
     if (mounted) {
       setState(() {});
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -142,15 +175,27 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       body: _buildDownloadsList(),
     );
   }
-
   Widget _buildDownloadsList() =>
       Consumer2<YouTubeService, music_provider.MusicProvider>(
         builder: (context, youTubeService, musicProvider, _) {
           final activeDownloads = youTubeService.activeDownloads;
-          final downloadedSongs = musicProvider.youtubeSongs;
-          final allSongs = {...downloadedSongs, ..._localFiles}.toList();
-
-          if (activeDownloads.isEmpty && allSongs.isEmpty) {
+          final queue = youTubeService.downloadQueue;
+          final queued = queue.entries
+              .where((e) => !e.isFinished || e.state == DownloadQueueState.done)
+              .toList();
+          // Read from the database rather than the loaded song list: the loaded
+          // list changes with whatever playlist is open, which used to make
+          // downloads vanish from this page.
+          final downloadedSongs = _downloadedSongs;
+          // Newest first. The database half arrives sorted; the scanned files
+          // are merged in by date so the whole list reads chronologically
+          // rather than as two unrelated blocks.
+          final allSongs = [...downloadedSongs, ..._localFiles]..sort(
+            (a, b) => b.dateAdded.compareTo(a.dateAdded),
+          );
+          if (activeDownloads.isEmpty &&
+              queue.entries.isEmpty &&
+              allSongs.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -174,9 +219,49 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               ),
             );
           }
-
           return ListView(
             children: [
+              if (queued.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Download queue',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      if (queue.isWorking)
+                        TextButton.icon(
+                          icon: const Icon(Icons.stop_circle_outlined),
+                          label: const Text('Stop'),
+                          onPressed: () =>
+                              queue.requestCancel(),
+                        )
+                      else if (queue.finishedEntries.isNotEmpty)
+                        TextButton.icon(
+                          icon: const Icon(Icons.clear_all),
+                          label: const Text('Clear'),
+                          onPressed: () => queue.clearFinished(),
+                        ),
+                    ],
+                  ),
+                ),
+                if (queue.isWorking)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      '${queue.completedCount + queue.failedCount} of ${queue.totalCount} done',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ...queued.map(_buildQueueItem),
+                const Divider(),
+              ],
               if (activeDownloads.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.all(16.0),
@@ -202,7 +287,86 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           );
         },
       );
-
+  Widget _buildQueueItem(DownloadQueueEntry entry) {
+    final theme = Theme.of(context);
+    final (icon, tint, trailing) = switch (entry.state) {
+      DownloadQueueState.pending => (
+        Icons.schedule,
+        theme.disabledColor,
+        const SizedBox.shrink(),
+      ),
+      DownloadQueueState.downloading => (
+        Icons.downloading,
+        theme.colorScheme.primary,
+        const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      DownloadQueueState.done => (Icons.check_circle, Colors.green, null),
+      DownloadQueueState.failed => (
+        Icons.error_outline,
+        theme.colorScheme.error,
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Retry',
+          onPressed: () => _retryQueueEntry(entry),
+        ),
+      ),
+      DownloadQueueState.cancelled => (
+        Icons.cancel_outlined,
+        theme.disabledColor,
+        null,
+      ),
+    };
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: ListTile(
+        dense: true,
+        leading: Icon(icon, color: tint),
+        title: Text(
+          entry.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: entry.state == DownloadQueueState.done ||
+                  entry.state == DownloadQueueState.cancelled
+              ? const TextStyle(decoration: TextDecoration.lineThrough)
+              : null,
+        ),
+        subtitle: entry.state == DownloadQueueState.downloading
+            ? Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: LinearProgressIndicator(
+                  value: entry.progress > 0 ? entry.progress : null,
+                  minHeight: 3,
+                ),
+              )
+            : entry.state == DownloadQueueState.failed &&
+                  entry.error != null
+            ? Text(
+                entry.error!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontSize: 12,
+                ),
+              )
+            : null,
+        trailing: trailing,
+      ),
+    );
+  }
+  Future<void> _retryQueueEntry(DownloadQueueEntry entry) async {
+    final result = await _youTubeService.downloadQueue.enqueueAll([
+      DownloadRequest(videoId: entry.videoId, title: entry.title),
+    ]);
+    if (!mounted || result.added == 0) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Retrying ${entry.title}')));
+  }
   Widget _buildDownloadItem(dynamic download) => Card(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     child: ListTile(
@@ -291,12 +455,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       ),
     ),
   );
-
   void _dismissFailedDownload(String videoId) {
     _youTubeService.dismissDownload(videoId);
     setState(() {});
   }
-
   Widget _buildSongItem(Song song) => Card(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     child: ListTile(
@@ -375,7 +537,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           : null,
     ),
   );
-
   Widget _buildThumbnail(Song song) {
     if (song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty) {
       return ClipRRect(
@@ -399,7 +560,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       child: const Icon(Icons.music_note),
     );
   }
-
   Future<void> _scanLocalFiles() async {
     try {
       final musicProvider = Provider.of<music_provider.MusicProvider>(
@@ -408,24 +568,20 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
       final songs = musicProvider.youtubeSongs;
       final List<Song> localFiles = List.from(songs);
-
       if (mounted) {
         setState(() {
           _localFiles = localFiles;
         });
       }
     } catch (e) {
-      debugPrint('Error scanning local files: $e');
     }
   }
-
   Future<void> _showRelocateDialog(Song song) async {
     final settingsProvider = Provider.of<SettingsProvider>(
       context,
       listen: false,
     );
     final currentLocation = settingsProvider.downloadLocation;
-
     final targetLocation = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -452,9 +608,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ],
       ),
     );
-
     if (targetLocation == null) return;
-
     try {
       final sourceFile = File(song.url);
       if (!await sourceFile.exists()) {
@@ -465,18 +619,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         }
         return;
       }
-
       final targetDir = await _getMusicDirectory(targetLocation);
       if (!await targetDir.exists()) {
         await targetDir.create(recursive: true);
       }
-
       final fileName = song.url.split('/').last;
       final targetFile = File('${targetDir.path}/$fileName');
-
       await sourceFile.copy(targetFile.path);
       await sourceFile.delete();
-
       if (!mounted) return;
       final musicProvider = Provider.of<music_provider.MusicProvider>(
         context,
@@ -484,9 +634,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
       final updatedSong = song.copyWith(url: targetFile.path);
       musicProvider.addSongToPlaylist(updatedSong);
-
       await _scanLocalFiles();
-
       final locationLabels = {
         'internal': 'Internal Storage',
         'downloads': 'Downloads folder',
@@ -498,7 +646,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Error relocating song: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -506,7 +653,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       }
     }
   }
-
   Future<void> _deleteSong(Song song) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -526,7 +672,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ],
       ),
     );
-
     if (confirmed == true) {
       try {
         final file = File(song.url);
@@ -549,7 +694,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       }
     }
   }
-
   Future<void> _deleteSelected() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -569,7 +713,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ],
       ),
     );
-
     if (confirmed == true) {
       setState(() => _isMultiSelectMode = false);
       for (final songId in _selectedSongs.toList()) {
@@ -590,7 +733,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             );
             await musicProvider.deleteSong(song);
           } catch (e) {
-            debugPrint('Error deleting song ${song.id}: $e');
           }
         }
       }
@@ -598,12 +740,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       unawaited(_scanLocalFiles());
     }
   }
-
   Future<Directory> _getMusicDirectory(String downloadLocation) async {
     final baseDir = await getApplicationDocumentsDirectory();
     return Directory('${baseDir.path}/tsmusic');
   }
-
   Future<void> addDownload(String videoId, String title) async {
     if (!_downloadProgress.containsKey(videoId)) {
       setState(() {
@@ -652,7 +792,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     errorStr.contains('consent') ||
                     errorStr.contains('blocked') ||
                     errorStr.contains('unavailable');
-
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Row(

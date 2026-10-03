@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
+import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart' as ts;
-
+import 'package:tsmusic/utils/download_enqueue.dart';
+import 'package:tsmusic/services/download_queue.dart';
 class NowPlayingQueueBottomSheet extends StatelessWidget {
   const NowPlayingQueueBottomSheet({super.key});
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -22,7 +23,6 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
     final onlineIndex = musicProvider.onlinePlaylistIndex;
     final hasLocal = localQueue.isNotEmpty;
     final hasOnline = onlineSongs.isNotEmpty;
-
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -57,6 +57,15 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                     color: theme.colorScheme.onSurface.withAlpha(179),
                   ),
                 ),
+                if (_queueDownloadRequests(localQueue, onlineSongs).isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.download_for_offline_outlined),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Download all online songs',
+                    onPressed: () => _downloadAllOnlineQueue(context),
+                  ),
+                ],
               ],
             ),
           ),
@@ -88,7 +97,6 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
               height: MediaQuery.of(context).size.height * 0.5,
               child: ListView(
                 children: [
-                  // Local section
                   if (hasLocal) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -121,7 +129,6 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                       final index = entry.key;
                       final song = entry.value;
                       final isCurrentSong = index == localIndex;
-
                       return Dismissible(
                         key: ValueKey('dismiss_local_${song.id}_$index'),
                         direction: DismissDirection.endToStart,
@@ -202,7 +209,6 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                     }),
                     const Divider(height: 1),
                   ],
-                  // Online section
                   if (hasOnline) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -274,7 +280,6 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                       final index = entry.key;
                       final song = entry.value;
                       final isCurrentSong = index == onlineIndex;
-
                       return Dismissible(
                         key: ValueKey('dismiss_online_${song.id}_$index'),
                         direction: DismissDirection.endToStart,
@@ -364,7 +369,6 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
     );
   }
 }
-
 void showNowPlayingQueue(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -373,11 +377,9 @@ void showNowPlayingQueue(BuildContext context) {
     builder: (context) => const NowPlayingQueueBottomSheet(),
   );
 }
-
 extension on BuildContext {
   YouTubeService get _youTubeService => read<YouTubeService>();
 }
-
 Future<void> _pastePlaylist(BuildContext context) async {
   final yt = context._youTubeService;
   final data = await Clipboard.getData(Clipboard.kTextPlain);
@@ -390,9 +392,7 @@ Future<void> _pastePlaylist(BuildContext context) async {
     }
     return;
   }
-
   final text = rawText.trim();
-  // Accept full URLs or bare playlist IDs
   if (!text.contains('youtube') &&
       !text.contains('youtu.be') &&
       !RegExp(r'^[A-Za-z0-9_\-]{10,}$').hasMatch(text)) {
@@ -403,7 +403,6 @@ Future<void> _pastePlaylist(BuildContext context) async {
     }
     return;
   }
-
   try {
     final count = await yt.fetchPlaylistAndAdd(text);
     if (context.mounted) {
@@ -419,37 +418,32 @@ Future<void> _pastePlaylist(BuildContext context) async {
     }
   }
 }
-
 class _OnlineDownloadButton extends StatefulWidget {
   final ts.Song song;
   final YouTubeService youTubeService;
   final music_provider.MusicProvider musicProvider;
-
   const _OnlineDownloadButton({
     required this.song,
     required this.youTubeService,
     required this.musicProvider,
   });
-
   @override
   State<_OnlineDownloadButton> createState() => _OnlineDownloadButtonState();
 }
-
 class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
   bool _isDownloaded = false;
-
   @override
   void initState() {
     super.initState();
     _checkDownloaded();
   }
-
   void _checkDownloaded() {
-    _isDownloaded = widget.musicProvider.librarySongs.any(
-      (s) => s.youtubeId == widget.song.youtubeId && s.isDownloaded,
-    );
+    // Read from the service's database-backed cache rather than
+    // musicProvider.librarySongs, which only holds downloads made while the
+    // library happened to be loaded.
+    _isDownloaded =
+        widget.youTubeService.isVideoDownloaded(widget.song.youtubeId ?? '');
   }
-
   @override
   Widget build(BuildContext context) {
     final activeDownloadsList = widget.youTubeService.activeDownloads
@@ -458,9 +452,7 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
     final activeDownloads = activeDownloadsList.isNotEmpty
         ? activeDownloadsList.first
         : null;
-
     if (_isDownloaded) return const SizedBox.shrink();
-
     if (activeDownloads != null) {
       return SizedBox(
         width: 20,
@@ -487,7 +479,6 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
         ),
       );
     }
-
     return IconButton(
       icon: Icon(
         Icons.download,
@@ -515,4 +506,33 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
       tooltip: 'Download',
     );
   }
+}
+List<DownloadRequest> _queueDownloadRequests(
+  List<ts.Song> localQueue,
+  List<ts.Song> onlineSongs,
+) {
+  final byId = <String, DownloadRequest>{};
+  for (final song in [...localQueue, ...onlineSongs]) {
+    final videoId = song.youtubeId;
+    if (videoId == null || videoId.isEmpty) continue;
+    byId.putIfAbsent(
+      videoId,
+      () => DownloadRequest(videoId: videoId, title: song.title),
+    );
+  }
+  return byId.values.toList();
+}
+Future<void> _downloadAllOnlineQueue(BuildContext context) async {
+  final musicProvider = context.read<music_provider.MusicProvider>();
+  final requests = _queueDownloadRequests(
+    musicProvider.queue,
+    musicProvider.onlinePlaylist,
+  );
+  if (requests.isEmpty) return;
+  await enqueueAllForDownload(
+    context: context,
+    requests: requests,
+    youTubeService: context.read<YouTubeService>(),
+    settings: context.read<SettingsProvider>(),
+  );
 }

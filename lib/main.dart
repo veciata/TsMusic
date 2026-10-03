@@ -4,7 +4,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -19,6 +19,7 @@ import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/providers/youtube_player_provider.dart';
+import 'package:tsmusic/providers/library_view_model.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/services/artist_image_cache.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
@@ -29,104 +30,89 @@ import 'package:tsmusic/widgets/mini_player_widget.dart';
 import 'package:tsmusic/core/services/error_tracking_service.dart';
 import 'package:tsmusic/core/services/clipboard_service.dart';
 import 'package:tsmusic/widgets/youtube_link_bottom_sheet.dart';
-
-import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/data/repositories/playlist_repository.dart';
+import 'package:tsmusic/data/repositories/song_repository.dart';
 import 'package:tsmusic/services/download_notification_service.dart';
 import 'package:tsmusic/services/home_widget_service.dart';
 import 'package:tsmusic/providers/update_notification_provider.dart';
 import 'package:tsmusic/widgets/update_notification_modal.dart';
-
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize error tracking before anything else
-  await ErrorTrackingService().init();
-
-  // Set up global platform error handler for async framework errors
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    ErrorTrackingService().recordError(
-      error,
-      stack,
-      context: 'PlatformDispatcher.onError',
-    );
-    return true;
-  };
-
-  // Initialize MediaKit for audio playback
-  MediaKit.ensureInitialized();
-  await PackageInfoUtils.init();
-
-  // Initialize download notifications
-  await DownloadNotificationService().initialize();
-
-  // Initialize home screen widget
-  await HomeWidgetService.init();
-  final youTubeService = YouTubeService();
-
-  final prefs = await SharedPreferences.getInstance();
-  final introCompleted = prefs.getBool('intro_completed') ?? false;
-  final lastSeenVersion = prefs.getString('last_seen_version') ?? '';
-
-  // Set custom ErrorWidget for fatal rendering exceptions
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    ErrorTrackingService().recordFlutterError(details);
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline_rounded,
-                  color: Colors.redAccent,
-                  size: 64,
+void main() {
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await ErrorTrackingService().init();
+      PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+        ErrorTrackingService().recordError(
+          error,
+          stack,
+          context: 'PlatformDispatcher.onError',
+        );
+        return true;
+      };
+      MediaKit.ensureInitialized();
+      await PackageInfoUtils.init();
+      await DownloadNotificationService().initialize();
+      await HomeWidgetService.init();
+      final sharedPlayer = Player();
+      final youTubeService = YouTubeService(player: sharedPlayer);
+      final prefs = await SharedPreferences.getInstance();
+      final introCompleted = prefs.getBool('intro_completed') ?? false;
+      final lastSeenVersion = prefs.getString('last_seen_version') ?? '';
+      ErrorWidget.builder = (FlutterErrorDetails details) {
+        ErrorTrackingService().recordFlutterError(details);
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 64,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Something went wrong',
+                      style: ThemeData.dark().textTheme.headlineSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'A rendering error occurred. The app may need to restart.',
+                      style: ThemeData.dark().textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[400],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        ErrorWidget.builder = ErrorWidget.builder;
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Something went wrong',
-                  style: ThemeData.dark().textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'A rendering error occurred. The app may need to restart.',
-                  style: ThemeData.dark().textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[400],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Attempt recovery by re-triggering a build
-                    ErrorWidget.builder = ErrorWidget.builder;
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  };
-
-  runZonedGuarded(
-    () {
+        );
+      };
       runApp(
         MusicPlayerApp(
           youTubeService: youTubeService,
+          player: sharedPlayer,
           introCompleted: introCompleted,
           lastSeenVersion: lastSeenVersion,
         ),
@@ -141,35 +127,31 @@ Future<void> main() async {
     },
   );
 }
-
 class MusicPlayerApp extends StatefulWidget {
   final YouTubeService youTubeService;
+  final Player player;
   final bool introCompleted;
   final String lastSeenVersion;
-
   const MusicPlayerApp({
     super.key,
     required this.youTubeService,
+    required this.player,
     required this.introCompleted,
     required this.lastSeenVersion,
   });
-
   @override
   State<MusicPlayerApp> createState() => _MusicPlayerAppState();
 }
-
 class _MusicPlayerAppState extends State<MusicPlayerApp>
     with WidgetsBindingObserver {
   late bool _introCompleted;
   final ClipboardService _clipboardService = ClipboardService();
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _introCompleted = widget.introCompleted;
   }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -177,12 +159,10 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       _checkClipboard();
     }
   }
-
   Future<void> _checkClipboard() async {
     final link = await _clipboardService.checkClipboard();
     final navigator = rootNavigatorKey.currentState;
     if (link == null || navigator == null || !mounted) return;
-
     showYouTubeLinkBottomSheet(
       navigator.context,
       link: link,
@@ -198,7 +178,6 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       },
     );
   }
-
   void _handleYouTubeDownload(YouTubeLinkResult link) {
     final navigator = rootNavigatorKey.currentState;
     if (navigator == null) return;
@@ -215,7 +194,6 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       );
     }
   }
-
   Future<void> _playYouTubePlaylist(
     YouTubeService ytService,
     YouTubeLinkResult link,
@@ -243,13 +221,11 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
         );
       }
     } catch (e) {
-      debugPrint('Error playing playlist: $e');
       messenger.showSnackBar(
         SnackBar(content: Text('Error playing playlist: $e')),
       );
     }
   }
-
   Future<void> _saveYouTubePlaylist(YouTubeLinkResult link) async {
     final navigator = rootNavigatorKey.currentState;
     if (navigator == null) return;
@@ -257,6 +233,10 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     final messenger = ScaffoldMessenger.of(navContext);
     final ytService = Provider.of<YouTubeService>(navContext, listen: false);
     final musicProvider = Provider.of<music_provider.MusicProvider>(
+      navContext,
+      listen: false,
+    );
+    final playlistRepository = Provider.of<PlaylistRepository>(
       navContext,
       listen: false,
     );
@@ -277,10 +257,9 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
         );
         return;
       }
-
-      final db = DatabaseHelper();
-      final playlistId = await db.createPlaylist(link.url);
-
+      final playlistId = await playlistRepository.createPlaylist(
+      link.url,
+    );
       for (final audio in audios) {
         await musicProvider.addOnlineSongToPlaylist(
           youtubeId: audio.id,
@@ -291,37 +270,43 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
           playlistId: playlistId,
         );
       }
-
       mainNavKey.currentState?.goToDownloads();
       messenger.showSnackBar(
         SnackBar(content: Text('Playlist saved (${audios.length} songs)')),
       );
     } catch (e) {
-      debugPrint('Error saving playlist: $e');
       messenger.showSnackBar(
         SnackBar(content: Text('Error saving playlist: $e')),
       );
     }
   }
-
   void _handleYouTubeSearch(YouTubeLinkResult link) {
     final query = link.videoId ?? link.playlistId ?? link.url;
     mainNavKey.currentState?._openSearch(query);
   }
-
   void _onIntroComplete() {
     setState(() {
       _introCompleted = true;
     });
   }
-
   @override
   Widget build(BuildContext context) => MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
+      Provider<SongRepository>(create: (_) => SongRepository()),
+      Provider<PlaylistRepository>(create: (_) => PlaylistRepository()),
+      ChangeNotifierProvider(
+        create: (ctx) => LibraryViewModel(
+          songRepository: ctx.read<SongRepository>(),
+        ),
+      ),
       ChangeNotifierProvider(
         create: (ctx) => music_provider.MusicProvider(
           notificationColor: ctx.read<ThemeProvider>().primaryColor,
+          songRepository: ctx.read<SongRepository>(),
+          playlistRepository: ctx.read<PlaylistRepository>(),
+          libraryViewModel: ctx.read<LibraryViewModel>(),
+          player: widget.player,
         ),
       ),
       ChangeNotifierProvider(create: (_) => widget.youTubeService),
@@ -353,7 +338,6 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
             fontWeight: FontWeight.w600,
           ),
         );
-
         return Consumer<SettingsProvider>(
           builder: (context, settingsProvider, _) => MaterialApp(
             title: kDebugMode ? 'TS Music [Debug]' : 'TS Music',
@@ -379,28 +363,23 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     ),
   );
 }
-
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
-
   @override
   MainNavigationScreenState createState() => MainNavigationScreenState();
 }
-
 class MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   static const _navigationChannel = MethodChannel(
     'com.veciata.tsmusic/navigation',
   );
-
   final List<Widget> _pages = [
     const HomeScreen(),
     const DownloadsScreen(),
     const SettingsScreen(),
     if (kDebugMode) const SqlScreen(),
   ];
-
   @override
   void initState() {
     super.initState();
@@ -411,10 +390,26 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           final query = call.arguments as String?;
           _openSearch(query);
           return Future.value(true);
+        case 'resumePlayback':
+          Provider.of<music_provider.MusicProvider>(
+            context,
+            listen: false,
+          ).resumeFromLauncher();
+          return Future.value(true);
         default:
           return Future.value(false);
       }
     });
+    final pendingResumeProvider =
+        Provider.of<music_provider.MusicProvider>(context, listen: false);
+    _navigationChannel
+        .invokeMethod('getPendingWidgetResume')
+        .then((value) {
+          if (value == true) {
+            pendingResumeProvider.resumeFromLauncher();
+          }
+        })
+        .catchError((_) {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final musicProv = Provider.of<music_provider.MusicProvider>(
         context,
@@ -425,19 +420,13 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         listen: false,
       );
       final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-      // Connect YouTube service to MusicProvider for notification integration
       musicProv.setYouTubeService(youTubeService);
-      // Set up widget auto-update — fires on every notifyListeners
       musicProv.onWidgetUpdateNeeded = () => _onWidgetUpdate(musicProv);
-      // Set up theme widget auto-update — fires when theme/color changes
       themeProvider.onWidgetUpdateNeeded = () => _onWidgetUpdate(musicProv);
-      // Load from database first, then scan for new music in background
       _initializeMusic(musicProv);
-      // Check for GitHub releases and show update modal if new ones found.
       _checkForUpdates();
     });
   }
-
   void _openSearch([String? query]) {
     Navigator.push(
       context,
@@ -446,28 +435,19 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
     );
   }
-
   Future<void> _initializeMusic(music_provider.MusicProvider musicProv) async {
     try {
-      // First load from database
       await musicProv.loadFromDatabaseOnly();
-
-      // If no music found, trigger a scan
       if (musicProv.songs.isEmpty) {
-        debugPrint('No music in database, scanning for music...');
         await musicProv.scanForNewMusic();
       }
     } catch (e) {
-      debugPrint('Error initializing music: $e');
-      // Try scanning anyway
       try {
         await musicProv.scanForNewMusic();
       } catch (scanError) {
-        debugPrint('Error during music scan: $scanError');
       }
     }
   }
-
   Future<void> _checkForUpdates() async {
     try {
       final provider = Provider.of<UpdateNotificationProvider>(
@@ -479,10 +459,8 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         await showUpdateNotificationModal(context);
       }
     } catch (e) {
-      debugPrint('Update check error: $e');
     }
   }
-
   Future<void> _requestNotificationPermission() async {
     if (Platform.isAndroid || Platform.isIOS) {
       final status = await Permission.notification.status;
@@ -491,7 +469,6 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       }
     }
   }
-
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -502,11 +479,9 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     });
   }
-
   void goToDownloads() {
     _onItemTapped(1);
   }
-
   String _getTitle() {
     final l10n = AppLocalizations.of(context);
     switch (_selectedIndex) {
@@ -522,7 +497,6 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         return l10n.tsMusic;
     }
   }
-
   void _onWidgetUpdate(music_provider.MusicProvider musicProv) {
     try {
       final youTubeService = Provider.of<YouTubeService>(
@@ -542,7 +516,6 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       } else {
         queue = [];
       }
-
       HomeWidgetService.updatePlayerWidget(
         currentSong: musicProv.currentSong,
         isPlaying: musicProv.isPlaying,
@@ -559,13 +532,11 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     } catch (_) {}
   }
-
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -594,7 +565,6 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
             children: _pages,
           ),
         ),
-        // Persistent mini player — always visible above bottom nav
         const MiniPlayerWidget(),
       ],
     ),

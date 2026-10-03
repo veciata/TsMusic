@@ -3,64 +3,40 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart';
+import 'package:tsmusic/data/repositories/playlist_repository.dart';
+import 'package:tsmusic/data/repositories/song_repository.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/utils/format_utils.dart';
-
+import 'package:tsmusic/utils/download_enqueue.dart';
+import 'package:tsmusic/services/download_queue.dart';
 class PlaylistDetailScreen extends StatefulWidget {
   final int playlistId;
   final String playlistName;
-
   const PlaylistDetailScreen({
     super.key,
     required this.playlistId,
     required this.playlistName,
   });
-
   @override
   State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
 }
-
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
-  final DatabaseHelper _db = DatabaseHelper();
+  final PlaylistRepository _playlistRepository = PlaylistRepository();
+  final SongRepository _songRepository = SongRepository();
   List<Song> _songs = [];
   bool _isLoading = true;
   bool _isEditMode = false;
-
   @override
   void initState() {
     super.initState();
     _loadSongs();
   }
-
   Future<void> _loadSongs() async {
     setState(() => _isLoading = true);
     try {
-      final songMaps = await _db.getSongsInPlaylist(widget.playlistId);
-      final songs = <Song>[];
-
-      for (final songData in songMaps) {
-        final songId = songData['id'] as int;
-        final artistsData = await _db.getArtistsForSong(songId);
-        final artists = artistsData
-            .map((row) => row['name'] as String)
-            .toList();
-
-        songs.add(
-          Song(
-            id: songId,
-            youtubeId: songData['youtube_id'] as String?,
-            title: songData['title'] as String? ?? 'Unknown Title',
-            url: songData['file_path'] as String,
-            duration: songData['duration'] as int? ?? 0,
-            artists: artists.isNotEmpty ? artists : ['Unknown Artist'],
-            dateAdded: songData['created_at'] != null
-                ? DateTime.parse(songData['created_at'] as String)
-                : DateTime.now(),
-          ),
-        );
-      }
-
+      final songs = await _songRepository.getPlaylistSongs(widget.playlistId);
       if (mounted) {
         setState(() {
           _songs = songs;
@@ -76,7 +52,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       }
     }
   }
-
   Future<void> _removeSong(Song song) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -97,10 +72,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         ],
       ),
     );
-
     if (confirmed == true) {
       try {
-        await _db.removeSongsFromPlaylist(widget.playlistId, [song.id]);
+        await _playlistRepository.removeSongsFromPlaylist(widget.playlistId, [
+          song.id,
+        ]);
         await _loadSongs();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -116,16 +92,34 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       }
     }
   }
-
   Future<void> _showAddSongsDialog() async {
     final l10n = AppLocalizations.of(context);
     final musicProvider = Provider.of<music_provider.MusicProvider>(
       context,
       listen: false,
     );
+    final youTubeService = context.read<YouTubeService>();
     final allSongs = musicProvider.librarySongs;
     final selectedSongs = <int>{};
-
+    final tv = TextEditingController();
+    var ytResults = <YouTubeAudio>[];
+    var ytLoading = false;
+    Future<void> addYouTubeTrack(YouTubeAudio audio) async {
+      try {
+        await musicProvider.addOnlineSongToPlaylist(
+          youtubeId: audio.id,
+          title: audio.title,
+          artists: audio.artists.isNotEmpty
+              ? audio.artists
+              : [audio.author],
+          duration: audio.duration?.inMilliseconds ?? 0,
+          thumbnailUrl: audio.thumbnailUrl,
+          playlistId: widget.playlistId,
+        );
+      } catch (e) {
+        rethrow;
+      }
+    }
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -134,48 +128,219 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           content: SizedBox(
             width: double.maxFinite,
             height: MediaQuery.of(context).size.height * 0.6,
-            child: allSongs.isEmpty
-                ? Center(child: Text(l10n.noMusicFound))
-                : ListView.builder(
-                    itemCount: allSongs.length,
-                    itemBuilder: (context, index) {
-                      final song = allSongs[index];
-                      final isSelected = selectedSongs.contains(song.id);
-                      final isAlreadyInPlaylist = _songs.any(
-                        (s) => s.id == song.id,
-                      );
-
-                      return CheckboxListTile(
-                        value: isSelected,
-                        onChanged: isAlreadyInPlaylist
-                            ? null
-                            : (value) {
-                                setDialogState(() {
-                                  if (value == true) {
-                                    selectedSongs.add(song.id);
-                                  } else {
-                                    selectedSongs.remove(song.id);
-                                  }
-                                });
-                              },
-                        title: Text(
-                          song.title,
-                          style: TextStyle(
-                            color: isAlreadyInPlaylist ? Colors.grey : null,
-                          ),
-                        ),
-                        subtitle: Text(
-                          song.artists.join(' & '),
-                          style: TextStyle(
-                            color: isAlreadyInPlaylist ? Colors.grey : null,
-                          ),
-                        ),
-                        secondary: isAlreadyInPlaylist
-                            ? const Icon(Icons.check_circle, color: Colors.grey)
-                            : null,
-                      );
-                    },
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add from YouTube (no download)',
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: tv,
+                          decoration: const InputDecoration(
+                            hintText: 'Search YouTube songs...',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) async {
+                            if (tv.text.trim().isEmpty) return;
+                            setDialogState(() => ytLoading = true);
+                            try {
+                              final results = await youTubeService.searchAudio(
+                                tv.text.trim(),
+                              );
+                              if (context.mounted) {
+                                setDialogState(() => ytResults = results);
+                              }
+                            } catch (_) {
+                              if (context.mounted) {
+                                setDialogState(
+                                  () => ytResults = <YouTubeAudio>[],
+                                );
+                              }
+                            } finally {
+                              if (context.mounted) {
+                                setDialogState(() => ytLoading = false);
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: ytLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.search),
+                        onPressed: ytLoading
+                            ? null
+                            : () async {
+                                if (tv.text.trim().isEmpty) return;
+                                setDialogState(() => ytLoading = true);
+                                try {
+                                  final results =
+                                      await youTubeService.searchAudio(
+                                    tv.text.trim(),
+                                  );
+                                  if (context.mounted) {
+                                    setDialogState(
+                                      () => ytResults = results,
+                                    );
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    setDialogState(
+                                      () => ytResults = <YouTubeAudio>[],
+                                    );
+                                  }
+                                } finally {
+                                  if (context.mounted) {
+                                    setDialogState(() => ytLoading = false);
+                                  }
+                                }
+                              },
+                      ),
+                    ],
+                  ),
+                  if (ytResults.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'YouTube results',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: ytResults.length,
+                        itemBuilder: (context, index) {
+                          final audio = ytResults[index];
+                          final alreadyInPlaylist = _songs.any(
+                            (s) => s.youtubeId == audio.id,
+                          );
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.play_circle_outline),
+                            title: Text(
+                              audio.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              audio.artists.isNotEmpty
+                                  ? audio.artists.join(' & ')
+                                  : audio.author,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: IconButton(
+                              icon: Icon(
+                                alreadyInPlaylist
+                                    ? Icons.check_circle
+                                    : Icons.add_circle_outline,
+                                color: alreadyInPlaylist
+                                    ? Colors.grey
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
+                              onPressed: alreadyInPlaylist
+                                  ? null
+                                  : () async {
+                                      try {
+                                        await addYouTubeTrack(audio);
+                                        await _loadSongs();
+                                        if (context.mounted) {
+                                          setDialogState(() {});
+                                        }
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Added "${audio.title}" to playlist',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      } catch (_) {}
+                                    },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  const Divider(height: 24),
+                  Text(
+                    l10n.addSongs,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  if (allSongs.isEmpty)
+                    Center(child: Text(l10n.noMusicFound))
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: allSongs.length,
+                        itemBuilder: (context, index) {
+                          final song = allSongs[index];
+                          final isSelected = selectedSongs.contains(song.id);
+                          final isAlreadyInPlaylist = _songs.any(
+                            (s) => s.id == song.id,
+                          );
+                          return CheckboxListTile(
+                            dense: true,
+                            value: isSelected,
+                            onChanged: isAlreadyInPlaylist
+                                ? null
+                                : (value) {
+                                    setDialogState(() {
+                                      if (value == true) {
+                                        selectedSongs.add(song.id);
+                                      } else {
+                                        selectedSongs.remove(song.id);
+                                      }
+                                    });
+                                  },
+                            title: Text(
+                              song.title,
+                              style: TextStyle(
+                                color: isAlreadyInPlaylist
+                                    ? Colors.grey
+                                    : null,
+                              ),
+                            ),
+                            subtitle: Text(
+                              song.artists.join(' & '),
+                              style: TextStyle(
+                                color: isAlreadyInPlaylist
+                                    ? Colors.grey
+                                    : null,
+                              ),
+                            ),
+                            secondary: isAlreadyInPlaylist
+                                ? const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.grey,
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
           actions: [
             TextButton(
@@ -188,7 +353,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   : () async {
                       Navigator.pop(context);
                       try {
-                        await _db.addSongsToPlaylist(
+                        await _playlistRepository.addSongsToPlaylist(
                           widget.playlistId,
                           selectedSongs.toList(),
                         );
@@ -217,24 +382,65 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ),
     );
   }
-
-  Future<void> _playPlaylist() async {
-    if (_songs.isEmpty) return;
-
+  Future<void> _startPlayback({
+    int? startIndex,
+    bool popAfter = false,
+  }) async {
     final musicProvider = Provider.of<music_provider.MusicProvider>(
       context,
       listen: false,
     );
-    await musicProvider.loadPlaylistAsQueue(widget.playlistId);
-    if (!mounted) return;
-    Navigator.pop(context);
+    try {
+      await musicProvider.loadPlaylistAsQueue(
+        widget.playlistId,
+        startIndex: startIndex,
+      );
+      if (!mounted) return;
+      if (popAfter) Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not start playback: $e')),
+      );
+    }
   }
-
+  Future<void> _playPlaylist() async {
+    if (_songs.isEmpty) return;
+    await _startPlayback(popAfter: true);
+  }
+  int get _remoteSongCount => _songs
+      .where(
+        (s) =>
+            s.url.startsWith('yt:') &&
+            (s.youtubeId?.isNotEmpty ?? false),
+      )
+      .length;
+  Future<void> _downloadAllRemoteSongs() async {
+    if (_remoteSongCount == 0) return;
+    final requests = _songs
+        .where(
+          (s) =>
+              s.url.startsWith('yt:') &&
+              (s.youtubeId?.isNotEmpty ?? false),
+        )
+        .map(
+          (s) => DownloadRequest(videoId: s.youtubeId!, title: s.title),
+        )
+        .toList();
+    await enqueueAllForDownload(
+      context: context,
+      requests: requests,
+      youTubeService: context.read<YouTubeService>(),
+      settings: context.read<SettingsProvider>(),
+    );
+    // No refresh here: the batch runs in the background and the library is
+    // updated per track as it lands, so reloading now would just be a no-op
+    // followed by another reload in a few seconds.
+  }
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.playlistName),
@@ -244,6 +450,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               icon: const Icon(Icons.play_arrow),
               onPressed: _playPlaylist,
               tooltip: l10n.play,
+            ),
+          if (_remoteSongCount > 0)
+            IconButton(
+              icon: const Icon(Icons.download_for_offline_outlined),
+              onPressed: _downloadAllRemoteSongs,
+              tooltip: 'Download all online songs',
             ),
           IconButton(
             icon: Icon(_isEditMode ? Icons.done : Icons.edit),
@@ -284,7 +496,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 final song = _songs.removeAt(oldIndex);
                 _songs.insert(newIndex, song);
                 setState(() {});
-                // TODO: Update positions in database
               },
               itemBuilder: (context, index) {
                 final song = _songs[index];
@@ -330,10 +541,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   ),
                   onTap: _isEditMode
                       ? null
-                      : () => Provider.of<music_provider.MusicProvider>(
-                          context,
-                          listen: false,
-                        ).playSong(song),
+                      : () => _startPlayback(startIndex: index),
                 );
               },
             ),

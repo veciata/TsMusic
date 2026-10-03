@@ -7,14 +7,12 @@ import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/main.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
-
 class YouTubePlaybackWidget extends StatelessWidget {
   final YouTubeAudio audio;
   final Future<void> Function(YouTubeAudio) onPlay;
   final Future<void> Function(YouTubeAudio) onDownload;
   final VoidCallback? onAddToPlaylist;
   final VoidCallback? onDelete;
-
   const YouTubePlaybackWidget({
     super.key,
     required this.audio,
@@ -23,31 +21,21 @@ class YouTubePlaybackWidget extends StatelessWidget {
     this.onAddToPlaylist,
     this.onDelete,
   });
-
   @override
   Widget build(BuildContext context) {
     final youtubePlayer = Provider.of<YouTubePlayerProvider>(context);
     final isLoading = youtubePlayer.isLoadingAudio(audio.id);
     final isCurrent = youtubePlayer.isCurrentAudio(audio.id);
     final isPlaying = youtubePlayer.isPlaying && isCurrent;
-
     final youTubeService = Provider.of<YouTubeService>(context);
-
     final downloadProgress = youTubeService.activeDownloads
         .where((d) => d.videoId == audio.id && d.error == null)
         .firstOrNull;
-
-    final musicProvider = Provider.of<music_provider.MusicProvider>(
-      context,
-      listen: false,
-    );
-    final downloadedSong = musicProvider.songs
-        .where((s) => s.youtubeId == audio.id && s.tags.contains('tsmusic'))
-        .firstOrNull;
+    // Database-backed, so a track downloaded while another playlist was open is
+    // still recognised here instead of being offered for download again.
+    final downloadedSong = youTubeService.downloadedSongFor(audio.id);
     final isDownloaded = downloadedSong != null;
-
     final localThumbnailPath = downloadedSong?.localThumbnailPath;
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
@@ -199,7 +187,6 @@ class YouTubePlaybackWidget extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildThumbnail(BuildContext context, String? localThumbnailPath) {
     if (localThumbnailPath != null) {
       return ClipRRect(
@@ -214,7 +201,6 @@ class YouTubePlaybackWidget extends StatelessWidget {
         ),
       );
     }
-
     if (audio.thumbnailUrl?.isNotEmpty == true) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(4),
@@ -230,7 +216,6 @@ class YouTubePlaybackWidget extends StatelessWidget {
         ),
       );
     }
-
     return Container(
       width: 60,
       height: 60,
@@ -239,7 +224,6 @@ class YouTubePlaybackWidget extends StatelessWidget {
     );
   }
 }
-
 extension _FirstOrNullExtension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
 }
