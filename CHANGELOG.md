@@ -1,16 +1,20 @@
 # Changelog
 
 ## [1.3.5] - 2026-09-16
-
 ### Fixed / Düzeltildi
-- Playing songs online no longer gets stuck when your connection restricts large downloads; playback uses a smarter streaming method that works even on restricted networks.
-  İnternet bağlantınız büyük indirmeleri kısıtladığında çevrimiçi şarkı çalma takılmıyor artık; oynatma, kısıtlı ağlarda bile çalışan daha akıllı bir yöntem kullanıyor.
+- Online (HLS) playback no longer jumps: progress bar and elapsed time count up smoothly across segment boundaries (use real track length).
+  Çevrimiçi (HLS) çalma artık sıçramıyor; ilerleme çubuğu ve geçen süre her segmentte sıfırlanmadan kesintisiz artıyor (gerçek şarkı uzunluğu kullanılıyor).
+- Global download queue: "Download all" adds songs to a persistent-in-session queue (one-at-a-time) so you can navigate away while downloading; single-track downloads also appear in the queue. Tracks already on device are skipped globally (checks all lists/DB).
+  Küresel indirme kuyruğu: "Hepsini indir" şarkıları oturum boyunca kuyrukta (tek tek) indirir, gezinirken indirme devam eder; tek parça indirmeler de kuyrukta görünür. Cihazda olan şarkılar tüm listeler/veritabanı baz alınarak atlanır.
+- Downloads page shows queue (with Stop/Clear/Retry), downloaded list is newest-first and global (not limited to the open playlist).
+  İndirilenler sayfası kuyruğu (Dur/Duraklat/Temizle/Yeniden dene) gösterir, indirilenler en yeniye göre ve tüm veritabanından global olarak listelenir.
 
-### Improved / Geliştirildi
-- Downloads are faster: each song is fetched in 6 parts at the same time instead of one after another.
-  İndirmeler daha hızlı: her şarkı tek tek yerine aynı anda 6 parça halinde indiriliyor.
-- Artist pictures are remembered on your device. Once a picture loads, it shows instantly next time — no repeated downloads.
-  Sanatçı fotoğrafları cihazınızda saklanıyor. Bir kez yüklendikten sonra bir daha ki sefere anında gösteriliyor — tekrar tekrar indirilmiyor.
+### Changed / Değiştirildi
+- "Download all" no longer blocks with a modal dialog; enqueues in background with a snackbar to view Downloads.
+  "Hepsini indir" artık modal ile bekletmiyor, arka planda kuyruğa ekliyor ve İndirilenler'e gitmek için bir bildirim gösteriyor.
+
+
+
 
 ## [1.3.4] - 2026-09-15
 
