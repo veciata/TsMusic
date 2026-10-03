@@ -7,7 +7,6 @@ import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/screens/now_playing_screen.dart';
 import 'package:tsmusic/models/player_styles.dart';
-
 Route _slideUpRoute() => PageRouteBuilder(
   pageBuilder: (context, animation, secondaryAnimation) =>
       const NowPlayingScreen(),
@@ -15,14 +14,11 @@ Route _slideUpRoute() => PageRouteBuilder(
     const begin = Offset(0.0, 1.0);
     const end = Offset.zero;
     const curve = Curves.easeInOut;
-
     final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-
     return SlideTransition(position: animation.drive(tween), child: child);
   },
   transitionDuration: const Duration(milliseconds: 350),
 );
-
 void _showMinimalPlayer(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -44,19 +40,15 @@ void _showMinimalPlayer(BuildContext context) {
     ),
   );
 }
-
 class MiniPlayerWidget extends StatefulWidget {
   const MiniPlayerWidget({super.key});
-
   @override
   State<MiniPlayerWidget> createState() => _MiniPlayerWidgetState();
 }
-
 class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
     with SingleTickerProviderStateMixin {
   double _progress = 0.0;
   StreamSubscription? _positionSubscription;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -71,30 +63,25 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
       }
     });
   }
-
   @override
   void dispose() {
     _positionSubscription?.cancel();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final youTubeService = Provider.of<YouTubeService>(context, listen: false);
     final theme = Theme.of(context);
-
     return Consumer<music_provider.MusicProvider>(
       builder: (context, musicProv, _) {
         final currentSong = musicProv.currentSong;
         final isOnlinePlaying = youTubeService.isPlaying;
         final currentOnlineAudio = youTubeService.currentAudio;
         final l10n = AppLocalizations.of(context);
-
         final String title;
         final String artist;
         final bool isPlaying;
         final String? albumArtUrl;
-
         if (isOnlinePlaying && currentOnlineAudio != null) {
           title = currentOnlineAudio.title;
           artist = currentOnlineAudio.author;
@@ -113,9 +100,7 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
           isPlaying = false;
           albumArtUrl = null;
         }
-
         final bool hasTrack = currentSong != null || isOnlinePlaying;
-
         return GestureDetector(
           onTap: () {
             if (hasTrack) {
@@ -235,18 +220,15 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
     );
   }
 }
-
 class _ProgressBar extends StatelessWidget {
   final double progress;
   final bool isPlaying;
   final Color color;
-
   const _ProgressBar({
     required this.progress,
     required this.isPlaying,
     required this.color,
   });
-
   @override
   Widget build(BuildContext context) => ClipRRect(
     child: TweenAnimationBuilder<double>(
@@ -276,22 +258,18 @@ class _ProgressBar extends StatelessWidget {
     ),
   );
 }
-
 class _AlbumArt extends StatelessWidget {
   final String? albumArtUrl;
   final double size;
   final bool isPlaying;
-
   const _AlbumArt({
     required this.albumArtUrl,
     required this.size,
     required this.isPlaying,
   });
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: size,
@@ -329,18 +307,15 @@ class _AlbumArt extends StatelessWidget {
     );
   }
 }
-
 class _PlayButton extends StatelessWidget {
   final bool isPlaying;
   final Color color;
   final VoidCallback onPressed;
-
   const _PlayButton({
     required this.isPlaying,
     required this.color,
     required this.onPressed,
   });
-
   @override
   Widget build(BuildContext context) => SizedBox(
     width: 44,

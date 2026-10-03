@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
-
 Widget buildMinimalStyle(StyleParams params) {
   final theme = params.theme;
   final musicProvider = params.musicProvider;
@@ -9,14 +8,12 @@ Widget buildMinimalStyle(StyleParams params) {
   final progressBar = params.progressBar;
   final togglePlay = params.togglePlay;
   final header = params.header;
-
   return Scaffold(
     backgroundColor: theme.colorScheme.surface,
     body: SafeArea(
-      top: false, // Edge-to-edge at the top
+      top: false,
       child: Column(
         children: [
-          // Massive edge-to-edge album art
           AspectRatio(
             aspectRatio: 1,
             child: Stack(
@@ -33,7 +30,6 @@ Widget buildMinimalStyle(StyleParams params) {
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
-                // Gradient for header text visibility
                 Positioned(
                   top: 0,
                   left: 0,
@@ -59,7 +55,6 @@ Widget buildMinimalStyle(StyleParams params) {
               ],
             ),
           ),
-
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -69,7 +64,6 @@ Widget buildMinimalStyle(StyleParams params) {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Typography focus
                   Text(
                     currentSong.title,
                     style: theme.textTheme.headlineMedium?.copyWith(
@@ -92,10 +86,7 @@ Widget buildMinimalStyle(StyleParams params) {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-
                   const Spacer(),
-
-                  // Stripped down progress bar
                   Theme(
                     data: theme.copyWith(
                       sliderTheme: SliderThemeData(
@@ -111,10 +102,7 @@ Widget buildMinimalStyle(StyleParams params) {
                     ),
                     child: progressBar,
                   ),
-
                   const SizedBox(height: 24),
-
-                  // Just a massive play/pause button
                   GestureDetector(
                     onTap: togglePlay,
                     child: Container(

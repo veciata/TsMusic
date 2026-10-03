@@ -5,10 +5,6 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/github_release.dart';
 import 'package:tsmusic/providers/update_notification_provider.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
-
-/// Shows the "What's New" update notification modal as a full-screen dialog.
-///
-/// Call after [UpdateNotificationProvider.checkForUpdates] returns `true`.
 Future<void> showUpdateNotificationModal(BuildContext context) {
   final provider = Provider.of<UpdateNotificationProvider>(
     context,
@@ -20,65 +16,51 @@ Future<void> showUpdateNotificationModal(BuildContext context) {
     builder: (_) => _UpdateNotificationModal(provider: provider),
   );
 }
-
 class _UpdateNotificationModal extends StatefulWidget {
   final UpdateNotificationProvider provider;
-
   const _UpdateNotificationModal({required this.provider});
-
   @override
   State<_UpdateNotificationModal> createState() =>
       _UpdateNotificationModalState();
 }
-
 class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
   @override
   void initState() {
     super.initState();
-    // Subscribe to provider changes so loading/loaded/error states re-render.
     widget.provider.addListener(_onProviderChange);
   }
-
   @override
   void dispose() {
     widget.provider.removeListener(_onProviderChange);
     super.dispose();
   }
-
   void _onProviderChange() {
     if (mounted) setState(() {});
   }
-
   Future<void> _openRelease(GitHubRelease release) async {
     final uri = Uri.tryParse(release.htmlUrl);
     if (uri != null && await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final state = widget.provider.state;
     final releases = widget.provider.newReleases;
-
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // -- Header --
           _buildHeader(theme, l10n),
-          // -- Body --
           Flexible(child: _buildBody(state, releases, theme, l10n)),
-          // -- Footer actions --
           _buildActions(theme, l10n),
         ],
       ),
     );
   }
-
   Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Container(
     width: double.infinity,
     padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
@@ -110,7 +92,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       ],
     ),
   );
-
   Widget _buildBody(
     UpdateCheckState state,
     List<GitHubRelease> releases,
@@ -123,7 +104,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
           padding: EdgeInsets.all(48),
           child: Center(child: CircularProgressIndicator()),
         );
-
       case UpdateCheckState.error:
         return Padding(
           padding: const EdgeInsets.all(48),
@@ -140,7 +120,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
             ],
           ),
         );
-
       case UpdateCheckState.loaded:
       case UpdateCheckState.idle:
         if (releases.isEmpty) {
@@ -152,16 +131,13 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
         return _buildReleaseList(releases, theme, l10n);
     }
   }
-
   Widget _buildReleaseList(
     List<GitHubRelease> releases,
     ThemeData theme,
     AppLocalizations l10n,
   ) {
-    // Show releases in reverse chronological order (newest first).
     final sorted = List<GitHubRelease>.from(releases)
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       shrinkWrap: true,
@@ -178,7 +154,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       ],
     );
   }
-
   Widget _buildReleaseCard(GitHubRelease release, ThemeData theme) => Card(
     margin: const EdgeInsets.only(bottom: 12),
     child: Padding(
@@ -186,7 +161,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Version tag + date row
           Row(
             children: [
               Container(
@@ -221,7 +195,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
               ),
             ),
           ],
-          // Release body
           if (release.body.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -239,7 +212,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
               ),
             ),
           ],
-          // View on GitHub
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
@@ -254,7 +226,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       ),
     ),
   );
-
   Widget _buildActions(ThemeData theme, AppLocalizations l10n) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
     child: Row(
@@ -270,7 +241,6 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       ],
     ),
   );
-
   String _formatDate(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }

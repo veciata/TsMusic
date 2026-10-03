@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 const List<Color> availableColors = [
   Color(0xFF1DB954),
   Color(0xFF1E88E5),
@@ -8,7 +7,6 @@ const List<Color> availableColors = [
   Color(0xFFFF5722),
   Color(0xFF009688),
 ];
-
 ThemeData buildLightTheme(Color primaryColor) {
   final colorScheme = ColorScheme.light(
     primary: primaryColor,
@@ -16,7 +14,6 @@ ThemeData buildLightTheme(Color primaryColor) {
     secondary: primaryColor.withValues(alpha: 0.6),
     onSurface: Colors.black87,
   );
-
   return ThemeData.light().copyWith(
     colorScheme: colorScheme,
     brightness: Brightness.light,
@@ -70,7 +67,6 @@ ThemeData buildLightTheme(Color primaryColor) {
     ),
   );
 }
-
 ThemeData buildDarkTheme(Color primaryColor) {
   final colorScheme = ColorScheme.dark(
     primary: primaryColor,
@@ -79,7 +75,6 @@ ThemeData buildDarkTheme(Color primaryColor) {
     surface: Colors.grey[850]!,
     onPrimary: Colors.white,
   );
-
   return ThemeData.dark().copyWith(
     colorScheme: colorScheme,
     brightness: Brightness.dark,

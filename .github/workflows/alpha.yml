@@ -40,16 +40,20 @@ jobs:
 
       - name: Build APK (unsigned)
         run: |
+          # No debug fallback: a failing release build must fail CI. Falling back
+          # to `flutter build apk --debug` used to silently publish a debug-signed
+          # APK (different applicationId, so the in-app updater cannot see it)
+          # under the alpha name.
           flutter build apk --release --no-sound-null-safety \
-            --build-name=${{ steps.versioning.outputs.v_name }} \
-            --build-number=${{ steps.versioning.outputs.v_num }} || \
-          flutter build apk --debug \
             --build-name=${{ steps.versioning.outputs.v_name }} \
             --build-number=${{ steps.versioning.outputs.v_num }}
 
+      - name: Verify launch activity is in the APK
+        run: scripts/verify_apk_entrypoint.sh build/app/outputs/flutter-apk/app-release.apk
+
       - name: Rename APK
         run: |
-          for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk build/app/outputs/flutter-apk/app-debug.apk; do
+          for f in build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/app-release.apk; do
             if [ -f "$f" ]; then
               dir=$(dirname "$f")
               mv "$f" "$dir/tsmusic-alpha.apk"

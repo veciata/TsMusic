@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart';
-
 class StyleParams {
   final ThemeData theme;
   final MusicProvider musicProvider;
@@ -18,7 +17,6 @@ class StyleParams {
   final Widget playbackControls;
   final Widget bottomControls;
   final VoidCallback? onQueuePressed;
-
   const StyleParams({
     required this.theme,
     required this.musicProvider,

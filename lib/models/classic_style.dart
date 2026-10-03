@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
-
 Widget buildClassicStyle(StyleParams params) {
   final theme = params.theme;
   final currentSong = params.currentSong;
@@ -9,7 +8,6 @@ Widget buildClassicStyle(StyleParams params) {
   final progressBar = params.progressBar;
   final playbackControls = params.playbackControls;
   final bottomControls = params.bottomControls;
-
   return Scaffold(
     backgroundColor: theme.colorScheme.surface,
     body: SafeArea(

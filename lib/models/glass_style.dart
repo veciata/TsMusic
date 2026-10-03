@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
-
 Widget buildGlassStyle(StyleParams params) {
   final theme = params.theme;
   final currentSong = params.currentSong;
@@ -10,30 +9,24 @@ Widget buildGlassStyle(StyleParams params) {
   final progressBar = params.progressBar;
   final playbackControls = params.playbackControls;
   final bottomControls = params.bottomControls;
-
   return Scaffold(
     body: Stack(
       children: [
-        // Background art heavily blurred
         if (albumArtUrl != null)
           Positioned.fill(child: Image.network(albumArtUrl, fit: BoxFit.cover))
         else
           Container(color: theme.colorScheme.primaryContainer),
-
         Positioned.fill(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
             child: Container(color: Colors.black.withValues(alpha: 0.3)),
           ),
         ),
-
         SafeArea(
           child: Column(
             children: [
               header,
               const SizedBox(height: 20),
-
-              // Glass Art Container
               Expanded(
                 flex: 3,
                 child: Center(
@@ -77,10 +70,7 @@ Widget buildGlassStyle(StyleParams params) {
                   ),
                 ),
               ),
-
               const Spacer(),
-
-              // Glass Controls Panel
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: ClipRRect(
@@ -120,7 +110,6 @@ Widget buildGlassStyle(StyleParams params) {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
-
                           Theme(
                             data: theme.copyWith(
                               sliderTheme: SliderThemeData(
@@ -138,7 +127,6 @@ Widget buildGlassStyle(StyleParams params) {
                             ),
                             child: progressBar,
                           ),
-
                           Theme(
                             data: theme.copyWith(
                               iconTheme: theme.iconTheme.copyWith(

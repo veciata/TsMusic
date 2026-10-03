@@ -8,19 +8,16 @@ import 'package:tsmusic/models/playback_mode.dart';
 import 'package:tsmusic/models/player_styles.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
-
 class SettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
   final IconData? icon;
-
   const SettingsSection({
     super.key,
     required this.title,
     required this.children,
     this.icon,
   });
-
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,19 +52,16 @@ class SettingsSection extends StatelessWidget {
     ],
   );
 }
-
 class ColorSelector extends StatelessWidget {
   final Color color;
   final bool isSelected;
   final VoidCallback onTap;
-
   const ColorSelector({
     super.key,
     required this.color,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
@@ -94,7 +88,6 @@ class ColorSelector extends StatelessWidget {
     ),
   );
 }
-
 void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
@@ -146,7 +139,6 @@ void _showPlayerStyleDialog(BuildContext context, ThemeProvider themeProvider) {
     ),
   );
 }
-
 void _showDownloadLocationDialog(
   BuildContext context,
   SettingsProvider settingsProvider,
@@ -202,7 +194,6 @@ void _showDownloadLocationDialog(
     ),
   );
 }
-
 void _showAudioFormatDialog(
   BuildContext context,
   SettingsProvider settingsProvider,
@@ -257,7 +248,6 @@ void _showAudioFormatDialog(
     ),
   );
 }
-
 void _showPlaybackModeDialog(
   BuildContext context,
   SettingsProvider settingsProvider,
@@ -315,7 +305,6 @@ void _showPlaybackModeDialog(
     ),
   );
 }
-
 void _showLanguageDialog(
   BuildContext context,
   SettingsProvider settingsProvider,
@@ -370,7 +359,6 @@ void _showLanguageDialog(
     ),
   );
 }
-
 void _showChangelogDialog(BuildContext context, AppLocalizations l10n) {
   final entries = [
     _ChangelogEntry('1.1.12', '2026-05-18', [
@@ -416,7 +404,6 @@ void _showChangelogDialog(BuildContext context, AppLocalizations l10n) {
       'Auto-update player widget on song change',
     ]),
   ];
-
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -485,14 +472,12 @@ void _showChangelogDialog(BuildContext context, AppLocalizations l10n) {
     ),
   );
 }
-
 class _ChangelogEntry {
   final String version;
   final String date;
   final List<String> lines;
   _ChangelogEntry(this.version, this.date, this.lines);
 }
-
 String _getThemeModeName(AppLocalizations l10n, ThemeMode mode) {
   switch (mode) {
     case ThemeMode.light:
@@ -503,7 +488,6 @@ String _getThemeModeName(AppLocalizations l10n, ThemeMode mode) {
       return l10n.followSystem;
   }
 }
-
 void _showThemeModeDialog(BuildContext context, ThemeProvider themeProvider) {
   final l10n = AppLocalizations.of(context);
   showDialog(
@@ -548,21 +532,17 @@ void _showThemeModeDialog(BuildContext context, ThemeProvider themeProvider) {
     ),
   );
 }
-
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final l10n = AppLocalizations.of(context);
-
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
         children: [
-          // Appearance Section
           SettingsSection(
             title: l10n.appearance,
             icon: Icons.palette,
@@ -654,7 +634,6 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          // Downloads Section
           SettingsSection(
             title: l10n.downloads,
             icon: Icons.download,
@@ -699,7 +678,6 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          // About Section
           SettingsSection(
             title: l10n.about,
             icon: Icons.info_outline,

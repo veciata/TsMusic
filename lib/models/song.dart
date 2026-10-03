@@ -1,38 +1,31 @@
 import 'storage_type.dart';
-
 class Song {
   final int id;
-  final String? youtubeId; // YouTube video ID for matching with search results
+  final String? youtubeId;
   final String title;
   final List<String> artists;
   final String? album;
   final String? albumArtUrl;
   final String url;
-  final int duration; // Duration in milliseconds
-  final StorageType storageType; // Whether the track is local or remote
+  final int duration;
+  final StorageType storageType;
   final List<String> tags;
-  final int? trackNumber; // Track number in album
-  final DateTime dateAdded; // When the song was added to the library
-  final String? localThumbnailPath; // Local path to downloaded thumbnail
-
-  // For backward compatibility
+  final int? trackNumber;
+  final DateTime dateAdded;
+  final String? localThumbnailPath;
   String get artist => artists.isNotEmpty ? artists.first : 'Unknown Artist';
-
   String get formattedDuration {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final duration = this.duration ~/ 1000; // Convert to seconds
+    final duration = this.duration ~/ 1000;
     final minutes = duration ~/ 60;
     final seconds = duration % 60;
     return '$minutes:${twoDigits(seconds)}';
   }
-
   Duration get durationObject => Duration(milliseconds: duration);
   final bool isFavorite;
   final bool isDownloaded;
-
   bool hasTag(String tag) =>
       tags.any((t) => t.toLowerCase() == tag.toLowerCase());
-
   Song({
     required this.id,
     this.youtubeId,
@@ -51,7 +44,6 @@ class Song {
     this.localThumbnailPath,
   }) : tags = tags ?? [],
        dateAdded = dateAdded ?? DateTime.now();
-
   Song copyWith({
     int? id,
     String? youtubeId,
@@ -85,18 +77,15 @@ class Song {
     dateAdded: dateAdded ?? this.dateAdded,
     localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
   );
-
   factory Song.fromJson(Map<String, dynamic> json) {
-    // Handle both int and String IDs for robustness
     int songId;
     if (json['id'] is String) {
       songId = int.tryParse(json['id'] as String) ?? 0;
     } else if (json['id'] is int) {
       songId = json['id'] as int;
     } else {
-      songId = 0; // Default or error case
+      songId = 0;
     }
-
     final storageStr = json['storageType'] as String?;
     final storageType = storageStr != null
         ? StorageType.values.firstWhere(
@@ -104,7 +93,6 @@ class Song {
             orElse: () => StorageType.local,
           )
         : StorageType.local;
-
     return Song(
       id: songId,
       youtubeId: json['youtubeId'] as String?,
@@ -127,7 +115,6 @@ class Song {
       localThumbnailPath: json['localThumbnailPath'] as String?,
     );
   }
-
   Map<String, dynamic> toMap() => {
     'id': id,
     'youtubeId': youtubeId,
@@ -145,7 +132,6 @@ class Song {
     'dateAdded': dateAdded.toIso8601String(),
     'localThumbnailPath': localThumbnailPath,
   };
-
   Map<String, dynamic> toDbMap() => {
     'id': id,
     'youtube_id': youtubeId,
@@ -156,6 +142,5 @@ class Song {
     'thumbnail_path': localThumbnailPath,
     'created_at': dateAdded.toIso8601String(),
   };
-
   Map<String, dynamic> toJson() => toMap();
 }

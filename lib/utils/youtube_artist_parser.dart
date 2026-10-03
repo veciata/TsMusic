@@ -4,15 +4,12 @@ class YouTubeArtistParser {
     if (fromTitle != null && fromTitle.isNotEmpty) {
       return fromTitle;
     }
-
     final cleaned = _cleanChannelName(channelName);
     if (cleaned.isNotEmpty) {
       return [cleaned];
     }
-
     return [channelName];
   }
-
   static List<String>? _extractFromTitle(String title) {
     final patterns = [
       RegExp(r'^(.+?)\s*[-:]\s*.+'),
@@ -20,9 +17,7 @@ class YouTubeArtistParser {
       RegExp(r'^(.+?)\s+feat\.\s+.+', caseSensitive: false),
       RegExp(r'^(.+?)\s+with\s+.+', caseSensitive: false),
     ];
-
     String? mainArtistFromPattern;
-
     for (final pattern in patterns) {
       final match = pattern.firstMatch(title);
       if (match != null) {
@@ -30,24 +25,17 @@ class YouTubeArtistParser {
         artist = artist
             .split(RegExp(r'\s*(ft\.|feat\.|with)\s*', caseSensitive: false))[0]
             .trim();
-
         if (artist.isNotEmpty && artist.length > 1) {
           mainArtistFromPattern = _cleanChannelName(artist);
         }
-
-        // Check if title contains featured artists
         final featMatch = RegExp(
           r'(?:ft\.?|feat\.?|featuring)\s+(.+)$',
           caseSensitive: false,
         ).firstMatch(title);
-
         final List<String> artists = [];
-
-        // Always add main artist first
         if (mainArtistFromPattern != null && mainArtistFromPattern.isNotEmpty) {
           artists.add(mainArtistFromPattern);
         }
-
         if (featMatch != null) {
           final featured = featMatch.group(1)?.trim() ?? '';
           if (featured.isNotEmpty) {
@@ -56,8 +44,6 @@ class YouTubeArtistParser {
                 .map((a) => _cleanChannelName(a.trim()))
                 .where((a) => a.isNotEmpty)
                 .toList();
-
-            // Only add featured artists if they're different from main
             for (final feat in featuredList) {
               if (!artists.any((a) => a.toLowerCase() == feat.toLowerCase())) {
                 artists.add(feat);
@@ -65,7 +51,6 @@ class YouTubeArtistParser {
             }
           }
         }
-
         if (artists.isNotEmpty) {
           return artists;
         }
@@ -73,7 +58,6 @@ class YouTubeArtistParser {
     }
     return null;
   }
-
   static String _cleanChannelName(String channel) {
     String cleaned = channel
         .replaceAll(
@@ -131,9 +115,7 @@ class YouTubeArtistParser {
         .replaceAll(RegExp(r'\s*\|\s*.*$'), '')
         .replaceAll(RegExp(r'\s*-\s*Topic$'), '')
         .trim();
-
     cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-
     return cleaned.isNotEmpty ? cleaned : channel;
   }
 }

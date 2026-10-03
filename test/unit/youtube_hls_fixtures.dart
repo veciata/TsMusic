@@ -48,18 +48,47 @@ class FakePlayer extends Fake implements Player {
   @override
   final PlayerStream stream;
 
+  /// Mutable so tests can simulate what the player reports after a stream dies
+  /// early (a truncated duration, a short position, a zero duration).
+  PlayerState playerState = const PlayerState();
+
+  @override
+  PlayerState get state => playerState;
+
   Playable? lastOpened;
   bool stopCalled = false;
   bool playCalled = false;
   bool pauseCalled = false;
 
+  /// Delay applied inside [open], so a test can provoke a second player cycle
+  /// while the first one is still running.
+  Duration openDelay = Duration.zero;
+
+  /// Whether a [stop] landed while an [open] was still in flight.
+  ///
+  /// That is the exact pattern that killed the app on device: two overlapping
+  /// `stop -> open -> play` cycles on one mpv core, ending in SIGSEGV.
+  bool stopDuringOpen = false;
+
+  /// Highest number of [open] calls that were ever in flight at once.
+  int maxConcurrentOpens = 0;
+
+  int _activeOpens = 0;
+
   @override
   Future<void> open(Playable playable, {bool play = true}) async {
+    _activeOpens++;
+    if (_activeOpens > maxConcurrentOpens) maxConcurrentOpens = _activeOpens;
     lastOpened = playable;
+    if (openDelay > Duration.zero) {
+      await Future<void>.delayed(openDelay);
+    }
+    _activeOpens--;
   }
 
   @override
   Future<void> stop() async {
+    if (_activeOpens > 0) stopDuringOpen = true;
     stopCalled = true;
   }
 
@@ -84,8 +113,12 @@ MockClient buildMockHttpClient({
   Duration perSegmentDelay = Duration.zero,
   void Function(int activeSegments)? onSegmentActive,
   int? failSegment,
+  // Called once per master-playlist fetch with the 1-based count, so tests
+  // can observe whether a stream URL was extracted fresh vs served from cache.
+  void Function(int masterFetches)? onMasterFetched,
 }) {
   var activeSegments = 0;
+  var masterFetches = 0;
   return MockClient((request) async {
     final url = request.url;
     final path = url.path;
@@ -118,7 +151,17 @@ MockClient buildMockHttpClient({
 
     final full = url.toString();
     if (full.contains('/master.m3u8')) {
-      return http.Response(kMasterPlaylist, 200);
+      masterFetches++;
+      onMasterFetched?.call(masterFetches);
+      // Vary the resolved media URI per extraction so tests can tell a fresh
+      // extraction (gen=N) apart from a cached stream URL (gen=1 forever).
+      return http.Response(
+        kMasterPlaylist.replaceFirst(
+          'media-high.m3u8',
+          'media-high.m3u8?gen=$masterFetches',
+        ),
+        200,
+      );
     }
     if (full.contains('media-high')) {
       return http.Response(kMediaPlaylist, 200);

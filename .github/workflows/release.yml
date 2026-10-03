@@ -240,6 +240,21 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: flutter build apk --release --split-per-abi --build-name=${{ steps.version.outputs.version }} --build-number=${{ github.run_number }}
 
+      - name: Verify launch activity is in the APKs
+        # A missing MainActivity produces an APK that installs and then dies on
+        # launch with ClassNotFoundException, so catch it here instead.
+        run: |
+          set -euo pipefail
+          found=0
+          for apk in build/app/outputs/flutter-apk/*.apk; do
+            scripts/verify_apk_entrypoint.sh "$apk"
+            found=1
+          done
+          if [ "$found" -ne 1 ]; then
+            echo "FAIL: no APK produced" >&2
+            exit 1
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:

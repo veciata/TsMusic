@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
@@ -8,53 +7,48 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/models/playlist_item.dart';
+import 'package:tsmusic/models/playlist.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/data/repositories/playlist_repository.dart';
 import 'package:tsmusic/services/artist_image_cache.dart';
+import 'package:tsmusic/services/youtube_service.dart';
+import 'package:tsmusic/core/services/clipboard_service.dart';
 import 'package:tsmusic/utils/format_utils.dart';
 import 'package:tsmusic/widgets/song_thumbnail.dart';
 import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
 import 'package:tsmusic/widgets/skeleton_widgets.dart';
-
 import 'search_screen.dart';
 import 'artist_detail_screen.dart';
 import 'playlist_detail_screen.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
-
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onSettingsTap;
-
   const HomeScreen({super.key, this.onSettingsTap});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final Set<int> _selectedSongs = {};
   bool _isMultiSelectMode = false;
   late TabController _tabController;
-  List<Map<String, dynamic>> _playlists = [];
+  List<Playlist> _playlists = [];
   bool _isLoadingPlaylists = false;
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadPlaylists();
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   Future<void> _loadPlaylists() async {
     setState(() => _isLoadingPlaylists = true);
     try {
-      final playlists = await DatabaseHelper().getAllPlaylists();
+      final playlists = await context.read<PlaylistRepository>().getAllPlaylists();
       if (mounted) {
         setState(() {
           _playlists = playlists;
@@ -67,12 +61,10 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
   }
-
   List<Song> _getSortedSongs(music_provider.MusicProvider provider) {
     try {
       final Map<int, Song> uniqueSongs = {};
       final Set<String> seenPaths = {};
-
       String getNormalizedPath(String filePath) {
         try {
           String path = filePath
@@ -88,13 +80,9 @@ class _HomeScreenState extends State<HomeScreen>
           final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
           return '/${segments.join('/')}';
         } catch (e) {
-          if (kDebugMode) {
-            print('Error normalizing path "$filePath": $e');
-          }
           return filePath.toLowerCase();
         }
       }
-
       for (final song in provider.librarySongs) {
         try {
           if (song.url.isEmpty) continue;
@@ -104,12 +92,9 @@ class _HomeScreenState extends State<HomeScreen>
           seenPaths.add(normalizedPath);
           uniqueSongs[song.id] = song;
         } catch (e) {
-          if (kDebugMode) {
-            print('Error processing song ${song.id}: $e');
-          }
+          continue;
         }
       }
-
       final songs = uniqueSongs.values.toList()
         ..sort((a, b) {
           int compare;
@@ -134,21 +119,15 @@ class _HomeScreenState extends State<HomeScreen>
           }
           return provider.sortAscending ? compare : -compare;
         });
-
       return songs;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in _getSortedSongs: $e');
-      }
       return [];
     }
   }
-
   String _getArtistsText(List<String> artists) {
     if (artists.isEmpty) return 'Unknown Artist';
     return artists.join(' & ');
   }
-
   Widget _buildFilterBar(
     music_provider.MusicProvider musicProvider,
     BuildContext context,
@@ -234,15 +213,12 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
-
   Widget _buildSongTile(Song song, music_provider.MusicProvider musicProvider) {
     final isSelected = _selectedSongs.contains(song.id);
     final l10n = AppLocalizations.of(context);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       musicProvider.requestThumbnail(song, priority: 1);
     });
-
     return ListTile(
       leading: _isMultiSelectMode
           ? Checkbox(
@@ -340,7 +316,6 @@ class _HomeScreenState extends State<HomeScreen>
       },
     );
   }
-
   PreferredSizeWidget _buildMultiSelectAppBar(AppLocalizations l10n) => AppBar(
     leading: IconButton(
       icon: const Icon(Icons.close),
@@ -377,7 +352,6 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     ],
   );
-
   Future<void> _deleteSelectedSongs(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -399,7 +373,6 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
     );
-
     if (confirmed == true) {
       if (!context.mounted) return;
       final musicProvider = Provider.of<music_provider.MusicProvider>(
@@ -418,7 +391,6 @@ class _HomeScreenState extends State<HomeScreen>
       });
     }
   }
-
   Future<void> _moveSelectedSongs(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
@@ -429,12 +401,10 @@ class _HomeScreenState extends State<HomeScreen>
       {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
       {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music'},
     ];
-
     final musicProvider = Provider.of<music_provider.MusicProvider>(
       context,
       listen: false,
     );
-
     final selectedPath = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -452,13 +422,11 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
-
     if (selectedPath != null) {
       final targetDir = Directory(selectedPath);
       if (!await targetDir.exists()) {
         await targetDir.create(recursive: true);
       }
-
       for (final id in _selectedSongs) {
         final song = musicProvider.songs.where((s) => s.id == id).firstOrNull;
         if (song != null) {
@@ -474,18 +442,14 @@ class _HomeScreenState extends State<HomeScreen>
             final updatedSong = song.copyWith(url: newPath);
             musicProvider.addSongToPlaylist(updatedSong);
           } catch (e) {
-            debugPrint('Error moving song ${song.id}: $e');
           }
         }
       }
-
       setState(() {
         _isMultiSelectMode = false;
         _selectedSongs.clear();
       });
-
       await musicProvider.refreshSongs();
-
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -495,7 +459,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
   }
-
   Widget _buildNoMusicFound() {
     final l10n = AppLocalizations.of(context);
     return Center(
@@ -525,14 +488,11 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
-
   Widget _buildMusicTab(music_provider.MusicProvider musicProvider) {
     final sortedSongs = _getSortedSongs(musicProvider);
-
     if (sortedSongs.isEmpty) {
       return _buildNoMusicFound();
     }
-
     return Column(
       children: [
         _buildFilterBar(musicProvider, context),
@@ -561,11 +521,9 @@ class _HomeScreenState extends State<HomeScreen>
       ],
     );
   }
-
   Widget _buildArtistsTab(music_provider.MusicProvider musicProvider) {
     final l10n = AppLocalizations.of(context);
     final artists = musicProvider.artists;
-
     if (artists.isEmpty) {
       return Center(
         child: Column(
@@ -581,7 +539,6 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       );
     }
-
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -595,7 +552,6 @@ class _HomeScreenState extends State<HomeScreen>
         final artistName = artists[index];
         final artistSongs = musicProvider.getSongsByArtist(artistName);
         final imageUrl = musicProvider.getArtistImageUrl(artistName);
-
         return GestureDetector(
           onTap: () {
             Navigator.push(
@@ -644,21 +600,45 @@ class _HomeScreenState extends State<HomeScreen>
       },
     );
   }
-
   void _showCreatePlaylistDialog() {
     final l10n = AppLocalizations.of(context);
     final controller = TextEditingController();
+    final linkController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.createPlaylist),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: l10n.playlistName,
-            border: const OutlineInputBorder(),
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: l10n.playlistName,
+                hintText: 'Optional when importing from a YouTube link',
+                border: const OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: linkController,
+              decoration: const InputDecoration(
+                labelText: 'YouTube playlist link (optional)',
+                hintText: 'https://www.youtube.com/playlist?list=…',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Paste a YouTube playlist (or video) link to create the '
+              'playlist and import its songs.',
+              style: TextStyle(fontSize: 12),
+            ),
+            ],
         ),
         actions: [
           TextButton(
@@ -666,25 +646,15 @@ class _HomeScreenState extends State<HomeScreen>
             child: Text(l10n.cancel),
           ),
           TextButton(
-            onPressed: () async {
+            onPressed: () {
               final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                Navigator.pop(context);
-                try {
-                  await DatabaseHelper().createPlaylist(name);
-                  await _loadPlaylists();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.playlistCreated)),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${l10n.error}: $e')),
-                    );
-                  }
-                }
+              final link = linkController.text.trim();
+              if (name.isEmpty && link.isEmpty) return;
+              Navigator.pop(context);
+              if (link.isNotEmpty) {
+                _createPlaylistFromLink(name, link);
+              } else {
+                _createEmptyPlaylist(name);
               }
             },
             child: Text(l10n.create),
@@ -693,18 +663,145 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
-
+  Future<void> _createEmptyPlaylist(String name) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      await context
+          .read<PlaylistRepository>()
+          .createPlaylist(name);
+      await _loadPlaylists();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.playlistCreated)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.error}: $e')),
+        );
+      }
+    }
+  }
+  Future<void> _createPlaylistFromLink(String name, String link) async {
+    final playlistRepository = context.read<PlaylistRepository>();
+    final youTubeService = context.read<YouTubeService>();
+    final musicProvider = context.read<music_provider.MusicProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+    final parsed = ClipboardService().parseYouTubeLink(link);
+    if (parsed == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Not a valid YouTube link')),
+      );
+      return;
+    }
+    final isPlaylist = parsed.playlistId != null;
+    final playlistUrl = isPlaylist
+        ? 'https://www.youtube.com/playlist?list=${parsed.playlistId}'
+        : link;
+    var importedName = name.trim();
+    final audios = <YouTubeAudio>[];
+    var added = 0;
+    var error = '';
+    final progress = ValueNotifier<String>('Fetching playlist…');
+    final finished = ValueNotifier<bool>(false);
+    unawaited(() async {
+      try {
+        if (isPlaylist) {
+          audios.addAll(await youTubeService.fetchPlaylist(playlistUrl));
+          if (importedName.isEmpty) {
+            final title = await youTubeService.fetchPlaylistTitle(playlistUrl);
+            if (title != null && title.isNotEmpty) importedName = title;
+          }
+        } else if (parsed.videoId != null) {
+          final audio = await youTubeService.getAudioByVideoId(parsed.videoId!);
+          if (audio != null) {
+            audios.add(audio);
+            if (importedName.isEmpty && audio.title.isNotEmpty) {
+              importedName = audio.title;
+            }
+          }
+        }
+        if (audios.isEmpty) {
+          error = 'This playlist is empty or could not be read.';
+          return;
+        }
+        final fallback = importedName.isEmpty ? 'YouTube playlist' : importedName;
+        final playlistId = await playlistRepository.createPlaylist(
+          fallback,
+          description: playlistUrl,
+        );
+        for (final audio in audios) {
+          progress.value = 'Adding ${added + 1}/${audios.length}: ${audio.title}';
+          try {
+            await musicProvider.addOnlineSongToPlaylist(
+              youtubeId: audio.id,
+              title: audio.title,
+              artists: audio.artists.isNotEmpty ? audio.artists : [audio.author],
+              duration: audio.duration?.inMilliseconds ?? 0,
+              thumbnailUrl: audio.thumbnailUrl,
+              playlistId: playlistId,
+            );
+            added++;
+          } catch (_) {
+          }
+        }
+      } catch (e) {
+        error = e.toString();
+      } finally {
+        finished.value = true;
+        progress.value = error.isEmpty ? 'Done' : 'Failed';
+      }
+    }());
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => ValueListenableBuilder<String>(
+        valueListenable: progress,
+        builder: (dialogContext, message, _) {
+          if (finished.value) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            });
+          }
+          return AlertDialog(
+            title: const Text('Importing playlist…'),
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Text(message)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (!context.mounted) return;
+    await _loadPlaylists();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          error.isNotEmpty
+              ? '${l10n.error}: $error'
+              : 'Created "$importedName" with $added song(s) from YouTube',
+        ),
+      ),
+    );
+  }
   Widget _buildPlaylistsTab(music_provider.MusicProvider musicProvider) {
     final l10n = AppLocalizations.of(context);
-
     if (_isLoadingPlaylists) {
       return const Center(child: CircularProgressIndicator());
     }
-
     final userPlaylists = _playlists
-        .where((p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId)
+        .where((p) => p.id != PlaylistRepository.nowPlayingPlaylistId)
         .toList();
-
     return Column(
       children: [
         Expanded(
@@ -725,6 +822,24 @@ class _HomeScreenState extends State<HomeScreen>
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'You can also paste a YouTube playlist link to '
+                        'import it as a playlist.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _showCreatePlaylistDialog,
+                        icon: const Icon(Icons.link),
+                        label: const Text('Import from YouTube link'),
                       ),
                     ],
                   ),
@@ -748,10 +863,10 @@ class _HomeScreenState extends State<HomeScreen>
                           color: Theme.of(context).colorScheme.secondary,
                         ),
                       ),
-                      title: Text(playlist['name'] ?? 'Unnamed'),
-                      subtitle: playlist['description'] != null
+                      title: Text(playlist.name),
+                      subtitle: playlist.description != null
                           ? Text(
-                              playlist['description']!,
+                              playlist.description!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             )
@@ -762,12 +877,14 @@ class _HomeScreenState extends State<HomeScreen>
                           color: Colors.red,
                         ),
                         onPressed: () async {
+                          final playlistRepository =
+                              context.read<PlaylistRepository>();
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: Text(l10n.deletePlaylist),
                               content: Text(
-                                '${l10n.confirmDelete} "${playlist['name']}"?',
+                                '${l10n.confirmDelete} "${playlist.name}"?',
                               ),
                               actions: [
                                 TextButton(
@@ -786,9 +903,7 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           );
                           if (confirmed == true) {
-                            await DatabaseHelper().deletePlaylist(
-                              playlist['id'] as int,
-                            );
+                            await playlistRepository.deletePlaylist(playlist.id);
                             await _loadPlaylists();
                           }
                         },
@@ -798,8 +913,8 @@ class _HomeScreenState extends State<HomeScreen>
                           context,
                           MaterialPageRoute(
                             builder: (context) => PlaylistDetailScreen(
-                              playlistId: playlist['id'] as int,
-                              playlistName: playlist['name'] ?? 'Unnamed',
+                              playlistId: playlist.id,
+                              playlistName: playlist.name,
                             ),
                           ),
                         );
@@ -812,16 +927,13 @@ class _HomeScreenState extends State<HomeScreen>
       ],
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final musicProvider = context.watch<music_provider.MusicProvider>();
     final l10n = AppLocalizations.of(context);
-
     if (musicProvider.isLoading) {
       return const SkeletonHomeScreen();
     }
-
     if (musicProvider.error != null && musicProvider.songs.isEmpty) {
       return PopScope(
         canPop: !_isMultiSelectMode,
@@ -868,7 +980,6 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       );
     }
-
     return PopScope(
       canPop: !_isMultiSelectMode,
       onPopInvokedWithResult: (didPop, result) {
@@ -909,7 +1020,6 @@ class _HomeScreenState extends State<HomeScreen>
           builder: (context, child) {
             final value = _tabController.animation!.value;
             if (value < 1.0) return const SizedBox.shrink();
-
             return Transform.scale(
               scale: (value - 1.0).clamp(0.0, 1.0),
               child: FloatingActionButton(
@@ -923,7 +1033,6 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
-
   Future<void> _handleSongAction(
     String action,
     Song song,
@@ -941,7 +1050,6 @@ class _HomeScreenState extends State<HomeScreen>
         break;
     }
   }
-
   Future<void> _showMoveDialog(Song song) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
@@ -952,7 +1060,6 @@ class _HomeScreenState extends State<HomeScreen>
       {'label': l10n.downloads, 'path': '/storage/emulated/0/Download'},
       {'label': l10n.musicFolder, 'path': '/storage/emulated/0/Music/tsmusic'},
     ];
-
     final selected = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -970,15 +1077,12 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
-
     if (selected != null) {
       try {
-        // Ensure the target directory exists
         final targetDir = Directory(selected);
         if (!await targetDir.exists()) {
           await targetDir.create(recursive: true);
         }
-
         final file = File(song.url);
         final newPath = path.join(selected, path.basename(song.url));
         try {
@@ -1001,7 +1105,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
   }
-
   Future<void> _showDeleteConfirmation(
     Song song,
     music_provider.MusicProvider provider,
@@ -1025,7 +1128,6 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
     );
-
     if (confirmed == true) {
       try {
         await provider.deleteSong(song);
@@ -1044,38 +1146,26 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 }
-
-/// Artist avatar for the Artists grid. Shows a fast initial image when one is
-/// already known (album art / hint), otherwise asks the shared
-/// [ArtistImageCache] — which reuses the persisted copy when it exists and only
-/// fetches (and stores) it once when missing. Because the cache is a
-/// [ChangeNotifier], other screens picking up the same artist image get it
-/// from disk instead of re-downloading.
 class _ArtistTileAvatar extends StatefulWidget {
   const _ArtistTileAvatar({
     required this.artistName,
     required this.songs,
     this.initialUrl,
   });
-
   final String artistName;
   final List<Song> songs;
   final String? initialUrl;
-
   @override
   State<_ArtistTileAvatar> createState() => _ArtistTileAvatarState();
 }
-
 class _ArtistTileAvatarState extends State<_ArtistTileAvatar> {
   String? _url;
-
   @override
   void initState() {
     super.initState();
     _url = widget.initialUrl;
     _resolve();
   }
-
   Future<void> _resolve() async {
     final cache = context.read<ArtistImageCache>();
     final cached = await cache.ensureArtistImage(
@@ -1086,7 +1176,6 @@ class _ArtistTileAvatarState extends State<_ArtistTileAvatar> {
       setState(() => _url = cached);
     }
   }
-
   ImageProvider<Object>? _imageProvider(String url) {
     if (!url.startsWith('http')) {
       final file = File(url);
@@ -1095,7 +1184,6 @@ class _ArtistTileAvatarState extends State<_ArtistTileAvatar> {
     }
     return NetworkImage(url);
   }
-
   @override
   Widget build(BuildContext context) {
     final provider = _url == null ? null : _imageProvider(_url!);

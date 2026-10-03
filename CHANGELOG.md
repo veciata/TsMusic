@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.3.5] - 2026-09-16
+## [1.4.0] - 2026-10-03
 ### Fixed / Düzeltildi
 - Online (HLS) playback no longer jumps: progress bar and elapsed time count up smoothly across segment boundaries (use real track length).
   Çevrimiçi (HLS) çalma artık sıçramıyor; ilerleme çubuğu ve geçen süre her segmentte sıfırlanmadan kesintisiz artıyor (gerçek şarkı uzunluğu kullanılıyor).

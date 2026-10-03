@@ -1,24 +1,16 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart';
-
 class DownloadNotificationService {
   static final DownloadNotificationService _instance =
       DownloadNotificationService._internal();
   factory DownloadNotificationService() => _instance;
   DownloadNotificationService._internal();
-
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
-
-  /// Set to true when downloads screen is visible
   bool isDownloadsScreenVisible = false;
-
   static const int _downloadProgressNotificationId = 1;
-
   Future<void> initialize() async {
     if (_isInitialized) return;
-
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
@@ -28,19 +20,15 @@ class DownloadNotificationService {
       iOS: darwinSettings,
       macOS: darwinSettings,
     );
-
     await _notifications.initialize(settings: initSettings);
     _isInitialized = true;
-    debugPrint('Download notification service initialized');
   }
-
   Future<void> showDownloadProgress({
     required String title,
     required double progress,
     required int totalDownloads,
   }) async {
     if (isDownloadsScreenVisible || !_isInitialized) return;
-
     final percent = (progress * 100).toStringAsFixed(0);
     final androidDetails = AndroidNotificationDetails(
       'download_progress',
@@ -54,9 +42,7 @@ class DownloadNotificationService {
       ongoing: true,
       autoCancel: false,
     );
-
     const darwinDetails = DarwinNotificationDetails();
-
     await _notifications.show(
       id: _downloadProgressNotificationId,
       title: 'Downloading: $title',
@@ -68,10 +54,8 @@ class DownloadNotificationService {
       ),
     );
   }
-
   Future<void> showDownloadComplete({required String title}) async {
     if (isDownloadsScreenVisible || !_isInitialized) return;
-
     const androidDetails = AndroidNotificationDetails(
       'download_complete',
       'Download Complete',
@@ -79,9 +63,7 @@ class DownloadNotificationService {
       importance: Importance.high,
       priority: Priority.high,
     );
-
     const darwinDetails = DarwinNotificationDetails();
-
     await _notifications.show(
       id: 2,
       title: 'Download Complete',
@@ -93,7 +75,6 @@ class DownloadNotificationService {
       ),
     );
   }
-
   Future<void> cancelDownloadNotification() async {
     await _notifications.cancel(id: _downloadProgressNotificationId);
   }

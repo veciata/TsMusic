@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
-
 Widget buildSquareStyle(StyleParams params) {
   final theme = params.theme;
   final currentSong = params.currentSong;
@@ -9,7 +8,6 @@ Widget buildSquareStyle(StyleParams params) {
   final progressBar = params.progressBar;
   final playbackControls = params.playbackControls;
   final bottomControls = params.bottomControls;
-
   return Scaffold(
     backgroundColor: theme.colorScheme.surface,
     body: SafeArea(
@@ -17,7 +15,6 @@ Widget buildSquareStyle(StyleParams params) {
         children: [
           header,
           const SizedBox(height: 16),
-          // Massive Square Art
           Expanded(
             flex: 3,
             child: Center(
@@ -61,10 +58,7 @@ Widget buildSquareStyle(StyleParams params) {
               ),
             ),
           ),
-
           const SizedBox(height: 32),
-
-          // Left-aligned Text
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32.0),
             child: Align(
@@ -95,13 +89,9 @@ Widget buildSquareStyle(StyleParams params) {
               ),
             ),
           ),
-
           const SizedBox(height: 24),
-
           progressBar,
-
           Expanded(child: playbackControls),
-
           bottomControls,
         ],
       ),

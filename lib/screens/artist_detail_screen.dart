@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -18,21 +17,17 @@ import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
 import 'package:tsmusic/widgets/song_thumbnail.dart';
 import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
-
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
   final ValueNotifier<String?> artistImageUrlNotifier;
-
   ArtistDetailScreen({
     super.key,
     required this.artistName,
     ValueNotifier<String?>? artistImageUrl,
   }) : artistImageUrlNotifier = artistImageUrl ?? ValueNotifier<String?>(null);
-
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
 }
-
 class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -46,7 +41,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
   final ScrollController _scrollController = ScrollController();
   final Set<int> _selectedLocalSongs = {};
   bool _isMultiSelectMode = false;
-
   @override
   void initState() {
     super.initState();
@@ -57,7 +51,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _loadYouTubeSongs();
     _scrollController.addListener(_onScroll);
     _fetchArtistImageIfNeeded();
-
     _checkConnectivity();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
@@ -65,7 +58,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       _checkConnectivity();
     });
   }
-
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >=
@@ -73,10 +65,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       _loadMoreYouTubeSongs();
     }
   }
-
   Future<void> _fetchArtistImageIfNeeded() async {
     if (widget.artistImageUrlNotifier.value != null) return;
-
     final musicProvider = context.read<music_provider.MusicProvider>();
     final localSongs = musicProvider.librarySongs
         .where(
@@ -85,9 +75,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           ),
         )
         .toList();
-
-    // Shared, persistent cache: reuses a previously stored picture when one
-    // exists and only fetches (then persists) a new one on a cache miss.
     final image = await context.read<ArtistImageCache>().ensureArtistImage(
       widget.artistName,
       localSongs: localSongs,
@@ -98,7 +85,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       });
     }
   }
-
   Future<void> _loadYouTubeSongs() async {
     if (_isOffline) {
       if (mounted) {
@@ -109,9 +95,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
       return;
     }
-
     if (_isLoading) return;
-
     setState(() => _isLoading = true);
     try {
       final results = await _youTubeService.searchAudio(widget.artistName);
@@ -128,7 +112,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     }
   }
-
   Future<void> _loadMoreYouTubeSongs() async {
     if (_isOffline) {
       if (mounted) {
@@ -139,9 +122,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
       return;
     }
-
     if (_isLoading || !_hasMore) return;
-
     setState(() => _isLoading = true);
     try {
       final nextPage = await _youTubeService.searchAudioNextPage(
@@ -159,7 +140,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       setState(() => _isLoading = false);
     }
   }
-
   void _checkConnectivity() {
     Connectivity().checkConnectivity().then((results) {
       if (mounted) {
@@ -169,7 +149,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     });
   }
-
   Future<void> _playAudio(YouTubeAudio audio) async {
     try {
       await _youtubePlayer.playAudio(audio);
@@ -181,7 +160,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     }
   }
-
   Future<void> _handleDownload(YouTubeAudio audio) async {
     final settingsProvider = context.read<SettingsProvider>();
     final result = await _youTubeService.downloadAudio(
@@ -195,7 +173,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       );
     }
   }
-
   Future<void> _deleteLocalSong(Song song) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -216,7 +193,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         ],
       ),
     );
-
     if (confirmed == true) {
       if (!mounted) return;
       try {
@@ -235,7 +211,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     }
   }
-
   void _playAllLocalSongs(
     List<Song> songs, {
     int startIndex = 0,
@@ -250,7 +225,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       musicProvider.playSongsFromList(songs, startIndex: startIndex);
     }
   }
-
   Future<void> _deleteSelectedLocalSongs() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -270,7 +244,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
         ],
       ),
     );
-
     if (confirmed == true) {
       if (!mounted) return;
       setState(() => _isMultiSelectMode = false);
@@ -291,13 +264,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
             }
             await musicProvider.deleteSong(song);
           } catch (e) {
-            debugPrint('Error deleting song ${song.id}: $e');
           }
         }
       }
     }
   }
-
   Widget _buildArtistInitialFallback() => Container(
     color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
     alignment: Alignment.center,
@@ -310,7 +281,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       ),
     ),
   );
-
   @override
   void dispose() {
     _tabController.dispose();
@@ -319,7 +289,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _youtubePlayer.unregisterScreen('artist_screen');
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -389,11 +358,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           : null,
     );
   }
-
   Widget _buildLocalSongsTab() {
     final musicProvider = context.watch<music_provider.MusicProvider>();
     final l10n = AppLocalizations.of(context);
-
     final songs = musicProvider.librarySongs
         .where(
           (song) => song.artists.any(
@@ -401,11 +368,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           ),
         )
         .toList();
-
     if (songs.isEmpty) {
       return Center(child: Text(l10n.noLocalSongsForArtist));
     }
-
     return Column(
       children: [
         Padding(
@@ -552,7 +517,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       ],
     );
   }
-
   Widget _buildYouTubeTab() {
     final l10n = AppLocalizations.of(context);
     if (_isLoading && _youtubeSongs.isEmpty) {
@@ -561,7 +525,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     if (_youtubeSongs.isEmpty) {
       return Center(child: Text(l10n.noOnlineSongsFound));
     }
-
     return ListView.builder(
       controller: _scrollController,
       itemCount: _youtubeSongs.length + (_hasMore ? 1 : 0),
@@ -584,24 +547,18 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       },
     );
   }
-
   Widget _buildLoadingIndicator() => const Padding(
     padding: EdgeInsets.all(16.0),
     child: Center(child: CircularProgressIndicator()),
   );
 }
-
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
-
   _SliverTabBarDelegate(this.tabBar);
-
   @override
   double get minExtent => tabBar.preferredSize.height;
-
   @override
   double get maxExtent => tabBar.preferredSize.height;
-
   @override
   Widget build(
     BuildContext context,
@@ -611,7 +568,6 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
     color: Theme.of(context).scaffoldBackgroundColor,
     child: tabBar,
   );
-
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
 }

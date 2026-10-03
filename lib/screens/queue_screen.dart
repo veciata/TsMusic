@@ -3,14 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/models/song.dart';
-
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Now Playing Queue'),
@@ -84,15 +81,12 @@ class QueueScreen extends StatelessWidget {
           final onlineIndex = musicProvider.onlinePlaylistIndex;
           final hasLocal = localQueue.isNotEmpty;
           final hasOnline = onlineSongs.isNotEmpty;
-
           if (!hasLocal && !hasOnline) {
             return const Center(child: Text('Queue is empty'));
           }
-
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              // Local playlist section
               if (hasLocal) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -127,7 +121,6 @@ class QueueScreen extends StatelessWidget {
                   final index = entry.key;
                   final song = entry.value;
                   final isCurrent = localIndex == index;
-
                   return _buildQueueTile(
                     context: context,
                     theme: theme,
@@ -145,7 +138,6 @@ class QueueScreen extends StatelessWidget {
                 }),
                 const Divider(height: 24),
               ],
-              // Online playlist section
               if (hasOnline) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -180,7 +172,6 @@ class QueueScreen extends StatelessWidget {
                   final index = entry.key;
                   final song = entry.value;
                   final isCurrent = onlineIndex == index;
-
                   return _buildQueueTile(
                     context: context,
                     theme: theme,
@@ -200,7 +191,6 @@ class QueueScreen extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildQueueTile({
     required BuildContext context,
     required ThemeData theme,

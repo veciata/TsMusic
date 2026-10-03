@@ -114,14 +114,35 @@ class SimplePlayerWidgetProvider : HomeWidgetProvider() {
                             else android.R.drawable.ic_media_play
                         )
 
-                        val playIntent = Intent(context, MediaButtonReceiver::class.java).apply {
-                            action = Intent.ACTION_MEDIA_BUTTON
-                            putExtra(Intent.EXTRA_KEY_EVENT,
-                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+                        // Play control: pause when a session appears live;
+                        // otherwise resume the saved session from the launcher
+                        // (same PlaybackResumeState the app restores at boot).
+                        val resumeIndex = widgetData.getInt("widget_resume_index", -1)
+                        val resumePositionMs = widgetData.getLong("widget_resume_position_ms", 0)
+                        val playPendingIntent: PendingIntent
+                        if (isPlaying) {
+                            val pauseIntent = Intent(context, MediaButtonReceiver::class.java).apply {
+                                action = Intent.ACTION_MEDIA_BUTTON
+                                putExtra(Intent.EXTRA_KEY_EVENT,
+                                    KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+                            }
+                            playPendingIntent = PendingIntent.getBroadcast(
+                                context, widgetId, pauseIntent, pendingFlags
+                            )
+                        } else {
+                            val resumeIntent = Intent(
+                                context,
+                                MainActivity::class.java,
+                            ).apply {
+                                action = "com.veciata.tsmusic.RESUME_FROM_WIDGET"
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                putExtra("widget_resume_index", resumeIndex)
+                                putExtra("widget_resume_position_ms", resumePositionMs)
+                            }
+                            playPendingIntent = PendingIntent.getActivity(
+                                context, widgetId, resumeIntent, pendingFlags
+                            )
                         }
-                        val playPendingIntent = PendingIntent.getBroadcast(
-                            context, widgetId, playIntent, pendingFlags
-                        )
                         setOnClickPendingIntent(R.id.widget_play_pause, playPendingIntent)
 
                         val prevIntent = Intent(context, MediaButtonReceiver::class.java).apply {

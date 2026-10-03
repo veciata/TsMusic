@@ -1,21 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
-
 class BottomNavigationWidget extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
-
   const BottomNavigationWidget({
     super.key,
     required this.currentIndex,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-
     final items = [
       BottomNavigationBarItem(
         icon: const Icon(Icons.home),
@@ -30,8 +26,6 @@ class BottomNavigationWidget extends StatelessWidget {
         label: localizations.settings,
       ),
     ];
-
-    // Add SQL debug tab in debug mode
     if (kDebugMode) {
       items.add(
         BottomNavigationBarItem(
@@ -40,7 +34,6 @@ class BottomNavigationWidget extends StatelessWidget {
         ),
       );
     }
-
     return BottomNavigationBar(
       currentIndex: currentIndex < 0 ? 0 : currentIndex,
       onTap: onTap,

@@ -2,19 +2,17 @@ import 'dart:convert';
 import 'package:flutter/painting.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:tsmusic/models/song.dart';
-
+import 'package:tsmusic/services/playback_resume_state.dart';
 class HomeWidgetService {
   static const String _playerWidgetClass =
       'com.veciata.tsmusic.SimplePlayerWidgetProvider';
   static const String _searchWidgetClass =
       'com.veciata.tsmusic.SearchWidgetProvider';
-
   static Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId('group.com.veciata.tsmusic');
     } catch (_) {}
   }
-
   static Future<void> updateSearchWidget({
     bool isDarkMode = false,
     Color? primaryColor,
@@ -28,7 +26,21 @@ class HomeWidgetService {
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
     } catch (_) {}
   }
-
+  static Future<void> updateResumeData({
+    required int index,
+    required int positionMs,
+  }) async {
+    try {
+      await HomeWidget.saveWidgetData<int>(
+        PlaybackResumeState.widgetIndexKey,
+        index,
+      );
+      await HomeWidget.saveWidgetData<int>(
+        PlaybackResumeState.widgetPositionKey,
+        positionMs,
+      );
+    } catch (_) {}
+  }
   static Future<void> updatePlayerWidget({
     required Song? currentSong,
     required bool isPlaying,
@@ -43,7 +55,6 @@ class HomeWidgetService {
       final String title;
       final String artist;
       final String? thumbnailPath;
-
       if (isOnlinePlaying && onlineTitle != null) {
         title = onlineTitle;
         artist = onlineAuthor ?? '';
@@ -60,7 +71,6 @@ class HomeWidgetService {
         artist = 'Not playing';
         thumbnailPath = null;
       }
-
       await HomeWidget.saveWidgetData<String>('widget_title', title);
       await HomeWidget.saveWidgetData<String>('widget_artist', artist);
       await HomeWidget.saveWidgetData<bool>(
@@ -80,7 +90,6 @@ class HomeWidgetService {
         'widget_primary_color',
         primaryColor?.toARGB32() ?? 0xFF1DB954,
       );
-
       final queueItems = (queue ?? [])
           .take(10)
           .map((s) => {'title': s.title, 'artists': s.artists.join(', ')})
@@ -89,7 +98,6 @@ class HomeWidgetService {
         'widget_queue',
         jsonEncode(queueItems),
       );
-
       await HomeWidget.updateWidget(qualifiedAndroidName: _playerWidgetClass);
     } catch (_) {}
   }

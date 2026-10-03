@@ -1,37 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:tsmusic/database/database_helper.dart';
+import 'package:tsmusic/data/repositories/playlist_repository.dart';
 import 'package:tsmusic/models/playlist_item.dart';
-import 'package:tsmusic/models/storage_type.dart';
+import 'package:tsmusic/models/playlist.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/localization/app_localizations.dart';
-import 'package:tsmusic/utils/playlist_boundary.dart';
-
 class PlaylistSelectorBottomSheet extends StatefulWidget {
   final PlaylistItem? item;
-
   const PlaylistSelectorBottomSheet({super.key, this.item});
-
   @override
   State<PlaylistSelectorBottomSheet> createState() =>
       _PlaylistSelectorBottomSheetState();
 }
-
 class _PlaylistSelectorBottomSheetState
     extends State<PlaylistSelectorBottomSheet> {
-  final DatabaseHelper _db = DatabaseHelper();
-  List<Map<String, dynamic>> _playlists = [];
+  final PlaylistRepository _playlistRepository = PlaylistRepository();
+  List<Playlist> _playlists = [];
   bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
     _loadPlaylists();
   }
-
   Future<void> _loadPlaylists() async {
     try {
-      final playlists = await _db.getAllPlaylists();
+      final playlists = await _playlistRepository.getAllPlaylists();
       if (mounted) {
         setState(() {
           _playlists = playlists;
@@ -47,7 +40,6 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
-
   Future<void> _deletePlaylist(int playlistId, String name) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -68,10 +60,9 @@ class _PlaylistSelectorBottomSheetState
         ],
       ),
     );
-
     if (confirmed == true) {
       try {
-        await _db.deletePlaylist(playlistId);
+        await _playlistRepository.deletePlaylist(playlistId);
         await _loadPlaylists();
         if (mounted) {
           ScaffoldMessenger.of(
@@ -87,7 +78,6 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
-
   void _showCreatePlaylistDialog() {
     final l10n = AppLocalizations.of(context);
     final controller = TextEditingController();
@@ -95,13 +85,19 @@ class _PlaylistSelectorBottomSheetState
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.createPlaylist),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: l10n.playlistName,
-            border: const OutlineInputBorder(),
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: l10n.playlistName,
+                border: const OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -114,7 +110,9 @@ class _PlaylistSelectorBottomSheetState
               if (name.isNotEmpty) {
                 Navigator.pop(context);
                 try {
-                  await _db.createPlaylist(name);
+                  await _playlistRepository.createPlaylist(
+                    name,
+                  );
                   await _loadPlaylists();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -136,35 +134,13 @@ class _PlaylistSelectorBottomSheetState
       ),
     );
   }
-
-  Future<void> _addToPlaylist(Map<String, dynamic> playlist) async {
-    final playlistId = playlist['id'] as int;
+  Future<void> _addToPlaylist(Playlist playlist) async {
+    final playlistId = playlist.id;
     final item = widget.item;
-
-    if (item?.youtubeId != null) {
-      final playlistTypeStr =
-          playlist['playlist_type'] as String? ?? 'local_only';
-      final playlistType = playlistTypeStr == 'remote_compatible'
-          ? PlaylistType.remoteCompatible
-          : PlaylistType.localOnly;
-
-      final warning = PlaylistBoundary.getWarningMessage(
-        StorageType.remote,
-        playlistType,
-      );
-      if (warning != null && mounted) {
-        final proceed = await PlaylistBoundary.showWarningDialog(
-          context,
-          warning,
-        );
-        if (!proceed) return;
-      }
-    }
-
     try {
       if (item != null) {
         if (item.songId != null) {
-          await _db.addSongsToPlaylist(playlistId, [item.songId!]);
+          await _playlistRepository.addSongsToPlaylist(playlistId, [item.songId!]);
         } else if (item.youtubeId != null) {
           if (!mounted) return;
           final musicProvider = context.read<music_provider.MusicProvider>();
@@ -178,11 +154,10 @@ class _PlaylistSelectorBottomSheetState
           );
         }
       }
-
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added to "${playlist['name']}"')),
+          SnackBar(content: Text('Added to "${playlist.name}"')),
         );
       }
     } catch (e) {
@@ -193,11 +168,9 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
-
   Future<void> _addToNowPlaying() async {
     final item = widget.item;
     if (item == null) return;
-
     try {
       if (item.songId != null) {
         final musicProvider = context.read<music_provider.MusicProvider>();
@@ -215,7 +188,7 @@ class _PlaylistSelectorBottomSheetState
           artists: item.artists ?? ['Unknown Artist'],
           duration: item.duration ?? 0,
           thumbnailUrl: item.thumbnailUrl,
-          playlistId: DatabaseHelper.nowPlayingPlaylistId,
+          playlistId: PlaylistRepository.nowPlayingPlaylistId,
         );
         if (songId > 0) {
           final song = musicProvider.librarySongs
@@ -226,7 +199,6 @@ class _PlaylistSelectorBottomSheetState
           }
         }
       }
-
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(
@@ -241,14 +213,12 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final musicProvider = context.watch<music_provider.MusicProvider>();
     final theme = Theme.of(context);
     final isAddMode = widget.item != null;
-
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -331,7 +301,7 @@ class _PlaylistSelectorBottomSheetState
                   const Divider(height: 1, indent: 72),
                   ..._playlists
                       .where(
-                        (p) => p['id'] != DatabaseHelper.nowPlayingPlaylistId,
+                        (p) => p.id != PlaylistRepository.nowPlayingPlaylistId,
                       )
                       .map(
                         (playlist) => ListTile(
@@ -349,10 +319,10 @@ class _PlaylistSelectorBottomSheetState
                               color: theme.colorScheme.secondary,
                             ),
                           ),
-                          title: Text(playlist['name'] ?? 'Unnamed'),
-                          subtitle: playlist['description'] != null
+                          title: Text(playlist.name),
+                          subtitle: playlist.description != null
                               ? Text(
-                                  playlist['description']!,
+                                  playlist.description!,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 )
@@ -362,7 +332,7 @@ class _PlaylistSelectorBottomSheetState
                             if (isAddMode) {
                               _addToPlaylist(playlist);
                             } else {
-                              final playlistId = playlist['id'] as int;
+                              final playlistId = playlist.id;
                               musicProvider.loadPlaylistAsQueue(playlistId);
                               if (mounted) {
                                 Navigator.pop(context);
@@ -370,18 +340,14 @@ class _PlaylistSelectorBottomSheetState
                             }
                           },
                           onLongPress: () {
-                            _deletePlaylist(
-                              playlist['id'] as int,
-                              playlist['name'] ?? 'Unnamed',
-                            );
+                            _deletePlaylist(playlist.id, playlist.name);
                           },
                         ),
                       ),
                   if (isAddMode &&
                       _playlists
                           .where(
-                            (p) =>
-                                p['id'] != DatabaseHelper.nowPlayingPlaylistId,
+                            (p) => p.id != PlaylistRepository.nowPlayingPlaylistId,
                           )
                           .isEmpty)
                     Padding(
@@ -404,7 +370,6 @@ class _PlaylistSelectorBottomSheetState
     );
   }
 }
-
 void showPlaylistSelector(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -413,7 +378,6 @@ void showPlaylistSelector(BuildContext context) {
     builder: (context) => const PlaylistSelectorBottomSheet(),
   );
 }
-
 void showAddToPlaylistSheet(
   BuildContext context, {
   required PlaylistItem item,
@@ -425,7 +389,6 @@ void showAddToPlaylistSheet(
     builder: (context) => PlaylistSelectorBottomSheet(item: item),
   );
 }
-
 void showAddYouTubeToPlaylistSheet(
   BuildContext context, {
   required String youtubeId,

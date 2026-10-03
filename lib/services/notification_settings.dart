@@ -1,8 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
-
 const _defaultColor = Color(0xFF1DB954);
-
 AudioServiceConfig getNotificationSettings({
   String? channelId,
   String? channelName,
@@ -10,7 +8,7 @@ AudioServiceConfig getNotificationSettings({
   bool? showNotificationBadge,
   Color? notificationColor,
   double?
-  fontSize, // For future use - not currently supported by audio_service package
+  fontSize,
 }) => AudioServiceConfig(
   androidNotificationChannelId:
       channelId ?? 'com.veciata.tsmusic.channel.audio',

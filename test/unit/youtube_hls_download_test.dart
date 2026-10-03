@@ -1,12 +1,24 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 
 import 'youtube_hls_fixtures.dart';
 
 void main() {
   late Directory tempDir;
+
+  setUpAll(() {
+    // YouTubeService constructs a SongRepository, which lazily touches the
+    // DatabaseHelper singleton. Without this the suite only passes when some
+    // other test file happens to have initialised sqflite in the same isolate.
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    databaseFactoryFfi.setDatabasesPath(
+      Directory.systemTemp.createTempSync('tsmusic_hls_test_db').path,
+    );
+  });
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('tsmusic_hls_test_');

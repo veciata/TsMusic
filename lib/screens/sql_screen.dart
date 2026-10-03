@@ -1,22 +1,17 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-
 import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/services/audio_notification_service.dart';
-
 class SqlScreen extends StatefulWidget {
   const SqlScreen({super.key});
-
   @override
   State<SqlScreen> createState() => _SqlScreenState();
 }
-
 class _SqlScreenState extends State<SqlScreen> {
   late Future<_DbOverview> _overviewFuture;
-
   @override
   void initState() {
     super.initState();
@@ -25,7 +20,6 @@ class _SqlScreenState extends State<SqlScreen> {
       (_) => _showChangelog(context),
     );
   }
-
   void _showChangelog(BuildContext context) {
     final entries = <_ChangelogEntry>[
       _ChangelogEntry('1.1.12', '2026-05-18', [
@@ -71,7 +65,6 @@ class _SqlScreenState extends State<SqlScreen> {
         'Auto-update player widget on song change',
       ]),
     ];
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -143,17 +136,12 @@ class _SqlScreenState extends State<SqlScreen> {
       ),
     );
   }
-
   Future<_DbOverview> _loadOverview() async {
     try {
       final db = await DatabaseHelper().database;
-
-      // Fetch tables from sqlite_master
       final tables = await db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
       );
-
-      // Build counts per table
       final Map<String, int> counts = {};
       for (final row in tables) {
         final name = row['name'] as String;
@@ -162,12 +150,9 @@ class _SqlScreenState extends State<SqlScreen> {
           final c = (cntRes.first['c'] as int?) ?? 0;
           counts[name] = c;
         } catch (e) {
-          debugPrint('Error counting records in table $name: $e');
           counts[name] = 0;
         }
       }
-
-      // Fetch some domain data
       final songs = await db.query(
         DatabaseHelper.tableSongs,
         orderBy: 'id DESC',
@@ -187,8 +172,6 @@ class _SqlScreenState extends State<SqlScreen> {
         DatabaseHelper.tablePlaylists,
         orderBy: 'id',
       );
-
-      // Fetch songs for each playlist
       final playlistSongs = <int, List<Map<String, Object?>>>{};
       for (final playlist in playlists) {
         final playlistId = playlist['id'] as int;
@@ -205,11 +188,9 @@ class _SqlScreenState extends State<SqlScreen> {
           );
           playlistSongs[playlistId] = songs;
         } catch (e) {
-          debugPrint('Error fetching songs for playlist $playlistId: $e');
           playlistSongs[playlistId] = [];
         }
       }
-
       return _DbOverview(
         tableNames: tables.map((e) => e['name'] as String).toList(),
         counts: counts,
@@ -220,8 +201,6 @@ class _SqlScreenState extends State<SqlScreen> {
         playlistSongs: playlistSongs,
       );
     } catch (e) {
-      debugPrint('Error loading database overview: $e');
-      // Return empty overview on error
       return _DbOverview(
         tableNames: [],
         counts: {},
@@ -233,11 +212,9 @@ class _SqlScreenState extends State<SqlScreen> {
       );
     }
   }
-
   Future<void> _testNotification(BuildContext context) async {
     try {
       if (Platform.isAndroid || Platform.isIOS) {
-        // Check if audio handler is available
         final audioHandler = AudioNotificationService.audioHandler;
         if (audioHandler == null) {
           if (!context.mounted) return;
@@ -251,14 +228,11 @@ class _SqlScreenState extends State<SqlScreen> {
           );
           return;
         }
-
-        // Try to trigger a test notification via audio service
         final musicProvider = Provider.of<music_provider.MusicProvider>(
           context,
           listen: false,
         );
         await musicProvider.showTestNotification();
-
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Test notification sent!')),
@@ -278,7 +252,6 @@ class _SqlScreenState extends State<SqlScreen> {
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
-
   Future<void> _cleanDuplicates(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -300,27 +273,20 @@ class _SqlScreenState extends State<SqlScreen> {
         ],
       ),
     );
-
     if (confirmed != true) return;
-
     try {
       final db = await DatabaseHelper().database;
-
-      // First normalize paths
       await db.rawUpdate(
         "UPDATE songs SET file_path = REPLACE(file_path, '/sdcard/', '/storage/emulated/0/')",
       );
       await db.rawUpdate(
         "UPDATE songs SET file_path = REPLACE(file_path, '/mnt/sdcard/', '/storage/emulated/0/')",
       );
-
-      // Then remove duplicates (keep lowest ID)
       await db.rawDelete('''
         DELETE FROM songs WHERE id NOT IN (
           SELECT MIN(id) FROM songs GROUP BY file_path
         )
       ''');
-
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -335,7 +301,6 @@ class _SqlScreenState extends State<SqlScreen> {
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -454,7 +419,6 @@ class _SqlScreenState extends State<SqlScreen> {
       },
     ),
   );
-
   Widget _buildPlaylistsTab(
     BuildContext context,
     _DbOverview data,
@@ -466,7 +430,6 @@ class _SqlScreenState extends State<SqlScreen> {
       final playlistId = playlist['id'] as int;
       final songs = data.playlistSongs[playlistId] ?? [];
       final isNowPlaying = playlistId == DatabaseHelper.nowPlayingPlaylistId;
-
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
         child: ExpansionTile(
@@ -523,20 +486,17 @@ class _SqlScreenState extends State<SqlScreen> {
       );
     },
   );
-
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-
     if (hours > 0) {
       return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
     } else {
       return '${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
   }
-
   Widget _buildSchemaTab(BuildContext context, _DbOverview data) => ListView(
     padding: const EdgeInsets.all(8.0),
     children: [
@@ -554,12 +514,10 @@ class _SqlScreenState extends State<SqlScreen> {
     ],
   );
 }
-
 class _TablesTab extends StatelessWidget {
   final List<String> tableNames;
   final Map<String, int> counts;
   const _TablesTab({required this.tableNames, required this.counts});
-
   @override
   Widget build(BuildContext context) => ListView.separated(
     itemCount: tableNames.length,
@@ -583,7 +541,6 @@ class _TablesTab extends StatelessWidget {
           ),
         ),
         onTap: () async {
-          // On tap: show first 100 rows
           final db = await DatabaseHelper().database;
           final rows = await db.query(name, limit: 100);
           if (!context.mounted) return;
@@ -598,12 +555,10 @@ class _TablesTab extends StatelessWidget {
     },
   );
 }
-
 class _RowsScreen extends StatelessWidget {
   final String table;
   final List<Map<String, Object?>> rows;
   const _RowsScreen({required this.table, required this.rows});
-
   @override
   Widget build(BuildContext context) {
     final columns = rows.isEmpty ? <String>[] : rows.first.keys.toList();
@@ -639,18 +594,15 @@ class _RowsScreen extends StatelessWidget {
     );
   }
 }
-
 class _SimpleListTab extends StatelessWidget {
   final String titleKey;
   final String Function(Map<String, Object?>) subtitleBuilder;
   final List<Map<String, Object?>> rows;
-
   const _SimpleListTab({
     required this.titleKey,
     required this.subtitleBuilder,
     required this.rows,
   });
-
   @override
   Widget build(BuildContext context) => ListView.separated(
     itemCount: rows.length,
@@ -669,14 +621,12 @@ class _SimpleListTab extends StatelessWidget {
     },
   );
 }
-
 class _ChangelogEntry {
   final String version;
   final String date;
   final List<String> lines;
   _ChangelogEntry(this.version, this.date, this.lines);
 }
-
 class _DbOverview {
   final List<String> tableNames;
   final Map<String, int> counts;
@@ -685,7 +635,6 @@ class _DbOverview {
   final List<Map<String, Object?>> genres;
   final List<Map<String, Object?>> playlists;
   final Map<int, List<Map<String, Object?>>> playlistSongs;
-
   _DbOverview({
     required this.tableNames,
     required this.counts,

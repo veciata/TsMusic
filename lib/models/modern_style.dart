@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
-
 Widget buildModernStyle(StyleParams params) {
   final theme = params.theme;
   final currentSong = params.currentSong;
@@ -9,7 +8,6 @@ Widget buildModernStyle(StyleParams params) {
   final progressBar = params.progressBar;
   final playbackControls = params.playbackControls;
   final bottomControls = params.bottomControls;
-
   return Scaffold(
     backgroundColor: theme.colorScheme.surfaceContainerHighest,
     body: SafeArea(
@@ -17,7 +15,6 @@ Widget buildModernStyle(StyleParams params) {
         children: [
           header,
           const SizedBox(height: 20),
-          // Large square album art card
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),

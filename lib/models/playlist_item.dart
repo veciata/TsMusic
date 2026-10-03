@@ -5,7 +5,6 @@ class PlaylistItem {
   final List<String>? artists;
   final int? duration;
   final String? thumbnailUrl;
-
   const PlaylistItem({
     this.songId,
     this.youtubeId,

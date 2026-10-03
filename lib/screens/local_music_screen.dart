@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
-
 class LocalMusicScreen extends StatelessWidget {
   const LocalMusicScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     final musicProvider = Provider.of<music_provider.MusicProvider>(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Local Music'),
@@ -22,7 +18,6 @@ class LocalMusicScreen extends StatelessWidget {
       ),
       body: Consumer<music_provider.MusicProvider>(
         builder: (context, musicProvider, _) {
-          // Load music when the screen is first built
           if (musicProvider.songs.isEmpty &&
               !musicProvider.isLoading &&
               musicProvider.error == null) {
@@ -42,7 +37,6 @@ class LocalMusicScreen extends StatelessWidget {
               ),
             );
           }
-
           if (musicProvider.error != null) {
             return Center(
               child: SingleChildScrollView(
@@ -72,7 +66,6 @@ class LocalMusicScreen extends StatelessWidget {
               ),
             );
           }
-
           if (musicProvider.songs.isEmpty) {
             return Center(
               child: Padding(
@@ -110,7 +103,6 @@ class LocalMusicScreen extends StatelessWidget {
               ),
             );
           }
-
           return ListView.builder(
             itemCount: musicProvider.songs.length,
             itemBuilder: (context, index) {

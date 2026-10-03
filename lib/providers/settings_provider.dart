@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/playback_mode.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
-
 class SettingsProvider with ChangeNotifier {
   static const String _audioFormatKey = 'audioFormat';
   static const String _languageKey = 'language';
@@ -12,64 +11,44 @@ class SettingsProvider with ChangeNotifier {
   static const String _firstLaunchKey = 'first_launch';
   static const String _defaultPlaybackModeKey = 'defaultPlaybackMode';
   static const String _autoDownloadOnPlayKey = 'auto_download_on_play';
-
   AudioFormat _audioFormat = AudioFormat.auto;
   Locale _locale = const Locale('en', 'US');
   String _downloadLocation = 'internal';
   PlaybackMode _defaultPlaybackMode = PlaybackMode.local;
   bool _autoDownloadOnPlay = false;
-
   AudioFormat get audioFormat => _audioFormat;
   Locale get locale => _locale;
   String get downloadLocation => _downloadLocation;
   PlaybackMode get defaultPlaybackMode => _defaultPlaybackMode;
   bool get autoDownloadOnPlay => _autoDownloadOnPlay;
-
   SettingsProvider() {
     _loadSettings();
   }
-
-  /// Get supported locales
   static const List<Locale> _supportedLocales = [
     Locale('en', 'US'),
     Locale('tr', 'TR'),
   ];
-
-  /// Get device locale and check if supported
   Locale _getDeviceLocale() {
     try {
       final deviceLocale = Platform.localeName;
-      debugPrint('Device locale: $deviceLocale');
-
-      // Parse platform locale (e.g., "en_US", "tr_TR")
       final languageCode = deviceLocale
           .split('_')
           .first
           .split('-')
           .first
           .toLowerCase();
-
-      // Check if language is supported
       for (final locale in _supportedLocales) {
         if (locale.languageCode == languageCode) {
-          debugPrint('Using supported locale: ${locale.languageCode}');
           return locale;
         }
       }
-
-      // Default to English if not supported
-      debugPrint('Locale not supported, defaulting to English');
       return const Locale('en', 'US');
     } catch (e) {
-      debugPrint('Error getting device locale: $e');
       return const Locale('en', 'US');
     }
   }
-
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Load audio format
     final audioFormatString = prefs.getString(_audioFormatKey);
     if (audioFormatString != null) {
       _audioFormat = AudioFormat.values.firstWhere(
@@ -77,8 +56,6 @@ class SettingsProvider with ChangeNotifier {
         orElse: () => AudioFormat.auto,
       );
     }
-
-    // Load default playback mode
     final playbackModeString = prefs.getString(_defaultPlaybackModeKey);
     if (playbackModeString != null) {
       _defaultPlaybackMode = PlaybackMode.values.firstWhere(
@@ -86,29 +63,18 @@ class SettingsProvider with ChangeNotifier {
         orElse: () => PlaybackMode.local,
       );
     }
-
-    // Load language or use device locale on first launch
     final languageCode = prefs.getString(_languageKey);
     final isFirstLaunch = prefs.getBool(_firstLaunchKey) ?? true;
-
     if (languageCode != null) {
-      // User has manually selected a language before
       _locale = Locale(languageCode);
     } else if (isFirstLaunch) {
-      // First launch - use device locale
       _locale = _getDeviceLocale();
-      // Save the detected locale
       await prefs.setString(_languageKey, _locale.languageCode);
       await prefs.setBool(_firstLaunchKey, false);
-      debugPrint('First launch: set locale to ${_locale.languageCode}');
     }
-
-    // Load auto-download on play
     _autoDownloadOnPlay = prefs.getBool(_autoDownloadOnPlayKey) ?? false;
-
     notifyListeners();
   }
-
   Future<void> setAutoDownloadOnPlay(bool value) async {
     if (_autoDownloadOnPlay != value) {
       _autoDownloadOnPlay = value;
@@ -117,7 +83,6 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
   Future<void> setAudioFormat(AudioFormat format) async {
     if (_audioFormat != format) {
       _audioFormat = format;
@@ -126,7 +91,6 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
   Future<void> setLanguage(Locale locale) async {
     if (_locale != locale) {
       _locale = locale;
@@ -135,7 +99,6 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
   String getAudioFormatName(AudioFormat format) {
     if (format == AudioFormat.mp3) {
       return 'MP3 (Best available audio)';
@@ -148,7 +111,6 @@ class SettingsProvider with ChangeNotifier {
     }
     return 'Best available audio';
   }
-
   Future<void> setDownloadLocation(String location) async {
     if (_downloadLocation != location) {
       _downloadLocation = location;
@@ -157,7 +119,6 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
   String getDownloadLocationName(String location) {
     if (location == 'internal') {
       return 'Internal Storage (App folder)';
@@ -168,7 +129,6 @@ class SettingsProvider with ChangeNotifier {
     }
     return 'Internal Storage (App folder)';
   }
-
   Future<void> setDefaultPlaybackMode(PlaybackMode mode) async {
     if (_defaultPlaybackMode != mode) {
       _defaultPlaybackMode = mode;
@@ -177,10 +137,8 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
   String getPlaybackModeName(PlaybackMode mode, AppLocalizations l10n) =>
       mode == PlaybackMode.online ? l10n.online : l10n.local;
-
   String getLanguageName(Locale locale) {
     if (locale.languageCode == 'tr') {
       return 'Türkçe';

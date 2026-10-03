@@ -16,6 +16,11 @@ class MainActivity : AudioServiceActivity() {
     private var resultCallback: MethodChannel.Result? = null
     private var navigationChannel: MethodChannel? = null
 
+    // Set when the launcher widget asked to resume playback while the Flutter
+    // side had no handler yet (cold start). The Dart layer polls and consumes
+    // it once initState registers the navigation channel handler.
+    private var pendingWidgetResume = false
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -29,23 +34,45 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
-        navigationChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.veciata.tsmusic/navigation")
+        navigationChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.veciata.tsmusic/navigation",
+        ).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getPendingWidgetResume" -> {
+                        result.success(pendingWidgetResume)
+                        pendingWidgetResume = false
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleOpenSearchIntent(intent)
+        handleWidgetIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleOpenSearchIntent(intent)
+        handleWidgetIntent(intent)
     }
 
-    private fun handleOpenSearchIntent(intent: Intent?) {
-        if (intent?.action == "com.veciata.tsmusic.OPEN_SEARCH") {
-            val query = intent.getStringExtra(Intent.EXTRA_TEXT)
-            navigationChannel?.invokeMethod("openSearch", query)
+    private fun handleWidgetIntent(intent: Intent?) {
+        when (intent?.action) {
+            "com.veciata.tsmusic.OPEN_SEARCH" -> {
+                val query = intent.getStringExtra(Intent.EXTRA_TEXT)
+                navigationChannel?.invokeMethod("openSearch", query)
+            }
+            "com.veciata.tsmusic.RESUME_FROM_WIDGET" -> {
+                // Warm start: the Dart handler is already registered, so this
+                // lands immediately. Cold start: the invoke is dropped, but the
+                // flag is picked up by the Dart initState poll.
+                pendingWidgetResume = true
+                navigationChannel?.invokeMethod("resumePlayback", null)
+            }
         }
     }
 

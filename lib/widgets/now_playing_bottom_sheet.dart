@@ -3,18 +3,15 @@ import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/screens/now_playing_screen.dart';
 import 'package:tsmusic/screens/queue_screen.dart';
-
 class NowPlayingBottomSheet extends StatelessWidget {
   const NowPlayingBottomSheet({super.key});
-
   @override
   Widget build(BuildContext context) => Consumer<music_provider.MusicProvider>(
     builder: (context, musicProvider, _) {
-      final currentSong = musicProvider.currentSong;
+      final currentSong = musicProvider.activeSong;
       if (currentSong == null) {
         return const SizedBox.shrink();
       }
-
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -31,7 +28,6 @@ class NowPlayingBottomSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             GestureDetector(
               onVerticalDragUpdate: (details) {
                 if (details.primaryDelta != null && details.primaryDelta! > 0) {
@@ -50,11 +46,8 @@ class NowPlayingBottomSheet extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Song info and controls
             GestureDetector(
               onTap: () {
-                // Navigate to full screen player
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -64,7 +57,6 @@ class NowPlayingBottomSheet extends StatelessWidget {
               },
               child: Row(
                 children: [
-                  // Album art
                   Hero(
                     tag: 'album_art_${currentSong.id}',
                     child: Container(
@@ -87,10 +79,7 @@ class NowPlayingBottomSheet extends StatelessWidget {
                           : null,
                     ),
                   ),
-
                   const SizedBox(width: 16),
-
-                  // Song info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,8 +110,6 @@ class NowPlayingBottomSheet extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // Play/Pause button
                   StreamBuilder<bool>(
                     stream: musicProvider.playingStream.distinct(),
                     builder: (context, snapshot) {
@@ -149,22 +136,18 @@ class NowPlayingBottomSheet extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Progress bar
             const SizedBox(height: 16),
             StreamBuilder<Duration>(
               stream: musicProvider.positionStream,
               builder: (context, snapshot) {
                 final position = snapshot.data ?? musicProvider.position;
                 final duration = musicProvider.duration;
-
                 return Column(
                   children: [
                     Slider(
                       value: position.inSeconds.toDouble(),
                       max: duration.inSeconds.toDouble(),
                       onChanged: (value) {
-                        // Update UI immediately
                         musicProvider.seek(Duration(seconds: value.toInt()));
                       },
                     ),
@@ -188,14 +171,11 @@ class NowPlayingBottomSheet extends StatelessWidget {
                 );
               },
             ),
-
-            // Quick actions
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Favorite
                   IconButton(
                     icon: Icon(
                       musicProvider.isFavorite(currentSong.id.toString())
@@ -211,12 +191,10 @@ class NowPlayingBottomSheet extends StatelessWidget {
                       musicProvider.toggleFavorite(currentSong.id.toString());
                     },
                   ),
-                  // Skip previous
                   IconButton(
                     icon: const Icon(Icons.skip_previous),
                     onPressed: musicProvider.previous,
                   ),
-                  // Play/Pause
                   StreamBuilder<bool>(
                     stream: musicProvider.playingStream.distinct(),
                     builder: (context, snapshot) {
@@ -240,12 +218,10 @@ class NowPlayingBottomSheet extends StatelessWidget {
                       );
                     },
                   ),
-                  // Skip next
                   IconButton(
                     icon: const Icon(Icons.skip_next),
                     onPressed: musicProvider.next,
                   ),
-                  // Queue
                   IconButton(
                     icon: const Icon(Icons.queue_music),
                     onPressed: () {
@@ -265,7 +241,6 @@ class NowPlayingBottomSheet extends StatelessWidget {
       );
     },
   );
-
   static void show(BuildContext context) {
     showModalBottomSheet(
       context: context,

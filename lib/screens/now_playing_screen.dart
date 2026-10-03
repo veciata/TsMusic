@@ -9,22 +9,17 @@ import 'package:tsmusic/models/style_params.dart';
 import 'package:tsmusic/widgets/now_playing_queue_bottom_sheet.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/utils/format_utils.dart';
-
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
-
   @override
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
-
 class _NowPlayingScreenState extends State<NowPlayingScreen>
     with TickerProviderStateMixin {
   AnimationController? _albumArtController;
   double _currentPosition = 0.0;
   bool _isDragging = false;
-
   StreamSubscription? _positionSubscription;
-
   @override
   void initState() {
     super.initState();
@@ -34,7 +29,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     );
     _startOrStopAnimation();
   }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -48,7 +42,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       }
     });
   }
-
   void _startOrStopAnimation() {
     final musicProvider = context.read<MusicProvider>();
     if (musicProvider.isPlaying) {
@@ -57,14 +50,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       _albumArtController?.stop();
     }
   }
-
   @override
   void dispose() {
     _albumArtController?.dispose();
     _positionSubscription?.cancel();
     super.dispose();
   }
-
   Widget _buildAlbumArt(
     ThemeData theme,
     String? albumArtUrl,
@@ -105,9 +96,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             )
           : null,
     );
-
     if (!spin) return content;
-
     return AnimatedBuilder(
       animation:
           _albumArtController ??
@@ -129,7 +118,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       },
     );
   }
-
   Widget _buildControlButton({
     required IconData icon,
     required VoidCallback onPressed,
@@ -140,16 +128,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     color: color,
     onPressed: onPressed,
   );
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final musicProvider = context.watch<MusicProvider>();
     final themeProvider = context.watch<ThemeProvider>();
-    final currentSong = musicProvider.currentSong;
+    final currentSong = musicProvider.activeSong;
     final playerStyle = themeProvider.playerStyle;
     final l10n = AppLocalizations.of(context);
-
     if (currentSong == null) {
       return Scaffold(
         body: Center(
@@ -180,10 +166,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ),
       );
     }
-
     final duration = musicProvider.duration.inSeconds;
     final albumArtUrl = currentSong.albumArtUrl;
-
     final header = _buildHeader(theme, l10n);
     final albumArt = _buildAlbumArt(
       theme,
@@ -195,7 +179,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final progressBar = _buildProgressBar(theme, duration, musicProvider);
     final playbackControls = _buildPlaybackControls(theme, musicProvider);
     final bottomControls = _buildBottomControls(theme, musicProvider);
-
     final params = StyleParams(
       theme: theme,
       musicProvider: musicProvider,
@@ -224,7 +207,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       playbackControls: playbackControls,
       bottomControls: bottomControls,
     );
-
     Widget playerWidget;
     switch (playerStyle) {
       case PlayerStyle.classic:
@@ -238,7 +220,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       case PlayerStyle.glass:
         playerWidget = buildGlassStyle(params);
     }
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -259,7 +240,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       body: playerWidget,
     );
   }
-
   Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Padding(
     padding: const EdgeInsets.all(16.0),
     child: Row(
@@ -277,7 +257,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       ],
     ),
   );
-
   Widget _buildProgressBar(
     ThemeData theme,
     int duration,
@@ -315,7 +294,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       ],
     ),
   );
-
   Widget _buildPlaybackControls(
     ThemeData theme,
     MusicProvider musicProvider, {
@@ -382,7 +360,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       ],
     ),
   );
-
   Widget _buildBottomControls(ThemeData theme, MusicProvider musicProvider) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 32, left: 24, right: 24),
@@ -399,7 +376,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           ],
         ),
       );
-
   void _showStyleSelector(
     BuildContext context,
     ThemeProvider themeProvider,
