@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:tsmusic/providers/youtube_player_provider.dart';
-import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/main.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';

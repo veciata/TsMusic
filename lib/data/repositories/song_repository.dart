@@ -348,6 +348,15 @@ class SongRepository {
         ${where != null ? 'WHERE $where' : ''}
         ${orderBy != null ? 'ORDER BY $orderBy' : ''}
       ''';
+  List<String> _splitNames(Object? joined) {
+    if (joined is! String || joined.isEmpty) return const [];
+    return joined
+        .split(',')
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+  }
+
   Song _songFromJoinedRow(Map<String, dynamic> row) {
     final artistNamesString = row['artist_names'] as String?;
     final artistNames = artistNamesString != null && artistNamesString.isNotEmpty
@@ -358,13 +367,14 @@ class SongRepository {
               .toList()
         : <String>[];
     final artists = artistNames.isNotEmpty ? artistNames : ['Unknown Artist'];
-    // Tags come from song_tags, not from genres. Reading genres here made
-    // 'tsmusic' -- the marker that says "downloaded from YouTube" -- always
-    // absent, so every isDownloaded check silently reported false.
-    final tagsString = row['tag_names'] as String?;
-    final tags = tagsString != null && tagsString.isNotEmpty
-        ? tagsString.split(',').where((tag) => tag.isNotEmpty).toSet().toList()
-        : <String>[];
+    // Read tags from both tables. They are not interchangeable: a download
+    // records 'tsmusic' in song_tags, while saveSong files a song's tags under
+    // genres. Reading only one of the two hides half of what is on disk --
+    // reading only genres meant real downloads never reported as downloaded.
+    final tags = <String>{
+      ..._splitNames(row['tag_names']),
+      ..._splitNames(row['genre_names']),
+    }.toList();
     return Song(
       id: row['id'] as int,
       youtubeId: row['youtube_id'] as String?,
@@ -385,12 +395,14 @@ class SongRepository {
     final songId = row['id'] as int;
     final artistsData = await _database.getArtistsForSong(songId);
     final artists = artistsData.map((row) => row['name'] as String).toList();
-    final tagsData = await _database.getTagsForSong(songId);
-    final tags = tagsData
-        .map((row) => row['name'] as String)
-        .where((name) => name.isNotEmpty)
-        .toSet()
-        .toList();
+    // Both tables, for the same reason as _songFromJoinedRow: downloads record
+    // their tag in song_tags, saveSong records tags under genres.
+    final tagRows = await _database.getTagsForSong(songId);
+    final genreRows = await _database.getGenresForSong(songId);
+    final tags = <String>{
+      ...tagRows.map((row) => row['name'] as String),
+      ...genreRows.map((row) => row['name'] as String),
+    }.where((name) => name.isNotEmpty).toList();
     return Song(
       id: songId,
       youtubeId: row['youtube_id'] as String?,
