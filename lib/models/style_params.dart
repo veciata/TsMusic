@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart';
+
 class StyleParams {
   final ThemeData theme;
   final MusicProvider musicProvider;

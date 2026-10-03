@@ -5,6 +5,7 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/github_release.dart';
 import 'package:tsmusic/providers/update_notification_provider.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
+
 Future<void> showUpdateNotificationModal(BuildContext context) {
   final provider = Provider.of<UpdateNotificationProvider>(
     context,
@@ -16,6 +17,7 @@ Future<void> showUpdateNotificationModal(BuildContext context) {
     builder: (_) => _UpdateNotificationModal(provider: provider),
   );
 }
+
 class _UpdateNotificationModal extends StatefulWidget {
   final UpdateNotificationProvider provider;
   const _UpdateNotificationModal({required this.provider});
@@ -23,26 +25,31 @@ class _UpdateNotificationModal extends StatefulWidget {
   State<_UpdateNotificationModal> createState() =>
       _UpdateNotificationModalState();
 }
+
 class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
   @override
   void initState() {
     super.initState();
     widget.provider.addListener(_onProviderChange);
   }
+
   @override
   void dispose() {
     widget.provider.removeListener(_onProviderChange);
     super.dispose();
   }
+
   void _onProviderChange() {
     if (mounted) setState(() {});
   }
+
   Future<void> _openRelease(GitHubRelease release) async {
     final uri = Uri.tryParse(release.htmlUrl);
     if (uri != null && await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -61,6 +68,7 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       ),
     );
   }
+
   Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Container(
     width: double.infinity,
     padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
@@ -131,6 +139,7 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
         return _buildReleaseList(releases, theme, l10n);
     }
   }
+
   Widget _buildReleaseList(
     List<GitHubRelease> releases,
     ThemeData theme,
@@ -154,6 +163,7 @@ class _UpdateNotificationModalState extends State<_UpdateNotificationModal> {
       ],
     );
   }
+
   Widget _buildReleaseCard(GitHubRelease release, ThemeData theme) => Card(
     margin: const EdgeInsets.only(bottom: 12),
     child: Padding(

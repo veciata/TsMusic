@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+
 class SkeletonListTile extends StatelessWidget {
   final bool hasLeading;
   final bool hasTrailing;
@@ -57,6 +58,7 @@ class SkeletonListTile extends StatelessWidget {
     );
   }
 }
+
 class SkeletonHomeScreen extends StatelessWidget {
   final int itemCount;
   const SkeletonHomeScreen({super.key, this.itemCount = 10});
@@ -68,6 +70,7 @@ class SkeletonHomeScreen extends StatelessWidget {
     ),
   );
 }
+
 class SkeletonDownloadsScreen extends StatelessWidget {
   final int itemCount;
   const SkeletonDownloadsScreen({super.key, this.itemCount = 5});

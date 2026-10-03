@@ -45,8 +45,6 @@ class HlsAudio {
   HlsAudio({required this.segments, required this.totalBytes});
 }
 
-
-
 class YouTubeAudio {
   final String id;
   final String title;
@@ -181,7 +179,8 @@ class YouTubeService with ChangeNotifier {
   /// Backed by the database, not by whichever song list happens to be loaded.
   /// The in-memory lists only contain downloads made while that list was open,
   /// so checking them reported false negatives and re-downloaded tracks.
-  bool isVideoDownloaded(String videoId) => _downloadedSongs.containsKey(videoId);
+  bool isVideoDownloaded(String videoId) =>
+      _downloadedSongs.containsKey(videoId);
 
   /// The saved song for [videoId], or null if it is not on the device.
   ts.Song? downloadedSongFor(String videoId) => _downloadedSongs[videoId];

@@ -11,6 +11,7 @@ import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/utils/format_utils.dart';
 import 'package:tsmusic/utils/download_enqueue.dart';
 import 'package:tsmusic/services/download_queue.dart';
+
 class PlaylistDetailScreen extends StatefulWidget {
   final int playlistId;
   final String playlistName;
@@ -22,6 +23,7 @@ class PlaylistDetailScreen extends StatefulWidget {
   @override
   State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
 }
+
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   final PlaylistRepository _playlistRepository = PlaylistRepository();
   final SongRepository _songRepository = SongRepository();
@@ -33,6 +35,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     super.initState();
     _loadSongs();
   }
+
   Future<void> _loadSongs() async {
     setState(() => _isLoading = true);
     try {
@@ -52,6 +55,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       }
     }
   }
+
   Future<void> _removeSong(Song song) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -92,6 +96,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       }
     }
   }
+
   Future<void> _showAddSongsDialog() async {
     final l10n = AppLocalizations.of(context);
     final musicProvider = Provider.of<music_provider.MusicProvider>(
@@ -109,9 +114,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         await musicProvider.addOnlineSongToPlaylist(
           youtubeId: audio.id,
           title: audio.title,
-          artists: audio.artists.isNotEmpty
-              ? audio.artists
-              : [audio.author],
+          artists: audio.artists.isNotEmpty ? audio.artists : [audio.author],
           duration: audio.duration?.inMilliseconds ?? 0,
           thumbnailUrl: audio.thumbnailUrl,
           playlistId: widget.playlistId,
@@ -120,6 +123,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         rethrow;
       }
     }
+
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -178,7 +182,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                             ? const SizedBox(
                                 width: 24,
                                 height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.search),
                         onPressed: ytLoading
@@ -187,14 +193,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 if (tv.text.trim().isEmpty) return;
                                 setDialogState(() => ytLoading = true);
                                 try {
-                                  final results =
-                                      await youTubeService.searchAudio(
-                                    tv.text.trim(),
-                                  );
+                                  final results = await youTubeService
+                                      .searchAudio(tv.text.trim());
                                   if (context.mounted) {
-                                    setDialogState(
-                                      () => ytResults = results,
-                                    );
+                                    setDialogState(() => ytResults = results);
                                   }
                                 } catch (_) {
                                   if (context.mounted) {
@@ -315,17 +317,13 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                             title: Text(
                               song.title,
                               style: TextStyle(
-                                color: isAlreadyInPlaylist
-                                    ? Colors.grey
-                                    : null,
+                                color: isAlreadyInPlaylist ? Colors.grey : null,
                               ),
                             ),
                             subtitle: Text(
                               song.artists.join(' & '),
                               style: TextStyle(
-                                color: isAlreadyInPlaylist
-                                    ? Colors.grey
-                                    : null,
+                                color: isAlreadyInPlaylist ? Colors.grey : null,
                               ),
                             ),
                             secondary: isAlreadyInPlaylist
@@ -382,10 +380,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ),
     );
   }
-  Future<void> _startPlayback({
-    int? startIndex,
-    bool popAfter = false,
-  }) async {
+
+  Future<void> _startPlayback({int? startIndex, bool popAfter = false}) async {
     final musicProvider = Provider.of<music_provider.MusicProvider>(
       context,
       listen: false,
@@ -399,33 +395,29 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       if (popAfter) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start playback: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not start playback: $e')));
     }
   }
+
   Future<void> _playPlaylist() async {
     if (_songs.isEmpty) return;
     await _startPlayback(popAfter: true);
   }
+
   int get _remoteSongCount => _songs
       .where(
-        (s) =>
-            s.url.startsWith('yt:') &&
-            (s.youtubeId?.isNotEmpty ?? false),
+        (s) => s.url.startsWith('yt:') && (s.youtubeId?.isNotEmpty ?? false),
       )
       .length;
   Future<void> _downloadAllRemoteSongs() async {
     if (_remoteSongCount == 0) return;
     final requests = _songs
         .where(
-          (s) =>
-              s.url.startsWith('yt:') &&
-              (s.youtubeId?.isNotEmpty ?? false),
+          (s) => s.url.startsWith('yt:') && (s.youtubeId?.isNotEmpty ?? false),
         )
-        .map(
-          (s) => DownloadRequest(videoId: s.youtubeId!, title: s.title),
-        )
+        .map((s) => DownloadRequest(videoId: s.youtubeId!, title: s.title))
         .toList();
     await enqueueAllForDownload(
       context: context,
@@ -437,6 +429,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     // updated per track as it lands, so reloading now would just be a no-op
     // followed by another reload in a few seconds.
   }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);

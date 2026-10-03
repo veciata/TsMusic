@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+
 class PlaybackResumeState {
   static const String indexKey = 'resume_current_index';
   static const String positionKey = 'resume_position_ms';
@@ -35,6 +36,7 @@ class PlaybackResumeState {
     await _setOptional(prefs, playlistIdsKey, playlistIds);
     await _setOptional(prefs, tempPlaylistIdsKey, tempPlaylistIds);
   }
+
   static Future<PlaybackResumeState?> load() async {
     final prefs = await SharedPreferences.getInstance();
     final index = prefs.getInt(indexKey);
@@ -49,10 +51,12 @@ class PlaybackResumeState {
       tempPlaylistIds: prefs.getString(tempPlaylistIdsKey),
     );
   }
+
   static Future<bool> exists() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(indexKey) != null;
   }
+
   static Future<void> _setOptional(
     SharedPreferences prefs,
     String key,

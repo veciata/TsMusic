@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/utils/lru_cache.dart';
+
 class ArtistImageCache extends ChangeNotifier {
   ArtistImageCache({
     http.Client? httpClient,
@@ -39,9 +40,9 @@ class ArtistImageCache extends ChangeNotifier {
       if (!await _dir!.exists()) {
         await _dir!.create(recursive: true);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<String?> getCachedImage(String artistName) async {
     final key = normalizeName(artistName);
     final inMemory = _resolved.get(key);
@@ -55,6 +56,7 @@ class ArtistImageCache extends ChangeNotifier {
     }
     return null;
   }
+
   Future<String?> ensureArtistImage(
     String artistName, {
     List<Song>? localSongs,
@@ -73,6 +75,7 @@ class ArtistImageCache extends ChangeNotifier {
       unawaited(_inFlight.remove(key));
     }
   }
+
   Future<String?> _resolve(
     String key,
     String artistName,
@@ -105,12 +108,12 @@ class ArtistImageCache extends ChangeNotifier {
           final saved = await _downloadToCache(key, thumb);
           if (saved != null) return saved;
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     _failed.add(key);
     return null;
   }
+
   Future<String?> _downloadToCache(String key, String url) async {
     if (_dir == null) return null;
     if (!url.startsWith('http')) {
@@ -137,11 +140,13 @@ class ArtistImageCache extends ChangeNotifier {
       return null;
     }
   }
+
   String _cachePath(String key) =>
       path.join(_dir!.path, 'artist_${key}_thumb.jpg');
   void close() {
     _httpClient.close();
   }
+
   @override
   void dispose() {
     close();

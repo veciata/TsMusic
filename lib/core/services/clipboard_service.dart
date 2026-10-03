@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+
 class YouTubeLinkResult {
   final String url;
   final String? videoId;
@@ -12,6 +13,7 @@ class YouTubeLinkResult {
     this.isPlaylist = false,
   });
 }
+
 class ClipboardService with WidgetsBindingObserver {
   static final ClipboardService _instance = ClipboardService._();
   factory ClipboardService() => _instance;
@@ -38,6 +40,7 @@ class ClipboardService with WidgetsBindingObserver {
       checkClipboard();
     }
   }
+
   YouTubeLinkResult? parseYouTubeLink(String text) {
     final trimmed = text.trim();
     final playlistMatch = _youtubePlaylistRegExp.firstMatch(trimmed);
@@ -64,6 +67,7 @@ class ClipboardService with WidgetsBindingObserver {
     }
     return null;
   }
+
   Future<YouTubeLinkResult?> checkClipboard() async {
     try {
       final data = await Clipboard.getData(Clipboard.kTextPlain);

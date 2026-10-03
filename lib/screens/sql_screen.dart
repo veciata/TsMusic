@@ -5,11 +5,13 @@ import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/services/audio_notification_service.dart';
+
 class SqlScreen extends StatefulWidget {
   const SqlScreen({super.key});
   @override
   State<SqlScreen> createState() => _SqlScreenState();
 }
+
 class _SqlScreenState extends State<SqlScreen> {
   late Future<_DbOverview> _overviewFuture;
   @override
@@ -20,6 +22,7 @@ class _SqlScreenState extends State<SqlScreen> {
       (_) => _showChangelog(context),
     );
   }
+
   void _showChangelog(BuildContext context) {
     final entries = <_ChangelogEntry>[
       _ChangelogEntry('1.1.12', '2026-05-18', [
@@ -136,6 +139,7 @@ class _SqlScreenState extends State<SqlScreen> {
       ),
     );
   }
+
   Future<_DbOverview> _loadOverview() async {
     try {
       final db = await DatabaseHelper().database;
@@ -212,6 +216,7 @@ class _SqlScreenState extends State<SqlScreen> {
       );
     }
   }
+
   Future<void> _testNotification(BuildContext context) async {
     try {
       if (Platform.isAndroid || Platform.isIOS) {
@@ -252,6 +257,7 @@ class _SqlScreenState extends State<SqlScreen> {
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
+
   Future<void> _cleanDuplicates(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -301,6 +307,7 @@ class _SqlScreenState extends State<SqlScreen> {
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -497,6 +504,7 @@ class _SqlScreenState extends State<SqlScreen> {
       return '${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
   }
+
   Widget _buildSchemaTab(BuildContext context, _DbOverview data) => ListView(
     padding: const EdgeInsets.all(8.0),
     children: [
@@ -514,6 +522,7 @@ class _SqlScreenState extends State<SqlScreen> {
     ],
   );
 }
+
 class _TablesTab extends StatelessWidget {
   final List<String> tableNames;
   final Map<String, int> counts;
@@ -555,6 +564,7 @@ class _TablesTab extends StatelessWidget {
     },
   );
 }
+
 class _RowsScreen extends StatelessWidget {
   final String table;
   final List<Map<String, Object?>> rows;
@@ -594,6 +604,7 @@ class _RowsScreen extends StatelessWidget {
     );
   }
 }
+
 class _SimpleListTab extends StatelessWidget {
   final String titleKey;
   final String Function(Map<String, Object?>) subtitleBuilder;
@@ -621,12 +632,14 @@ class _SimpleListTab extends StatelessWidget {
     },
   );
 }
+
 class _ChangelogEntry {
   final String version;
   final String date;
   final List<String> lines;
   _ChangelogEntry(this.version, this.date, this.lines);
 }
+
 class _DbOverview {
   final List<String> tableNames;
   final Map<String, int> counts;

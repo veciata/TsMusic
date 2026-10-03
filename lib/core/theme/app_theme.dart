@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 const List<Color> availableColors = [
   Color(0xFF1DB954),
   Color(0xFF1E88E5),
@@ -67,6 +68,7 @@ ThemeData buildLightTheme(Color primaryColor) {
     ),
   );
 }
+
 ThemeData buildDarkTheme(Color primaryColor) {
   final colorScheme = ColorScheme.dark(
     primary: primaryColor,

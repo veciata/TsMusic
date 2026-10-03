@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as path;
+
 class FileScanResult {
   final List<File> files;
   final int totalScanned;
@@ -13,6 +14,7 @@ class FileScanResult {
     required this.elapsedTime,
   });
 }
+
 class StreamedFileListingService {
   static const List<String> audioExtensions = [
     '.mp3',
@@ -44,9 +46,9 @@ class StreamedFileListingService {
         batchFiles,
         batchSize,
       );
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   static Stream<FileScanResult> _streamFilesRecursive(
     String dirPath,
     bool recursive,
@@ -100,8 +102,7 @@ class StreamedFileListingService {
               batchSize,
             );
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
       if (batchFiles.isNotEmpty) {
         yield FileScanResult(
@@ -111,9 +112,9 @@ class StreamedFileListingService {
           elapsedTime: DateTime.now().difference(startTime),
         );
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   static Stream<FileScanResult> streamMultipleDirectories(
     List<String> directories, {
     bool recursive = true,
@@ -127,6 +128,7 @@ class StreamedFileListingService {
       );
     }
   }
+
   static Stream<File> streamFilteredFiles(
     String dirPath, {
     bool Function(File)? filter,

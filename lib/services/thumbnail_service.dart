@@ -6,11 +6,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/youtube_client.dart';
+
 class _PriorityItem {
   final Song song;
   final int priority;
   _PriorityItem(this.song, this.priority);
 }
+
 class ThumbnailService {
   static ThumbnailService? _instance;
   final http.Client _httpClient;
@@ -38,9 +40,9 @@ class ThumbnailService {
       if (!await _thumbnailsDir!.exists()) {
         await _thumbnailsDir!.create(recursive: true);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<String?> _getExistingPath(String youtubeId) async {
     if (_thumbnailsDir == null) return null;
     final file = File(
@@ -49,6 +51,7 @@ class ThumbnailService {
     if (await file.exists()) return file.path;
     return null;
   }
+
   Future<String?> _getExistingArtistPath(String artistName) async {
     if (_thumbnailsDir == null) return null;
     final safeName = _safeArtistName(artistName);
@@ -58,6 +61,7 @@ class ThumbnailService {
     if (await file.exists()) return file.path;
     return null;
   }
+
   String _safeArtistName(String name) =>
       name.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]'), '_');
   void requestThumbnail(Song song, {int priority = 2}) {
@@ -78,6 +82,7 @@ class ThumbnailService {
       _processQueue();
     }
   }
+
   void requestThumbnailForAll(List<Song> songs) {
     for (final song in songs) {
       if (song.localThumbnailPath != null) continue;
@@ -96,6 +101,7 @@ class ThumbnailService {
     _sortQueue();
     _processQueue();
   }
+
   void _sortQueue() {
     final list = _queue.toList()
       ..sort((a, b) => a.priority.compareTo(b.priority));
@@ -103,6 +109,7 @@ class ThumbnailService {
       ..clear()
       ..addAll(list);
   }
+
   Future<void> _processQueue() async {
     if (_processing || _queue.isEmpty) return;
     _processing = true;
@@ -117,6 +124,7 @@ class ThumbnailService {
     }
     _processing = false;
   }
+
   Future<void> _processVideoThumbnail(_PriorityItem item) async {
     final videoId = item.song.youtubeId!;
     _inProgress.add(videoId);
@@ -145,6 +153,7 @@ class ThumbnailService {
       _inProgress.remove(videoId);
     }
   }
+
   Future<void> _processArtistThumbnail(_PriorityItem item) async {
     final artist = item.song.artists.first;
     final key = 'artist:$artist';
@@ -157,6 +166,7 @@ class ThumbnailService {
       _inProgress.remove(key);
     }
   }
+
   Future<void> _fallbackToArtistThumbnail(_PriorityItem item) async {
     if (item.song.artists.isEmpty) {
       onThumbnailFailed?.call(item.song);
@@ -181,6 +191,7 @@ class ThumbnailService {
       _inProgress.remove(key);
     }
   }
+
   Future<void> _fetchArtistThumbnail(String artist, Song originalSong) async {
     if (_artistLookupAttempted.contains(artist.toLowerCase().trim())) {
       final existing = await _getExistingArtistPath(artist);
@@ -215,6 +226,7 @@ class ThumbnailService {
       onThumbnailFailed?.call(originalSong);
     }
   }
+
   void dispose() {
     _queue.clear();
     _httpClient.close();

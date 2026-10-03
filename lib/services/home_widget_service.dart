@@ -3,6 +3,7 @@ import 'package:flutter/painting.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/services/playback_resume_state.dart';
+
 class HomeWidgetService {
   static const String _playerWidgetClass =
       'com.veciata.tsmusic.SimplePlayerWidgetProvider';
@@ -13,6 +14,7 @@ class HomeWidgetService {
       await HomeWidget.setAppGroupId('group.com.veciata.tsmusic');
     } catch (_) {}
   }
+
   static Future<void> updateSearchWidget({
     bool isDarkMode = false,
     Color? primaryColor,
@@ -26,6 +28,7 @@ class HomeWidgetService {
       await HomeWidget.updateWidget(qualifiedAndroidName: _searchWidgetClass);
     } catch (_) {}
   }
+
   static Future<void> updateResumeData({
     required int index,
     required int positionMs,
@@ -41,6 +44,7 @@ class HomeWidgetService {
       );
     } catch (_) {}
   }
+
   static Future<void> updatePlayerWidget({
     required Song? currentSong,
     required bool isPlaying,

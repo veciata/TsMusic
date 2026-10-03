@@ -17,12 +17,14 @@ import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
 import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/core/services/error_tracking_service.dart';
 import 'package:tsmusic/screens/downloads_screen.dart';
+
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
   const SearchScreen({super.key, this.initialQuery});
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
+
 class _SearchScreenState extends State<SearchScreen> {
   static const List<String> _mixTopics = [
     'Gaming chill',
@@ -68,6 +70,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _checkConnectivity();
     });
   }
+
   @override
   void dispose() {
     _youtubePlayer.unregisterScreen('search_screen');
@@ -80,6 +83,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchDebounce?.cancel();
     super.dispose();
   }
+
   Future<void> _checkConnectivity() async {
     try {
       final results = await Connectivity().checkConnectivity();
@@ -96,12 +100,14 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
+
   void _debouncedSearch(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       _searchYouTube(query);
     });
   }
+
   Future<void> _playAudio(YouTubeAudio audio) async {
     try {
       await _youtubePlayer.playAudio(audio);
@@ -119,6 +125,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
+
   Future<void> _handleDownload(YouTubeAudio audio) async {
     if (!mounted) return;
     final isDownloading = _youTubeService.isDownloading(audio.id);
@@ -185,6 +192,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
+
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >=
@@ -196,6 +204,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
+
   Future<void> _searchYouTube(String query, {bool loadMore = false}) async {
     if (_isOffline) {
       if (mounted) {
@@ -249,6 +258,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) setState(() => _isSearchingYouTube = false);
     }
   }
+
   Widget _buildMixedResults(
     List<model.Song> localSongs,
     music_provider.MusicProvider provider,
@@ -377,6 +387,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ],
     );
   }
+
   Widget _buildEmptySearchState(music_provider.MusicProvider provider) {
     final libraryVm = Provider.of<LibraryViewModel>(context);
     final currentSong = provider.currentSong;
@@ -392,9 +403,9 @@ class _SearchScreenState extends State<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(
                 'Explore',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
             Padding(
@@ -415,8 +426,12 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               ...recent.map(
-                (song) =>
-                    _buildLocalResultItem(song, provider, currentSong, isPlaying),
+                (song) => _buildLocalResultItem(
+                  song,
+                  provider,
+                  currentSong,
+                  isPlaying,
+                ),
               ),
             ] else
               Padding(
@@ -434,9 +449,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Search for songs...',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(
                           context,
                         ).colorScheme.onSurface.withValues(alpha: 0.5),
@@ -460,6 +473,7 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
+
   Widget _buildMixCard(music_provider.MusicProvider provider) {
     final hasMix = provider.isMixSession && provider.onlinePlaylist.isNotEmpty;
     final showPicker = !hasMix || _showMixPicker;
@@ -490,9 +504,10 @@ class _SearchScreenState extends State<SearchScreen> {
                             ? '${provider.onlinePlaylist.length} tracks · YouTube-backed'
                             : 'Pick a vibe to start a curated YouTube mix',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSecondaryContainer
+                              .withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -533,6 +548,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+
   Future<void> _startMixOf(
     music_provider.MusicProvider provider,
     String topic,
@@ -549,6 +565,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+
   Future<void> _saveCurrentMix(music_provider.MusicProvider provider) async {
     final controller = TextEditingController();
     final name = await showDialog<String>(
@@ -591,6 +608,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+
   Widget _buildLocalResultItem(
     model.Song song,
     music_provider.MusicProvider provider,
@@ -686,6 +704,7 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
+
   Future<void> _handleSongAction(
     String action,
     model.Song song,
@@ -700,6 +719,7 @@ class _SearchScreenState extends State<SearchScreen> {
         await _showDeleteConfirmation(song, provider);
     }
   }
+
   Future<void> _showMoveDialog(model.Song song) async {
     final l10n = AppLocalizations.of(context);
     final locations = [
@@ -755,6 +775,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
+
   Future<void> _showDeleteConfirmation(
     model.Song song,
     music_provider.MusicProvider provider,
@@ -795,6 +816,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
   }
+
   Widget _buildYouTubeResultItem(YouTubeAudio audio) {
     final musicProvider = context.read<music_provider.MusicProvider>();
     return YouTubePlaybackWidget(
@@ -819,6 +841,7 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final musicProvider = Provider.of<music_provider.MusicProvider>(context);

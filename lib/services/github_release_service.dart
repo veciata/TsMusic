@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:tsmusic/models/github_release.dart';
+
 class GitHubReleaseService {
   final String owner;
   final String repo;
@@ -37,6 +38,7 @@ class GitHubReleaseService {
       return [];
     }
   }
+
   void dispose() {
     _client.close();
   }

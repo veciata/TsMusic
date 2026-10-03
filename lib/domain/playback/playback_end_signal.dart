@@ -228,10 +228,12 @@ class PlaybackStallWatchdog {
   ///
   /// Requires a known expected [expectedDuration]: a stream that played
   /// everything it had to play is finished, not stalled.
-  bool isTruncated({required Duration expectedDuration, required Duration banked}) {
+  bool isTruncated({
+    required Duration expectedDuration,
+    required Duration banked,
+  }) {
     if (!_stalled) return false;
     if (expectedDuration <= PlaybackEndSignal.meaningfulLength) return false;
-    return banked <
-        expectedDuration - PlaybackEndSignal.endTolerance;
+    return banked < expectedDuration - PlaybackEndSignal.endTolerance;
   }
 }

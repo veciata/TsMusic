@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+
 class ErrorTrackingService {
   static final ErrorTrackingService _instance = ErrorTrackingService._();
   factory ErrorTrackingService() => _instance;
@@ -10,6 +11,7 @@ class ErrorTrackingService {
     if (_initialized) return;
     _initialized = true;
   }
+
   void recordError(
     Object error,
     StackTrace stack, {
@@ -22,6 +24,7 @@ class ErrorTrackingService {
     if (extras != null && extras.isNotEmpty) debugPrint('║  Extras: $extras');
     debugPrint('║  Stack: $stack');
   }
+
   void recordFlutterError(FlutterErrorDetails details) {
     recordError(
       details.exception,
@@ -29,6 +32,7 @@ class ErrorTrackingService {
       context: details.context?.toString(),
     );
   }
+
   void dispose() {
     _initialized = false;
   }

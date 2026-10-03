@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+
 class SlidingText extends StatefulWidget {
   final String text;
   final TextStyle? style;
@@ -15,6 +16,7 @@ class SlidingText extends StatefulWidget {
   @override
   State<SlidingText> createState() => _SlidingTextState();
 }
+
 class _SlidingTextState extends State<SlidingText>
     with SingleTickerProviderStateMixin {
   late ScrollController _scrollController;
@@ -27,6 +29,7 @@ class _SlidingTextState extends State<SlidingText>
     _scrollController = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback(_checkOverflow);
   }
+
   void _checkOverflow(_) {
     if (!mounted) return;
     final textPainter = TextPainter(
@@ -41,6 +44,7 @@ class _SlidingTextState extends State<SlidingText>
       WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
     }
   }
+
   Future<void> _startScrolling() async {
     while (mounted && _needsScroll) {
       await Future.delayed(Duration(seconds: widget.pauseDuration.toInt()));
@@ -68,6 +72,7 @@ class _SlidingTextState extends State<SlidingText>
       );
     }
   }
+
   @override
   Widget build(BuildContext context) => ClipRect(
     child: SingleChildScrollView(

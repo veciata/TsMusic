@@ -1,4 +1,5 @@
 import 'app_localizations.dart';
+
 class AppLocalizationsTr extends AppLocalizations {
   @override
   String get home => 'Ana Sayfa';

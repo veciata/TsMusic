@@ -6,6 +6,7 @@ import 'package:tsmusic/providers/youtube_player_provider.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/main.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
+
 class YouTubePlaybackWidget extends StatelessWidget {
   final YouTubeAudio audio;
   final Future<void> Function(YouTubeAudio) onPlay;
@@ -186,6 +187,7 @@ class YouTubePlaybackWidget extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildThumbnail(BuildContext context, String? localThumbnailPath) {
     if (localThumbnailPath != null) {
       return ClipRRect(
@@ -223,6 +225,7 @@ class YouTubePlaybackWidget extends StatelessWidget {
     );
   }
 }
+
 extension _FirstOrNullExtension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
 }

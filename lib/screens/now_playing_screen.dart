@@ -9,11 +9,13 @@ import 'package:tsmusic/models/style_params.dart';
 import 'package:tsmusic/widgets/now_playing_queue_bottom_sheet.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/utils/format_utils.dart';
+
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
   @override
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
+
 class _NowPlayingScreenState extends State<NowPlayingScreen>
     with TickerProviderStateMixin {
   AnimationController? _albumArtController;
@@ -29,6 +31,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     );
     _startOrStopAnimation();
   }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -42,6 +45,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       }
     });
   }
+
   void _startOrStopAnimation() {
     final musicProvider = context.read<MusicProvider>();
     if (musicProvider.isPlaying) {
@@ -50,12 +54,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       _albumArtController?.stop();
     }
   }
+
   @override
   void dispose() {
     _albumArtController?.dispose();
     _positionSubscription?.cancel();
     super.dispose();
   }
+
   Widget _buildAlbumArt(
     ThemeData theme,
     String? albumArtUrl,
@@ -118,6 +124,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       },
     );
   }
+
   Widget _buildControlButton({
     required IconData icon,
     required VoidCallback onPressed,
@@ -240,6 +247,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       body: playerWidget,
     );
   }
+
   Widget _buildHeader(ThemeData theme, AppLocalizations l10n) => Padding(
     padding: const EdgeInsets.all(16.0),
     child: Row(

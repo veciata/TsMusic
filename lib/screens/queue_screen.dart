@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:tsmusic/providers/music_provider.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/models/song.dart';
+
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
   @override
@@ -191,6 +192,7 @@ class QueueScreen extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildQueueTile({
     required BuildContext context,
     required ThemeData theme,

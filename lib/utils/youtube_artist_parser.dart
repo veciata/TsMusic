@@ -10,6 +10,7 @@ class YouTubeArtistParser {
     }
     return [channelName];
   }
+
   static List<String>? _extractFromTitle(String title) {
     final patterns = [
       RegExp(r'^(.+?)\s*[-:]\s*.+'),
@@ -58,6 +59,7 @@ class YouTubeArtistParser {
     }
     return null;
   }
+
   static String _cleanChannelName(String channel) {
     String cleaned = channel
         .replaceAll(

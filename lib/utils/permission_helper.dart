@@ -1,6 +1,7 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+
 class PermissionHelper {
   static Future<bool> requestStoragePermission() async {
     try {
@@ -75,6 +76,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static Future<bool> isAndroid13OrHigher() async {
     try {
@@ -85,6 +87,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<bool> hasStoragePermission() async {
     try {
       if (!await _shouldRequestPermission()) {
@@ -103,6 +106,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<bool> openAppSettings() async {
     try {
       final opened = await openAppSettings();
@@ -111,6 +115,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<bool> showPermissionRationale(
     BuildContext context, {
     String? message,
@@ -146,6 +151,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<bool> requestManageExternalStorage() async {
     try {
       if (!await _isAndroid11OrHigher()) {
@@ -190,6 +196,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<bool> hasManageExternalStorage() async {
     if (!await _isAndroid11OrHigher()) {
       return true;
@@ -197,6 +204,7 @@ class PermissionHelper {
     final status = await Permission.manageExternalStorage.status;
     return status.isGranted;
   }
+
   static Future<bool> requestFileManagementPermission() async {
     try {
       if (!await _isAndroid()) return true;
@@ -213,6 +221,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<bool> hasFileManagementPermission() async {
     try {
       if (!await _isAndroid()) return true;
@@ -226,6 +235,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<int> _getSdkInt() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
@@ -235,6 +245,7 @@ class PermissionHelper {
       return 0;
     }
   }
+
   static Future<bool> _shouldRequestPermission() async {
     if (!await _isAndroid()) {
       return false;
@@ -247,6 +258,7 @@ class PermissionHelper {
       return !storageStatus.isGranted;
     }
   }
+
   static Future<bool> _isAndroid() async => true;
   static Future<bool> _isAndroid13OrHigher() async {
     if (!(await _isAndroid())) {
@@ -260,6 +272,7 @@ class PermissionHelper {
       return false;
     }
   }
+
   static Future<Permission> _getStoragePermission() async {
     if (await _isAndroid13OrHigher()) {
       return Permission.audio;

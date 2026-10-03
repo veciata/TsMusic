@@ -6,12 +6,14 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/services/permission_service.dart';
+
 class IntroductionScreen extends StatefulWidget {
   final VoidCallback onComplete;
   const IntroductionScreen({super.key, required this.onComplete});
   @override
   State<IntroductionScreen> createState() => _IntroductionScreenState();
 }
+
 class _IntroductionScreenState extends State<IntroductionScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -46,6 +48,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
       } catch (_) {}
     }
   }
+
   void _initPages() {
     final l10n = AppLocalizations.of(context);
     _pages = [
@@ -105,6 +108,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
       ),
     ];
   }
+
   Future<void> _checkPermissions() async {
     final permissionService = PermissionService();
     final hasStorage = await permissionService.hasStoragePermission();
@@ -116,11 +120,13 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
       });
     }
   }
+
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
+
   Future<void> _nextPage() async {
     final currentPageData = _pages[_currentPage];
     if (currentPageData.isPermissionPage) {
@@ -169,6 +175,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
       _goToNextPage();
     }
   }
+
   void _goToNextPage() {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
@@ -179,11 +186,13 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
       _completeIntroduction();
     }
   }
+
   Future<void> _completeIntroduction() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('intro_completed', true);
     widget.onComplete();
   }
+
   @override
   Widget build(BuildContext context) {
     if (_pages.isEmpty) {
@@ -304,7 +313,9 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
     );
   }
 }
+
 enum _PermissionType { storage, notification }
+
 class _IntroPage {
   final IconData icon;
   final String title;
@@ -325,6 +336,7 @@ class _IntroPage {
     this.permissionType,
   });
 }
+
 class _IntroPageView extends StatelessWidget {
   final _IntroPage page;
   const _IntroPageView({required this.page});
@@ -363,6 +375,7 @@ class _IntroPageView extends StatelessWidget {
     ),
   );
 }
+
 class _ThemePageView extends StatelessWidget {
   final _IntroPage page;
   final Color selectedColor;
@@ -476,6 +489,7 @@ class _ThemePageView extends StatelessWidget {
     );
   }
 }
+
 class _DownloadLocationPageView extends StatelessWidget {
   final _IntroPage page;
   final String selected;
@@ -564,6 +578,7 @@ class _DownloadLocationPageView extends StatelessWidget {
     );
   }
 }
+
 class _PermissionPageView extends StatelessWidget {
   final _IntroPage page;
   final VoidCallback onRequestPermission;
@@ -620,6 +635,7 @@ class _PermissionPageView extends StatelessWidget {
     );
   }
 }
+
 class _DotIndicator extends StatelessWidget {
   final bool isActive;
   final Color color;

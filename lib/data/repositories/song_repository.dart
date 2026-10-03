@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/song.dart';
+
 class SongRepository {
   SongRepository({DatabaseHelper? database})
     : _database = database ?? DatabaseHelper();
@@ -13,6 +14,7 @@ class SongRepository {
     );
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
   Future<bool> existsById(int id) async {
     final db = await _db;
     final rows = await db.query(
@@ -24,12 +26,14 @@ class SongRepository {
     );
     return rows.isNotEmpty;
   }
+
   static const String _notYouTubeOnly = "s.file_path NOT LIKE 'yt:%'";
 
   /// Tracks saved from YouTube: they carry a youtube_id and the 'tsmusic' tag.
   /// A file_path of 'yt:<id>' means the track is only a placeholder for an
   /// online stream, not something on the device.
-  static const String _downloadedOnly = '''
+  static const String _downloadedOnly =
+      '''
     s.youtube_id IS NOT NULL
     AND s.youtube_id != ''
     AND s.file_path NOT LIKE 'yt:%'
@@ -41,33 +45,32 @@ class SongRepository {
   ''';
   Future<List<Song>> getAllSongs() async {
     final db = await _db;
-    final rows = await db.rawQuery(
-      _songSelectQuery(where: _notYouTubeOnly),
-    );
+    final rows = await db.rawQuery(_songSelectQuery(where: _notYouTubeOnly));
     return _mapJoinedRows(rows);
   }
+
   Future<List<Song>> search(String query) async {
     final rows = await _database.searchSongs(query);
     final songs = <Song>[];
     for (final row in rows) {
       try {
         songs.add(await _songFromRow(row));
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     return songs;
   }
+
   Future<List<Song>> getPlaylistSongs(int playlistId) async {
     final rows = await _database.getSongsInPlaylist(playlistId);
     final songs = <Song>[];
     for (final row in rows) {
       try {
         songs.add(await _songFromRow(row));
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     return songs;
   }
+
   Future<void> recordPlay(int songId) async {
     final db = await _db;
     await db.rawUpdate(
@@ -76,6 +79,7 @@ class SongRepository {
       [DateTime.now().millisecondsSinceEpoch, songId],
     );
   }
+
   Future<List<Song>> getRecentlyPlayed({int limit = 20}) async {
     final db = await _db;
     final rows = await db.rawQuery(
@@ -85,6 +89,7 @@ class SongRepository {
     );
     return _mapJoinedRows(rows);
   }
+
   Future<List<Song>> getMostPlayed({int limit = 20}) async {
     final db = await _db;
     final rows = await db.rawQuery(
@@ -94,6 +99,7 @@ class SongRepository {
     );
     return _mapJoinedRows(rows);
   }
+
   Future<void> saveSong(Song song) async {
     final db = await _db;
     await db.transaction((txn) async {
@@ -102,10 +108,15 @@ class SongRepository {
         song.toDbMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      await _insertArtistsAndTags(txn, song, songId,
-          filterUnknownArtist: false);
+      await _insertArtistsAndTags(
+        txn,
+        song,
+        songId,
+        filterUnknownArtist: false,
+      );
     });
   }
+
   Future<void> saveSongs(List<Song> songs) async {
     final db = await _db;
     await db.transaction((txn) async {
@@ -116,13 +127,17 @@ class SongRepository {
             song.toDbMap(),
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
-          await _insertArtistsAndTags(txn, song, songId,
-              filterUnknownArtist: true);
-        } catch (e) {
-        }
+          await _insertArtistsAndTags(
+            txn,
+            song,
+            songId,
+            filterUnknownArtist: true,
+          );
+        } catch (e) {}
       }
     });
   }
+
   Future<void> ensureSongsInDatabase(List<Song> songs) async {
     final db = await _db;
     final missingSongs = <Song>[];
@@ -147,13 +162,17 @@ class SongRepository {
             song.toDbMap(),
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
-          await _insertArtistsAndTags(txn, song, songId,
-              filterUnknownArtist: true);
-        } catch (e) {
-        }
+          await _insertArtistsAndTags(
+            txn,
+            song,
+            songId,
+            filterUnknownArtist: true,
+          );
+        } catch (e) {}
       }
     });
   }
+
   Future<void> deleteSong(int songId) => _database.deleteSong(songId);
   Future<void> deleteSongsByIds(List<int> songIds) async {
     if (songIds.isEmpty) return;
@@ -172,6 +191,7 @@ class SongRepository {
       );
     });
   }
+
   Future<void> updateThumbnailPath(int songId, String thumbnailPath) =>
       _database.updateThumbnailPath(songId, thumbnailPath);
   Future<void> updateYouTubeId({
@@ -186,6 +206,7 @@ class SongRepository {
       whereArgs: [filePath],
     );
   }
+
   Future<void> updateNowPlayingPlaylist(List<int> songIds) =>
       _database.updateNowPlayingPlaylist(songIds);
   Future<int> addYouTubeSong({
@@ -194,14 +215,14 @@ class SongRepository {
     required List<String> artists,
     required int duration,
     String? thumbnailUrl,
-  }) =>
-      _database.addYouTubeSongToDatabase(
-        youtubeId: youtubeId,
-        title: title,
-        artists: artists,
-        duration: duration,
-        thumbnailUrl: thumbnailUrl,
-      );
+  }) => _database.addYouTubeSongToDatabase(
+    youtubeId: youtubeId,
+    title: title,
+    artists: artists,
+    duration: duration,
+    thumbnailUrl: thumbnailUrl,
+  );
+
   /// YouTube ids already saved on the device, regardless of which list is open.
   Future<Set<String>> getDownloadedYouTubeIds() async =>
       (await _database.getDownloadedYouTubeIds()).toSet();
@@ -213,12 +234,9 @@ class SongRepository {
   Future<List<Song>> getDownloadedYouTubeSongs() async {
     final db = await _db;
     final rows = await db.rawQuery('''
-      ${_songSelectQuery(
-        where: '''
+      ${_songSelectQuery(where: '''
           ${_downloadedOnly}
-        ''',
-        orderBy: 's.created_at DESC',
-      )}
+        ''', orderBy: 's.created_at DESC')}
     ''');
     return rows.map(_songFromJoinedRow).toList();
   }
@@ -238,6 +256,7 @@ class SongRepository {
       return null;
     }
   }
+
   Future<Song> addSongFromYouTube({
     required String videoId,
     required String filePath,
@@ -245,15 +264,14 @@ class SongRepository {
     required List<String> artists,
     required int duration,
     String? thumbnailPath,
-  }) =>
-      _database.addSongFromYouTube(
-        videoId: videoId,
-        filePath: filePath,
-        title: title,
-        artists: artists,
-        duration: duration,
-        thumbnailPath: thumbnailPath,
-      );
+  }) => _database.addSongFromYouTube(
+    videoId: videoId,
+    filePath: filePath,
+    title: title,
+    artists: artists,
+    duration: duration,
+    thumbnailPath: thumbnailPath,
+  );
   Future<void> addToPlaylist(int playlistId, List<int> songIds) =>
       _database.addSongsToPlaylist(playlistId, songIds);
   Future<int> _getOrCreateArtist(
@@ -277,10 +295,8 @@ class SongRepository {
       'created_at': DateTime.now().toIso8601String(),
     });
   }
-  Future<int> _getOrCreateGenre(
-    DatabaseExecutor txn,
-    String genreName,
-  ) async {
+
+  Future<int> _getOrCreateGenre(DatabaseExecutor txn, String genreName) async {
     final existingGenre = await txn.query(
       DatabaseHelper.tableGenres,
       where: '${DatabaseHelper.columnName} = ?',
@@ -294,6 +310,7 @@ class SongRepository {
       'created_at': DateTime.now().toIso8601String(),
     });
   }
+
   Future<void> _insertArtistsAndTags(
     DatabaseExecutor txn,
     Song song,
@@ -322,17 +339,19 @@ class SongRepository {
       }
     }
   }
+
   List<Song> _mapJoinedRows(List<Map<String, dynamic>> rows) {
     final songs = <Song>[];
     for (final row in rows) {
       try {
         songs.add(_songFromJoinedRow(row));
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     return songs;
   }
-  String _songSelectQuery({String? orderBy, String? where}) => '''
+
+  String _songSelectQuery({String? orderBy, String? where}) =>
+      '''
         SELECT
           s.*,
           (SELECT GROUP_CONCAT(name, ',') FROM artists a
@@ -359,7 +378,8 @@ class SongRepository {
 
   Song _songFromJoinedRow(Map<String, dynamic> row) {
     final artistNamesString = row['artist_names'] as String?;
-    final artistNames = artistNamesString != null && artistNamesString.isNotEmpty
+    final artistNames =
+        artistNamesString != null && artistNamesString.isNotEmpty
         ? artistNamesString
               .split(',')
               .where((name) => name.isNotEmpty && name != 'Unknown Artist')
@@ -391,6 +411,7 @@ class SongRepository {
       localThumbnailPath: row['thumbnail_path'] as String?,
     );
   }
+
   Future<Song> _songFromRow(Map<String, dynamic> row) async {
     final songId = row['id'] as int;
     final artistsData = await _database.getArtistsForSong(songId);

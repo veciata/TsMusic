@@ -7,6 +7,7 @@ import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/screens/now_playing_screen.dart';
 import 'package:tsmusic/models/player_styles.dart';
+
 Route _slideUpRoute() => PageRouteBuilder(
   pageBuilder: (context, animation, secondaryAnimation) =>
       const NowPlayingScreen(),
@@ -40,11 +41,13 @@ void _showMinimalPlayer(BuildContext context) {
     ),
   );
 }
+
 class MiniPlayerWidget extends StatefulWidget {
   const MiniPlayerWidget({super.key});
   @override
   State<MiniPlayerWidget> createState() => _MiniPlayerWidgetState();
 }
+
 class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
     with SingleTickerProviderStateMixin {
   double _progress = 0.0;
@@ -63,11 +66,13 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
       }
     });
   }
+
   @override
   void dispose() {
     _positionSubscription?.cancel();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final youTubeService = Provider.of<YouTubeService>(context, listen: false);
@@ -220,6 +225,7 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget>
     );
   }
 }
+
 class _ProgressBar extends StatelessWidget {
   final double progress;
   final bool isPlaying;
@@ -258,6 +264,7 @@ class _ProgressBar extends StatelessWidget {
     ),
   );
 }
+
 class _AlbumArt extends StatelessWidget {
   final String? albumArtUrl;
   final double size;
@@ -307,6 +314,7 @@ class _AlbumArt extends StatelessWidget {
     );
   }
 }
+
 class _PlayButton extends StatelessWidget {
   final bool isPlaying;
   final Color color;

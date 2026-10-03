@@ -17,6 +17,7 @@ import 'package:tsmusic/widgets/youtube_playback_widget.dart';
 import 'package:tsmusic/widgets/sliding_text.dart';
 import 'package:tsmusic/widgets/song_thumbnail.dart';
 import 'package:tsmusic/widgets/playlist_selector_bottom_sheet.dart';
+
 class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
   final ValueNotifier<String?> artistImageUrlNotifier;
@@ -28,6 +29,7 @@ class ArtistDetailScreen extends StatefulWidget {
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
 }
+
 class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -58,6 +60,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       _checkConnectivity();
     });
   }
+
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >=
@@ -65,6 +68,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       _loadMoreYouTubeSongs();
     }
   }
+
   Future<void> _fetchArtistImageIfNeeded() async {
     if (widget.artistImageUrlNotifier.value != null) return;
     final musicProvider = context.read<music_provider.MusicProvider>();
@@ -85,6 +89,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       });
     }
   }
+
   Future<void> _loadYouTubeSongs() async {
     if (_isOffline) {
       if (mounted) {
@@ -112,6 +117,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     }
   }
+
   Future<void> _loadMoreYouTubeSongs() async {
     if (_isOffline) {
       if (mounted) {
@@ -140,6 +146,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       setState(() => _isLoading = false);
     }
   }
+
   void _checkConnectivity() {
     Connectivity().checkConnectivity().then((results) {
       if (mounted) {
@@ -149,6 +156,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     });
   }
+
   Future<void> _playAudio(YouTubeAudio audio) async {
     try {
       await _youtubePlayer.playAudio(audio);
@@ -160,6 +168,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     }
   }
+
   Future<void> _handleDownload(YouTubeAudio audio) async {
     final settingsProvider = context.read<SettingsProvider>();
     final result = await _youTubeService.downloadAudio(
@@ -173,6 +182,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       );
     }
   }
+
   Future<void> _deleteLocalSong(Song song) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -211,6 +221,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       }
     }
   }
+
   void _playAllLocalSongs(
     List<Song> songs, {
     int startIndex = 0,
@@ -225,6 +236,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       musicProvider.playSongsFromList(songs, startIndex: startIndex);
     }
   }
+
   Future<void> _deleteSelectedLocalSongs() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -263,12 +275,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
               await file.delete();
             }
             await musicProvider.deleteSong(song);
-          } catch (e) {
-          }
+          } catch (e) {}
         }
       }
     }
   }
+
   Widget _buildArtistInitialFallback() => Container(
     color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
     alignment: Alignment.center,
@@ -289,6 +301,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
     _youtubePlayer.unregisterScreen('artist_screen');
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -358,6 +371,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
           : null,
     );
   }
+
   Widget _buildLocalSongsTab() {
     final musicProvider = context.watch<music_provider.MusicProvider>();
     final l10n = AppLocalizations.of(context);
@@ -517,6 +531,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       ],
     );
   }
+
   Widget _buildYouTubeTab() {
     final l10n = AppLocalizations.of(context);
     if (_isLoading && _youtubeSongs.isEmpty) {
@@ -547,11 +562,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
       },
     );
   }
+
   Widget _buildLoadingIndicator() => const Padding(
     padding: EdgeInsets.all(16.0),
     child: Center(child: CircularProgressIndicator()),
   );
 }
+
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
   _SliverTabBarDelegate(this.tabBar);

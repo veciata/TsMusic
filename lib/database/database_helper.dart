@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:tsmusic/models/song.dart';
+
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
@@ -30,6 +31,7 @@ class DatabaseHelper {
     _database = await _initDatabase();
     return _database!;
   }
+
   Future<List<Map<String, dynamic>>> getUniqueSongsWithArtist() async {
     final db = await database;
     return await db.rawQuery('''
@@ -50,6 +52,7 @@ class DatabaseHelper {
       ORDER BY s.title COLLATE NOCASE ASC
     ''');
   }
+
   DatabaseHelper._internal() {
     _initDatabase().then(_verifyDatabaseSchema);
   }
@@ -82,6 +85,7 @@ class DatabaseHelper {
     }
     return songs;
   }
+
   Future<bool> isDatabaseEmpty() async {
     final db = await database;
     final count = Sqflite.firstIntValue(
@@ -89,6 +93,7 @@ class DatabaseHelper {
     );
     return count == 0 || count == null;
   }
+
   Future<void> clearSongs() async {
     final db = await database;
     await db.delete(tableSongs);
@@ -96,6 +101,7 @@ class DatabaseHelper {
     _displayedSongs.clear();
     _songsMap.clear();
   }
+
   Future<void> _verifyDatabaseSchema(Database db) async {
     try {
       final tables = await db.rawQuery(
@@ -143,6 +149,7 @@ class DatabaseHelper {
       }
     }
   }
+
   Future<bool> verifyAndRepairTables() async {
     try {
       final db = await database;
@@ -152,6 +159,7 @@ class DatabaseHelper {
       return false;
     }
   }
+
   static const int databaseVersion = 7;
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), 'music_player.db');
@@ -162,6 +170,7 @@ class DatabaseHelper {
       onUpgrade: _onUpgrade,
     );
   }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('''
@@ -223,22 +232,19 @@ class DatabaseHelper {
           where: '$columnId = ?',
           whereArgs: [nowPlayingPlaylistId],
         );
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     if (oldVersion < 4) {
       try {
         await db.execute('ALTER TABLE $tableSongs ADD COLUMN youtube_id TEXT');
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     if (oldVersion < 5) {
       try {
         await db.execute(
           'ALTER TABLE $tableSongs ADD COLUMN thumbnail_path TEXT',
         );
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     if (oldVersion < 7) {
       try {
@@ -248,10 +254,10 @@ class DatabaseHelper {
         await db.execute(
           'ALTER TABLE $tableSongs ADD COLUMN last_played_at INTEGER',
         );
-      } catch (e) {
-      }
+      } catch (e) {}
     }
   }
+
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $tableArtists (
@@ -369,6 +375,7 @@ class DatabaseHelper {
       )
     ''');
   }
+
   Future<int> insertArtist(Map<String, dynamic> artist) async {
     final db = await database;
     return await db.insert(
@@ -377,6 +384,7 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
   Future<int> insertGenre(Map<String, dynamic> genre) async {
     final db = await database;
     return await db.insert(
@@ -385,10 +393,12 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
   Future<List<Map<String, dynamic>>> getGenres() async {
     final db = await database;
     return await db.query(tableGenres, orderBy: columnName);
   }
+
   Future<int> findSongIdByPath(String filePath) async {
     final db = await database;
     final result = await db.query(
@@ -399,6 +409,7 @@ class DatabaseHelper {
     );
     return result.isNotEmpty ? result.first['id'] as int : -1;
   }
+
   Future<int> insertSong(Map<String, dynamic> song) async {
     final db = await database;
     final existingId = await findSongIdByPath(song['file_path']);
@@ -414,14 +425,12 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
   Future<List<Map<String, dynamic>>> getSongs() async {
     final db = await database;
-    return await db.query(
-      tableSongs,
-      orderBy: 'title',
-      distinct: true,
-    );
+    return await db.query(tableSongs, orderBy: 'title', distinct: true);
   }
+
   Future<List<Map<String, dynamic>>> getSongsWithArtist() async {
     final db = await database;
     return await db.rawQuery('''
@@ -442,6 +451,7 @@ class DatabaseHelper {
       ORDER BY s.title COLLATE NOCASE ASC
     ''');
   }
+
   Future<int> addArtistToGenre(int artistId, int genreId) async {
     final db = await database;
     return await db.insert(tableArtistGenre, {
@@ -449,6 +459,7 @@ class DatabaseHelper {
       'genre_id': genreId,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
+
   Future<int> addArtistToSong(int songId, int artistId) async {
     final db = await database;
     return await db.insert(tableSongArtist, {
@@ -456,6 +467,7 @@ class DatabaseHelper {
       'artist_id': artistId,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
+
   Future<int> addGenreToSong(int songId, int genreId) async {
     final db = await database;
     return await db.insert(tableSongGenre, {
@@ -463,6 +475,7 @@ class DatabaseHelper {
       'genre_id': genreId,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
+
   Future<int> addTagToSong(int songId, int tagId) async {
     final db = await database;
     return await db.insert(tableSongTags, {
@@ -470,6 +483,7 @@ class DatabaseHelper {
       'tag_id': tagId,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
+
   Future<List<Map<String, dynamic>>> getGenresForArtist(int artistId) async {
     final db = await database;
     return await db.rawQuery(
@@ -482,6 +496,7 @@ class DatabaseHelper {
       [artistId],
     );
   }
+
   Future<List<Map<String, dynamic>>> getArtistsForSong(int songId) async {
     final db = await database;
     return await db.rawQuery(
@@ -494,6 +509,7 @@ class DatabaseHelper {
       [songId],
     );
   }
+
   Future<List<Map<String, dynamic>>> getSongsByArtist(int artistId) async {
     final db = await database;
     return await db.rawQuery(
@@ -506,6 +522,7 @@ class DatabaseHelper {
       [artistId],
     );
   }
+
   Future<List<Map<String, dynamic>>> getSongsByGenre(int genreId) async {
     final db = await database;
     return await db.rawQuery(
@@ -517,6 +534,7 @@ class DatabaseHelper {
       [genreId],
     );
   }
+
   Future<List<Map<String, dynamic>>> searchSongs(String query) async {
     final db = await database;
     final searchTerm = '%$query%';
@@ -533,6 +551,7 @@ class DatabaseHelper {
       [searchTerm, searchTerm],
     );
   }
+
   Future<List<Map<String, dynamic>>> getGenresForSong(int songId) async {
     final db = await database;
     return await db.rawQuery(
@@ -545,6 +564,7 @@ class DatabaseHelper {
       [songId],
     );
   }
+
   Future<List<Map<String, dynamic>>> getTagsForSong(int songId) async {
     final db = await database;
     return await db.rawQuery(
@@ -557,6 +577,7 @@ class DatabaseHelper {
       [songId],
     );
   }
+
   /// Every YouTube `videoId` already saved on this device, across all
   /// playlists and saved lists.
   ///
@@ -640,6 +661,7 @@ class DatabaseHelper {
       }
     });
   }
+
   Future<int> _getOrCreateArtist(Transaction txn, String artistName) async {
     if (artistName.trim().isEmpty) {
       throw ArgumentError('Artist name cannot be empty');
@@ -658,6 +680,7 @@ class DatabaseHelper {
       columnCreatedAt: DateTime.now().toIso8601String(),
     });
   }
+
   Future<int> _getOrCreateGenre(Transaction txn, String genreName) async {
     if (genreName.trim().isEmpty) {
       throw ArgumentError('Genre name cannot be empty');
@@ -675,6 +698,7 @@ class DatabaseHelper {
       columnCreatedAt: DateTime.now().toIso8601String(),
     });
   }
+
   Future<int> _getOrCreateTag(Transaction txn, String tagName) async {
     if (tagName.trim().isEmpty) {
       throw ArgumentError('Tag name cannot be empty');
@@ -692,6 +716,7 @@ class DatabaseHelper {
       columnCreatedAt: DateTime.now().toIso8601String(),
     });
   }
+
   static const int nowPlayingPlaylistId = 1;
   Future<void> _ensureNowPlayingPlaylist() async {
     final db = await database;
@@ -704,6 +729,7 @@ class DatabaseHelper {
       columnCreatedAt: DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
+
   Future<int> createPlaylist(
     String name, {
     String? description,
@@ -717,6 +743,7 @@ class DatabaseHelper {
       'cover_art_url': coverArtUrl,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
+
   Future<int> updatePlaylist(
     int playlistId, {
     String? name,
@@ -736,6 +763,7 @@ class DatabaseHelper {
       whereArgs: [playlistId],
     );
   }
+
   Future<int> deletePlaylist(int playlistId) async {
     if (playlistId == nowPlayingPlaylistId) {
       throw Exception('Cannot delete the Now Playing playlist');
@@ -747,6 +775,7 @@ class DatabaseHelper {
       whereArgs: [playlistId],
     );
   }
+
   Future<List<Map<String, dynamic>>> getAllPlaylists() async {
     try {
       final db = await database;
@@ -779,6 +808,7 @@ class DatabaseHelper {
       rethrow;
     }
   }
+
   Future<Map<String, dynamic>?> getPlaylist(int playlistId) async {
     final db = await database;
     if (playlistId == nowPlayingPlaylistId) {
@@ -791,6 +821,7 @@ class DatabaseHelper {
     );
     return result.isNotEmpty ? result.first : null;
   }
+
   Future<int> addSongsToPlaylist(int playlistId, List<int> songIds) async {
     final db = await database;
     int count = 0;
@@ -819,6 +850,7 @@ class DatabaseHelper {
     });
     return count;
   }
+
   Future<int> removeSongsFromPlaylist(int playlistId, List<int> songIds) async {
     if (songIds.isEmpty) return 0;
     final db = await database;
@@ -829,6 +861,7 @@ class DatabaseHelper {
       whereArgs: [playlistId, ...songIds],
     );
   }
+
   Future<List<Map<String, dynamic>>> getSongsInPlaylist(int playlistId) async {
     final db = await database;
     if (playlistId == nowPlayingPlaylistId) {
@@ -845,6 +878,7 @@ class DatabaseHelper {
       [playlistId],
     );
   }
+
   Future<void> updateNowPlayingPlaylist(List<int> songIds) async {
     final db = await database;
     await db.transaction((txn) async {
@@ -862,6 +896,7 @@ class DatabaseHelper {
       }
     });
   }
+
   Future<bool> isSongInPlaylist(int playlistId, int songId) async {
     final db = await database;
     final result = await db.query(
@@ -872,6 +907,7 @@ class DatabaseHelper {
     );
     return (result.first['count'] as int?) == 1;
   }
+
   Future<int> reorderPlaylistSongs(
     int playlistId,
     Map<int, int> newPositions,
@@ -894,10 +930,12 @@ class DatabaseHelper {
     });
     return count;
   }
+
   Future<void> close() async {
     final db = await database;
     await db.close();
   }
+
   Future<void> updateThumbnailPath(int songId, String thumbnailPath) async {
     final db = await database;
     await db.update(
@@ -907,10 +945,12 @@ class DatabaseHelper {
       whereArgs: [songId],
     );
   }
+
   Future<void> deleteSong(int songId) async {
     final db = await database;
     await db.delete(tableSongs, where: '$columnId = ?', whereArgs: [songId]);
   }
+
   Future<Song> addSongFromYouTube({
     required String videoId,
     required String filePath,
@@ -984,6 +1024,7 @@ class DatabaseHelper {
       localThumbnailPath: map['thumbnail_path'] as String?,
     );
   }
+
   Future<int> addYouTubeSongToDatabase({
     required String youtubeId,
     required String title,

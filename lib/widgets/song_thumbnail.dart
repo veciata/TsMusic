@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/providers/music_provider.dart' as mp;
+
 class SongThumbnail extends StatelessWidget {
   final Song song;
   final double size;
@@ -47,6 +48,7 @@ class SongThumbnail extends StatelessWidget {
     }
     return _buildFallback(context);
   }
+
   Widget _buildFallback(BuildContext context) => Container(
     width: size,
     height: size,

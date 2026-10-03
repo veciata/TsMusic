@@ -11,6 +11,7 @@ import 'package:tsmusic/data/repositories/song_repository.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/services/thumbnail_service.dart';
+
 class LibraryViewModel extends ChangeNotifier {
   final SongRepository _songRepository;
   static const List<String> audioExtensions = [
@@ -45,7 +46,7 @@ class LibraryViewModel extends ChangeNotifier {
   Future<void> Function()? onNowPlayingReloadRequested;
   Future<void> Function()? onQueuePersistenceRequested;
   LibraryViewModel({SongRepository? songRepository})
-      : _songRepository = songRepository ?? SongRepository();
+    : _songRepository = songRepository ?? SongRepository();
   List<Song> get songs => _displayedSongs;
   List<Song> get filteredSongs => _filteredSongs;
   List<Song> get librarySongs => _songsMap.values.toList();
@@ -66,6 +67,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     return artistSet.toList()..sort((a, b) => a.compareTo(b));
   }
+
   void addSongToLibrary(Song song) {
     if (!_songsMap.containsKey(song.url)) {
       _songsMap[song.url] = song;
@@ -73,11 +75,13 @@ class LibraryViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   void removeSongFromLibrary(Song song) {
     _displayedSongs.removeWhere((s) => s.id == song.id);
     _songsMap.remove(song.url);
     notifyListeners();
   }
+
   void updateSongInPlace(Song updated) {
     for (int i = 0; i < _displayedSongs.length; i++) {
       if (_displayedSongs[i].id == updated.id) {
@@ -90,14 +94,17 @@ class LibraryViewModel extends ChangeNotifier {
     onSongUpdated?.call(updated);
     notifyListeners();
   }
+
   void setDisplayedSongs(List<Song> songs) {
     _displayedSongs = List.of(songs);
     notifyListeners();
   }
+
   void clearDisplayedSongs() {
     _displayedSongs.clear();
     notifyListeners();
   }
+
   Future<void> clearLibraryCache() async {
     try {
       _songsMap.clear();
@@ -105,9 +112,9 @@ class LibraryViewModel extends ChangeNotifier {
       onLibraryCacheCleared?.call();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_songsKey);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<void> saveSongsToCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -115,9 +122,11 @@ class LibraryViewModel extends ChangeNotifier {
       jsonEncode(_cachedSongs.map((s) => s.toJson()).toList()),
     );
   }
+
   void initThumbnailService() {
     _initThumbnailService();
   }
+
   void _initThumbnailService() {
     _thumbnailService = ThumbnailService();
     _thumbnailService!.onThumbnailReady = (song, localPath) {
@@ -140,6 +149,7 @@ class LibraryViewModel extends ChangeNotifier {
       }
     };
   }
+
   bool isThumbnailLoading(Song song) {
     if (song.localThumbnailPath != null) return false;
     final ytId = song.youtubeId;
@@ -151,6 +161,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     return false;
   }
+
   void requestThumbnail(Song song, {int priority = 2}) {
     if (song.localThumbnailPath != null) return;
     final ytId = song.youtubeId;
@@ -166,6 +177,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     _thumbnailService?.requestThumbnail(song, priority: priority);
   }
+
   void _startBackgroundThumbnails() {
     if (_thumbnailBgStarted) return;
     _thumbnailBgStarted = true;
@@ -204,16 +216,19 @@ class LibraryViewModel extends ChangeNotifier {
       }
     });
   }
+
   void setSortOption(SongSortOption option) {
     _currentSortOption = option;
     _applySorting();
     notifyListeners();
   }
+
   void toggleSortDirection() {
     _sortAscending = !_sortAscending;
     _applySorting();
     notifyListeners();
   }
+
   List<Song> sortLibrary({
     required SongSortOption sortBy,
     bool ascending = true,
@@ -247,6 +262,7 @@ class LibraryViewModel extends ChangeNotifier {
     _displayedSongs = List.of(sortedSongs);
     return sortedSongs;
   }
+
   void _applySorting() {
     switch (_currentSortOption) {
       case SongSortOption.title:
@@ -292,6 +308,7 @@ class LibraryViewModel extends ChangeNotifier {
         break;
     }
   }
+
   Future<void> filterSongs(String query) async {
     if (query.isEmpty) {
       _displayedSongs = _cachedSongs;
@@ -331,6 +348,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     notifyListeners();
   }
+
   String? getArtistImageUrl(String artistName) {
     final artistSongs = getSongsByArtist(artistName);
     if (artistSongs.isNotEmpty) {
@@ -338,6 +356,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     return null;
   }
+
   String? getAlbumArtUrl(String albumName, {String? artistName}) {
     for (final song in _songsMap.values) {
       if (song.album == albumName &&
@@ -348,6 +367,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     return null;
   }
+
   List<Song> getSongsByArtist(String artistName) => _songsMap.values
       .where((song) => song.artists.any((artist) => artist == artistName))
       .toList();
@@ -371,6 +391,7 @@ class LibraryViewModel extends ChangeNotifier {
     }
     return albumSet.toList()..sort();
   }
+
   Future<void> recordPlay(Song song) => _songRepository.recordPlay(song.id);
   Future<List<Song>> getRecentlyPlayed({int limit = 20}) =>
       _songRepository.getRecentlyPlayed(limit: limit);
@@ -396,6 +417,7 @@ class LibraryViewModel extends ChangeNotifier {
       rethrow;
     }
   }
+
   Future<void> loadFromDatabaseOnly() async {
     if (_isLoading) return;
     try {
@@ -429,6 +451,7 @@ class LibraryViewModel extends ChangeNotifier {
       rethrow;
     }
   }
+
   Future<void> loadLocalMusic({bool forceRescan = false}) async {
     if (_isLoading) return;
     try {
@@ -477,6 +500,7 @@ class LibraryViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   Future<void> refreshSongs() async {
     try {
       _thumbnailBgStarted = false;
@@ -492,9 +516,9 @@ class LibraryViewModel extends ChangeNotifier {
       await _loadSongsFromDatabase();
       _applySorting();
       await onNowPlayingReloadRequested?.call();
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<void> loadLocalMusicWithRetry({bool forceRescan = false}) async {
     try {
       await loadLocalMusic(forceRescan: forceRescan);
@@ -519,15 +543,18 @@ class LibraryViewModel extends ChangeNotifier {
       }
     }
   }
+
   Future<void> retryLoading() async {
     _retryCount = 0;
     _error = null;
     notifyListeners();
     await loadLocalMusicWithRetry(forceRescan: true);
   }
+
   Future<void> scanForNewMusic() async {
     await loadLocalMusic(forceRescan: true);
   }
+
   Future<void> _scanLocalStorageForMusic({bool background = false}) async {
     if (!background) {
       _isLoading = true;
@@ -598,6 +625,7 @@ class LibraryViewModel extends ChangeNotifier {
       }
     }
   }
+
   Future<void> _cleanupDeletedSongs() async {
     try {
       final allSongs = await _songRepository.getAllSongs();
@@ -612,9 +640,9 @@ class LibraryViewModel extends ChangeNotifier {
       if (songsToRemove.isNotEmpty) {
         await _songRepository.deleteSongsByIds(songsToRemove);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<void> _cleanupOldDuplicateFiles() async {
     try {
       final musicDirectories = await _getAllMusicDirectories();
@@ -660,17 +688,15 @@ class LibraryViewModel extends ChangeNotifier {
               for (final file in toDelete) {
                 try {
                   await file.delete();
-                } catch (e) {
-                }
+                } catch (e) {}
               }
             }
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<bool> _checkStoragePermission() async {
     if (Platform.isAndroid) {
       final androidInfo = await DeviceInfoPlugin().androidInfo;
@@ -694,6 +720,7 @@ class LibraryViewModel extends ChangeNotifier {
       return status.isGranted;
     }
   }
+
   Future<List<String>> _getAllMusicDirectories() async {
     final musicDirectories = <String>{};
     final standardPaths = [
@@ -709,6 +736,7 @@ class LibraryViewModel extends ChangeNotifier {
         .toList();
     return uniquePaths;
   }
+
   Future<Map<String, dynamic>> _scanAllDirectoriesParallel(
     List<String> directories,
   ) async {
@@ -732,11 +760,11 @@ class LibraryViewModel extends ChangeNotifier {
             totalFilesFound += result['count'] as int;
           }
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     return {'files': allMusicFiles, 'totalFiles': totalFilesFound};
   }
+
   Future<Map<String, dynamic>?> _scanSingleDirectory(
     String dirPath,
     Set<String> processedPaths,
@@ -760,18 +788,17 @@ class LibraryViewModel extends ChangeNotifier {
                 processedPaths.add(entity.path);
                 fileCount++;
               }
-            } catch (_) {
-            }
+            } catch (_) {}
           }
         }
       }
-      if (fileCount > 0) {
-      }
+      if (fileCount > 0) {}
       return {'files': musicFiles, 'count': fileCount};
     } catch (e) {
       return null;
     }
   }
+
   Future<List<File>> _scanAlternativeLocations() async {
     final List<File> alternativeFiles = [];
     final alternativePaths = ['/storage', '/mnt', '/data', '/system'];
@@ -791,17 +818,16 @@ class LibraryViewModel extends ChangeNotifier {
                   if (stat.size > 512) {
                     alternativeFiles.add(entity);
                   }
-                } catch (_) {
-                }
+                } catch (_) {}
               }
             }
           }
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     return alternativeFiles;
   }
+
   Future<void> _processAndAddAllSongs(
     List<File> musicFiles,
     bool background,
@@ -819,8 +845,7 @@ class LibraryViewModel extends ChangeNotifier {
         if (song != null) {
           validSongs.add(song);
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     if (validSongs.isEmpty) {
       return;
@@ -834,6 +859,7 @@ class LibraryViewModel extends ChangeNotifier {
     _displayedSongs = _cachedSongs;
     await onQueuePersistenceRequested?.call();
   }
+
   Future<Song?> _processMusicFile(File file) async {
     try {
       final fileName = path.basenameWithoutExtension(file.path);
@@ -935,6 +961,7 @@ class LibraryViewModel extends ChangeNotifier {
       return null;
     }
   }
+
   Future<Duration> _getAudioDuration(String filePath) async {
     try {
       final file = File(filePath);
@@ -969,6 +996,7 @@ class LibraryViewModel extends ChangeNotifier {
       return Duration.zero;
     }
   }
+
   Future<void> _checkForNewMusicInBackground() async {
     try {
       if (_isDatabaseInitialized) return;
@@ -981,9 +1009,9 @@ class LibraryViewModel extends ChangeNotifier {
         await _scanLocalStorageForMusic(background: true);
         await prefs.setInt('last_music_scan', now);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   @override
   void dispose() {
     _loadingNotifier.dispose();

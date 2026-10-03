@@ -9,6 +9,7 @@ import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/models/song.dart' as ts;
 import 'package:tsmusic/utils/download_enqueue.dart';
 import 'package:tsmusic/services/download_queue.dart';
+
 class NowPlayingQueueBottomSheet extends StatelessWidget {
   const NowPlayingQueueBottomSheet({super.key});
   @override
@@ -57,7 +58,10 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
                     color: theme.colorScheme.onSurface.withAlpha(179),
                   ),
                 ),
-                if (_queueDownloadRequests(localQueue, onlineSongs).isNotEmpty) ...[
+                if (_queueDownloadRequests(
+                  localQueue,
+                  onlineSongs,
+                ).isNotEmpty) ...[
                   const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.download_for_offline_outlined),
@@ -369,6 +373,7 @@ class NowPlayingQueueBottomSheet extends StatelessWidget {
     );
   }
 }
+
 void showNowPlayingQueue(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -377,9 +382,11 @@ void showNowPlayingQueue(BuildContext context) {
     builder: (context) => const NowPlayingQueueBottomSheet(),
   );
 }
+
 extension on BuildContext {
   YouTubeService get _youTubeService => read<YouTubeService>();
 }
+
 Future<void> _pastePlaylist(BuildContext context) async {
   final yt = context._youTubeService;
   final data = await Clipboard.getData(Clipboard.kTextPlain);
@@ -418,6 +425,7 @@ Future<void> _pastePlaylist(BuildContext context) async {
     }
   }
 }
+
 class _OnlineDownloadButton extends StatefulWidget {
   final ts.Song song;
   final YouTubeService youTubeService;
@@ -430,6 +438,7 @@ class _OnlineDownloadButton extends StatefulWidget {
   @override
   State<_OnlineDownloadButton> createState() => _OnlineDownloadButtonState();
 }
+
 class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
   bool _isDownloaded = false;
   @override
@@ -437,13 +446,16 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
     super.initState();
     _checkDownloaded();
   }
+
   void _checkDownloaded() {
     // Read from the service's database-backed cache rather than
     // musicProvider.librarySongs, which only holds downloads made while the
     // library happened to be loaded.
-    _isDownloaded =
-        widget.youTubeService.isVideoDownloaded(widget.song.youtubeId ?? '');
+    _isDownloaded = widget.youTubeService.isVideoDownloaded(
+      widget.song.youtubeId ?? '',
+    );
   }
+
   @override
   Widget build(BuildContext context) {
     final activeDownloadsList = widget.youTubeService.activeDownloads
@@ -507,6 +519,7 @@ class _OnlineDownloadButtonState extends State<_OnlineDownloadButton> {
     );
   }
 }
+
 List<DownloadRequest> _queueDownloadRequests(
   List<ts.Song> localQueue,
   List<ts.Song> onlineSongs,
@@ -522,6 +535,7 @@ List<DownloadRequest> _queueDownloadRequests(
   }
   return byId.values.toList();
 }
+
 Future<void> _downloadAllOnlineQueue(BuildContext context) async {
   final musicProvider = context.read<music_provider.MusicProvider>();
   final requests = _queueDownloadRequests(

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 class PermissionService {
   Future<bool> hasStoragePermission() async {
     if (kIsWeb || !Platform.isAndroid) return true;
@@ -14,6 +15,7 @@ class PermissionService {
     }
     return status.isGranted;
   }
+
   Future<bool> requestStoragePermission() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     final deviceInfo = await DeviceInfoPlugin().androidInfo;
@@ -35,16 +37,19 @@ class PermissionService {
       return status.isGranted;
     }
   }
+
   Future<bool> hasNotificationPermission() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     final status = await Permission.notification.status;
     return status.isGranted || status.isLimited;
   }
+
   Future<bool> requestNotificationPermission() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     final status = await Permission.notification.request();
     return status.isGranted;
   }
+
   Future<bool> hasAllPermissions() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     final deviceInfo = await DeviceInfoPlugin().androidInfo;

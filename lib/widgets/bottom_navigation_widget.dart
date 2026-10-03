@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
+
 class BottomNavigationWidget extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;

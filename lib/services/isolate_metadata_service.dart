@@ -1,11 +1,13 @@
 import 'dart:isolate';
 import 'dart:io';
 import 'package:media_kit/media_kit.dart';
+
 class _MetadataExtractionRequest {
   final String filePath;
   final SendPort sendPort;
   _MetadataExtractionRequest({required this.filePath, required this.sendPort});
 }
+
 class _MetadataExtractionResult {
   final String? title;
   final String? artist;
@@ -18,6 +20,7 @@ class _MetadataExtractionResult {
     this.duration,
   });
 }
+
 class IsolateMetadataExtractionService {
   static IsolateMetadataExtractionService? _instance;
   Isolate? _isolate;
@@ -31,6 +34,7 @@ class IsolateMetadataExtractionService {
     _receivePort = ReceivePort();
     _isolate = await Isolate.spawn(_isolateEntryPoint, _receivePort!.sendPort);
   }
+
   Future<Map<String, dynamic>?> extractMetadata(String filePath) async {
     if (_sendPort == null) await initialize();
     final responsePort = ReceivePort();
@@ -52,10 +56,10 @@ class IsolateMetadataExtractionService {
           'duration': result.duration,
         };
       }
-    } catch (e) {
-    }
+    } catch (e) {}
     return null;
   }
+
   Future<List<Map<String, dynamic>>> extractBatchMetadata(
     List<String> filePaths,
   ) async {
@@ -63,6 +67,7 @@ class IsolateMetadataExtractionService {
     final results = await Future.wait(futures);
     return results.whereType<Map<String, dynamic>>().toList();
   }
+
   void dispose() {
     _isolate?.kill();
     _receivePort?.close();
@@ -70,6 +75,7 @@ class IsolateMetadataExtractionService {
     _receivePort = null;
     _sendPort = null;
   }
+
   static void _isolateEntryPoint(SendPort mainSendPort) {
     final receivePort = ReceivePort();
     mainSendPort.send(receivePort.sendPort);

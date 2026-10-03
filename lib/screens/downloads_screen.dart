@@ -15,11 +15,13 @@ import 'package:tsmusic/widgets/sliding_text.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'search_screen.dart';
 import 'package:animations/animations.dart';
+
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
   @override
   State<DownloadsScreen> createState() => _DownloadsScreenState();
 }
+
 class _DownloadsScreenState extends State<DownloadsScreen> {
   late YouTubeService _youTubeService;
   late SettingsProvider _settingsProvider;
@@ -47,6 +49,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       _downloadsLoaded = true;
     });
   }
+
   final Set<int> _selectedSongs = {};
   bool _isMultiSelectMode = false;
   @override
@@ -64,6 +67,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
     unawaited(_loadDownloadedSongs());
   }
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +93,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
     unawaited(_loadDownloadedSongs(force: true));
   }
+
   @override
   void dispose() {
     _youTubeService.removeListener(_onDownloadsChanged);
@@ -96,11 +101,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     DownloadNotificationService().isDownloadsScreenVisible = false;
     super.dispose();
   }
+
   void _onDownloadsChanged() {
     if (mounted) {
       setState(() {});
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -175,118 +182,117 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       body: _buildDownloadsList(),
     );
   }
-  Widget _buildDownloadsList() =>
-      Consumer2<YouTubeService, music_provider.MusicProvider>(
-        builder: (context, youTubeService, musicProvider, _) {
-          final activeDownloads = youTubeService.activeDownloads;
-          final queue = youTubeService.downloadQueue;
-          final queued = queue.entries
-              .where((e) => !e.isFinished || e.state == DownloadQueueState.done)
-              .toList();
-          // Read from the database rather than the loaded song list: the loaded
-          // list changes with whatever playlist is open, which used to make
-          // downloads vanish from this page.
-          final downloadedSongs = _downloadedSongs;
-          // Newest first. The database half arrives sorted; the scanned files
-          // are merged in by date so the whole list reads chronologically
-          // rather than as two unrelated blocks.
-          final allSongs = [...downloadedSongs, ..._localFiles]..sort(
-            (a, b) => b.dateAdded.compareTo(a.dateAdded),
-          );
-          if (activeDownloads.isEmpty &&
-              queue.entries.isEmpty &&
-              allSongs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.music_off,
-                    size: 64,
-                    color: Theme.of(context).disabledColor,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No downloads yet',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Download songs from the search tab',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            );
-          }
-          return ListView(
+
+  Widget
+  _buildDownloadsList() => Consumer2<YouTubeService, music_provider.MusicProvider>(
+    builder: (context, youTubeService, musicProvider, _) {
+      final activeDownloads = youTubeService.activeDownloads;
+      final queue = youTubeService.downloadQueue;
+      final queued = queue.entries
+          .where((e) => !e.isFinished || e.state == DownloadQueueState.done)
+          .toList();
+      // Read from the database rather than the loaded song list: the loaded
+      // list changes with whatever playlist is open, which used to make
+      // downloads vanish from this page.
+      final downloadedSongs = _downloadedSongs;
+      // Newest first. The database half arrives sorted; the scanned files
+      // are merged in by date so the whole list reads chronologically
+      // rather than as two unrelated blocks.
+      final allSongs = [...downloadedSongs, ..._localFiles]
+        ..sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+      if (activeDownloads.isEmpty &&
+          queue.entries.isEmpty &&
+          allSongs.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (queued.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Download queue',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      if (queue.isWorking)
-                        TextButton.icon(
-                          icon: const Icon(Icons.stop_circle_outlined),
-                          label: const Text('Stop'),
-                          onPressed: () =>
-                              queue.requestCancel(),
-                        )
-                      else if (queue.finishedEntries.isNotEmpty)
-                        TextButton.icon(
-                          icon: const Icon(Icons.clear_all),
-                          label: const Text('Clear'),
-                          onPressed: () => queue.clearFinished(),
-                        ),
-                    ],
-                  ),
-                ),
-                if (queue.isWorking)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+              Icon(
+                Icons.music_off,
+                size: 64,
+                color: Theme.of(context).disabledColor,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No downloads yet',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Download songs from the search tab',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        );
+      }
+      return ListView(
+        children: [
+          if (queued.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
+              child: Row(
+                children: [
+                  const Expanded(
                     child: Text(
-                      '${queue.completedCount + queue.failedCount} of ${queue.totalCount} done',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      'Download queue',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                ...queued.map(_buildQueueItem),
-                const Divider(),
-              ],
-              if (activeDownloads.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'Downloading...',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  if (queue.isWorking)
+                    TextButton.icon(
+                      icon: const Icon(Icons.stop_circle_outlined),
+                      label: const Text('Stop'),
+                      onPressed: () => queue.requestCancel(),
+                    )
+                  else if (queue.finishedEntries.isNotEmpty)
+                    TextButton.icon(
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Clear'),
+                      onPressed: () => queue.clearFinished(),
+                    ),
+                ],
+              ),
+            ),
+            if (queue.isWorking)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  '${queue.completedCount + queue.failedCount} of ${queue.totalCount} done',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                ...activeDownloads.map(_buildDownloadItem),
-                const Divider(),
-              ],
-              if (allSongs.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'Downloaded',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-                ...allSongs.map(_buildSongItem),
-              ],
-            ],
-          );
-        },
+              ),
+            ...queued.map(_buildQueueItem),
+            const Divider(),
+          ],
+          if (activeDownloads.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Downloading...',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            ...activeDownloads.map(_buildDownloadItem),
+            const Divider(),
+          ],
+          if (allSongs.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Downloaded',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            ...allSongs.map(_buildSongItem),
+          ],
+        ],
       );
+    },
+  );
   Widget _buildQueueItem(DownloadQueueEntry entry) {
     final theme = Theme.of(context);
     final (icon, tint, trailing) = switch (entry.state) {
@@ -329,7 +335,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           entry.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: entry.state == DownloadQueueState.done ||
+          style:
+              entry.state == DownloadQueueState.done ||
                   entry.state == DownloadQueueState.cancelled
               ? const TextStyle(decoration: TextDecoration.lineThrough)
               : null,
@@ -342,22 +349,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   minHeight: 3,
                 ),
               )
-            : entry.state == DownloadQueueState.failed &&
-                  entry.error != null
+            : entry.state == DownloadQueueState.failed && entry.error != null
             ? Text(
                 entry.error!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: theme.colorScheme.error,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
               )
             : null,
         trailing: trailing,
       ),
     );
   }
+
   Future<void> _retryQueueEntry(DownloadQueueEntry entry) async {
     final result = await _youTubeService.downloadQueue.enqueueAll([
       DownloadRequest(videoId: entry.videoId, title: entry.title),
@@ -367,6 +371,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       context,
     ).showSnackBar(SnackBar(content: Text('Retrying ${entry.title}')));
   }
+
   Widget _buildDownloadItem(dynamic download) => Card(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     child: ListTile(
@@ -459,6 +464,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     _youTubeService.dismissDownload(videoId);
     setState(() {});
   }
+
   Widget _buildSongItem(Song song) => Card(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     child: ListTile(
@@ -560,6 +566,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       child: const Icon(Icons.music_note),
     );
   }
+
   Future<void> _scanLocalFiles() async {
     try {
       final musicProvider = Provider.of<music_provider.MusicProvider>(
@@ -573,9 +580,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           _localFiles = localFiles;
         });
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<void> _showRelocateDialog(Song song) async {
     final settingsProvider = Provider.of<SettingsProvider>(
       context,
@@ -653,6 +660,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       }
     }
   }
+
   Future<void> _deleteSong(Song song) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -694,6 +702,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       }
     }
   }
+
   Future<void> _deleteSelected() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -732,18 +741,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               listen: false,
             );
             await musicProvider.deleteSong(song);
-          } catch (e) {
-          }
+          } catch (e) {}
         }
       }
       _selectedSongs.clear();
       unawaited(_scanLocalFiles());
     }
   }
+
   Future<Directory> _getMusicDirectory(String downloadLocation) async {
     final baseDir = await getApplicationDocumentsDirectory();
     return Directory('${baseDir.path}/tsmusic');
   }
+
   Future<void> addDownload(String videoId, String title) async {
     if (!_downloadProgress.containsKey(videoId)) {
       setState(() {

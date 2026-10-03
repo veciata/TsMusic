@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/player_styles.dart';
 import 'package:tsmusic/core/theme/app_theme.dart' as app_theme;
+
 class ThemeProvider with ChangeNotifier {
   static const String _themeModeKey = 'theme_mode';
   static const String _primaryColorKey = 'primary_color';
@@ -14,6 +15,7 @@ class ThemeProvider with ChangeNotifier {
   set onWidgetUpdateNeeded(VoidCallback callback) {
     _onWidgetUpdateNeeded = callback;
   }
+
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _isDarkMode;
   Color get primaryColor => _primaryColor;
@@ -31,6 +33,7 @@ class ThemeProvider with ChangeNotifier {
     _updateDarkMode();
     notifyListeners();
   }
+
   void _updateDarkMode() {
     _isDarkMode =
         _themeMode == ThemeMode.dark ||
@@ -38,6 +41,7 @@ class ThemeProvider with ChangeNotifier {
             WidgetsBinding.instance.platformDispatcher.platformBrightness ==
                 Brightness.dark);
   }
+
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     _updateDarkMode();
@@ -46,6 +50,7 @@ class ThemeProvider with ChangeNotifier {
     notifyListeners();
     _onWidgetUpdateNeeded?.call();
   }
+
   Future<void> setPrimaryColor(Color color) async {
     _primaryColor = color;
     final prefs = await SharedPreferences.getInstance();
@@ -53,17 +58,20 @@ class ThemeProvider with ChangeNotifier {
     notifyListeners();
     _onWidgetUpdateNeeded?.call();
   }
+
   Future<void> setPlayerStyle(PlayerStyle style) async {
     _playerStyle = style;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_playerStyleKey, style.index);
     notifyListeners();
   }
+
   Future<void> toggleTheme() async {
     await setThemeMode(
       _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
     );
   }
+
   ThemeData getLightTheme() => app_theme.buildLightTheme(_primaryColor);
   ThemeData getDarkTheme() => app_theme.buildDarkTheme(_primaryColor);
   String getPlayerStyleName(PlayerStyle style) => style.displayName;

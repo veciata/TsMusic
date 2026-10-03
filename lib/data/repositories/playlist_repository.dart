@@ -1,5 +1,6 @@
 import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/playlist.dart';
+
 class PlaylistRepository {
   PlaylistRepository({DatabaseHelper? database})
     : _database = database ?? DatabaseHelper();
@@ -9,10 +10,12 @@ class PlaylistRepository {
     final rows = await _database.getAllPlaylists();
     return rows.map(Playlist.fromRow).toList();
   }
+
   Future<Playlist?> getPlaylist(int playlistId) async {
     final row = await _database.getPlaylist(playlistId);
     return row == null ? null : Playlist.fromRow(row);
   }
+
   Future<int> createPlaylist(
     String name, {
     String? description,
@@ -56,6 +59,7 @@ class PlaylistRepository {
       }
     });
   }
+
   Future<void> updateNowPlayingPlaylist(List<int> songIds) =>
       _database.updateNowPlayingPlaylist(songIds);
 }

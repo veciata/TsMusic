@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/localization/app_en.dart';
 import 'package:tsmusic/localization/app_tr.dart';
+
 class AppLocalizations {
   static const supportedLocales = [Locale('en', 'US'), Locale('tr', 'TR')];
   static const Locale fallbackLocale = Locale('en', 'US');
@@ -8,6 +9,7 @@ class AppLocalizations {
     final locale = Localizations.localeOf(context);
     return _getLocalizedValues(locale);
   }
+
   static AppLocalizations _getLocalizedValues(Locale locale) {
     switch (locale.languageCode) {
       case 'tr':
@@ -17,6 +19,7 @@ class AppLocalizations {
         return AppLocalizationsEn();
     }
   }
+
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
   String get home => throw UnimplementedError();
@@ -155,6 +158,7 @@ class AppLocalizations {
   String get changelog => throw UnimplementedError();
   String get licenses => throw UnimplementedError();
 }
+
 class _AppLocalizationsDelegate
     extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();

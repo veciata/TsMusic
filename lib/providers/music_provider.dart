@@ -275,6 +275,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   int get enrichedCount => _enrichedCount;
   bool get shuffleEnabled => _shuffleEnabled;
   PlaylistMode get loopMode => _loopMode;
+
   /// Playback position, smoothed so it never runs backwards within a track.
   ///
   /// The player reports a per-segment position for online (HLS) tracks: it

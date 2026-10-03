@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
+
 Widget buildGlassStyle(StyleParams params) {
   final theme = params.theme;
   final currentSong = params.currentSong;

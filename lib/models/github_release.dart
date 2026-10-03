@@ -20,6 +20,7 @@ class GitHubRelease {
     }
     return v;
   }
+
   factory GitHubRelease.fromJson(Map<String, dynamic> json) => GitHubRelease(
     tagName: json['tag_name'] as String? ?? '',
     name: json['name'] as String? ?? '',

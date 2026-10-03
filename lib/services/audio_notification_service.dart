@@ -5,6 +5,7 @@ import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/core/services/error_tracking_service.dart';
 import 'package:tsmusic/services/notification_settings.dart';
 import 'package:flutter/services.dart';
+
 class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final Player _player;
   final Function(Song?) onCurrentSongChanged;
@@ -34,6 +35,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     _updatePlaybackState(isPlaying);
     onOnlineMediaChanged?.call(song, isPlaying);
   }
+
   void _init() {
     _player.stream.playing.listen(_updatePlaybackState);
     _player.stream.position.listen(_updatePosition);
@@ -41,26 +43,31 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     _player.stream.buffer.listen(_updateBuffer);
     _updatePlaybackState(_player.state.playing);
   }
+
   @override
   Future<void> play() async {
     await _player.play();
     onPlaybackStateChanged(true);
   }
+
   @override
   Future<void> pause() async {
     await _player.pause();
     onPlaybackStateChanged(false);
   }
+
   @override
   Future<void> stop() async {
     await _player.stop();
     onPlaybackStateChanged(false);
     await super.stop();
   }
+
   @override
   Future<void> seek(Duration position) async {
     await _player.seek(position);
   }
+
   @override
   Future<void> skipToNext() async {
     if (onSkipToNext != null) {
@@ -69,6 +76,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       onCurrentSongChanged(null);
     }
   }
+
   @override
   Future<void> skipToPrevious() async {
     if (onSkipToPrevious != null) {
@@ -77,10 +85,12 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       onCurrentSongChanged(null);
     }
   }
+
   @override
   Future<void> setSpeed(double speed) async {
     await _player.setRate(speed);
   }
+
   Future<void> setVolume(double volume) => _player.setVolume(volume);
   void _updatePlaybackState(bool isPlaying) {
     final controls = [
@@ -108,19 +118,23 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       ),
     );
   }
+
   void _updatePosition(Duration position) {
     final state = playbackState.value;
     playbackState.add(state.copyWith(updatePosition: position));
   }
+
   void _updateDuration(Duration? duration) {
     if (duration != null && _currentSong != null) {
       mediaItem.add(_createMediaItem(_currentSong!, duration));
     }
   }
+
   void _updateBuffer(Duration buffer) {
     final state = playbackState.value;
     playbackState.add(state.copyWith(bufferedPosition: buffer));
   }
+
   AudioProcessingState _mapProcessingState() {
     if (_player.state.buffering) {
       return AudioProcessingState.buffering;
@@ -130,6 +144,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     }
     return AudioProcessingState.idle;
   }
+
   Future<void> setMedia(Media media, {Song? song}) async {
     _currentSong = song;
     await _player.open(media);
@@ -141,10 +156,10 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
         mediaItem.add(_createMediaItem(song, duration));
         queue.add([_createMediaItem(song, duration)]);
         onCurrentSongChanged(song);
-      } catch (e) {
-      }
+      } catch (e) {}
     }
   }
+
   MediaItem _createMediaItem(Song song, Duration? duration) {
     final artUri = song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
         ? Uri.parse(song.albumArtUrl!)
@@ -160,6 +175,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       duration: duration,
     );
   }
+
   MediaItem _createOnlineMediaItem(Song song, Duration? duration) {
     final artUri = song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
         ? Uri.parse(song.albumArtUrl!)
@@ -175,10 +191,12 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       duration: duration,
     );
   }
+
   Future<void> disposePlayer() async {
     await _player.dispose();
   }
 }
+
 class AudioNotificationService {
   static AudioPlayerHandler? _audioHandler;
   static AudioPlayerHandler? get audioHandler => _audioHandler;
@@ -211,8 +229,7 @@ class AudioNotificationService {
         }
         return _audioHandler;
       } catch (e) {
-        if (e is PlatformException) {
-        }
+        if (e is PlatformException) {}
         rethrow;
       }
     } catch (e, stackTrace) {
@@ -224,6 +241,7 @@ class AudioNotificationService {
       return null;
     }
   }
+
   static Future<void> dispose() async {
     await _audioHandler?.disposePlayer();
     await _audioHandler?.stop();

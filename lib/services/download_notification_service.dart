@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 class DownloadNotificationService {
   static final DownloadNotificationService _instance =
       DownloadNotificationService._internal();
@@ -23,6 +24,7 @@ class DownloadNotificationService {
     await _notifications.initialize(settings: initSettings);
     _isInitialized = true;
   }
+
   Future<void> showDownloadProgress({
     required String title,
     required double progress,
@@ -54,6 +56,7 @@ class DownloadNotificationService {
       ),
     );
   }
+
   Future<void> showDownloadComplete({required String title}) async {
     if (isDownloadsScreenVisible || !_isInitialized) return;
     const androidDetails = AndroidNotificationDetails(
@@ -75,6 +78,7 @@ class DownloadNotificationService {
       ),
     );
   }
+
   Future<void> cancelDownloadNotification() async {
     await _notifications.cancel(id: _downloadProgressNotificationId);
   }

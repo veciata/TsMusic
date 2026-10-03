@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
+
 Widget buildMinimalStyle(StyleParams params) {
   final theme = params.theme;
   final musicProvider = params.musicProvider;

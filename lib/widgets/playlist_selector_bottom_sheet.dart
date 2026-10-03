@@ -5,6 +5,7 @@ import 'package:tsmusic/models/playlist_item.dart';
 import 'package:tsmusic/models/playlist.dart';
 import 'package:tsmusic/providers/music_provider.dart' as music_provider;
 import 'package:tsmusic/localization/app_localizations.dart';
+
 class PlaylistSelectorBottomSheet extends StatefulWidget {
   final PlaylistItem? item;
   const PlaylistSelectorBottomSheet({super.key, this.item});
@@ -12,6 +13,7 @@ class PlaylistSelectorBottomSheet extends StatefulWidget {
   State<PlaylistSelectorBottomSheet> createState() =>
       _PlaylistSelectorBottomSheetState();
 }
+
 class _PlaylistSelectorBottomSheetState
     extends State<PlaylistSelectorBottomSheet> {
   final PlaylistRepository _playlistRepository = PlaylistRepository();
@@ -22,6 +24,7 @@ class _PlaylistSelectorBottomSheetState
     super.initState();
     _loadPlaylists();
   }
+
   Future<void> _loadPlaylists() async {
     try {
       final playlists = await _playlistRepository.getAllPlaylists();
@@ -40,6 +43,7 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
+
   Future<void> _deletePlaylist(int playlistId, String name) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -78,6 +82,7 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
+
   void _showCreatePlaylistDialog() {
     final l10n = AppLocalizations.of(context);
     final controller = TextEditingController();
@@ -110,9 +115,7 @@ class _PlaylistSelectorBottomSheetState
               if (name.isNotEmpty) {
                 Navigator.pop(context);
                 try {
-                  await _playlistRepository.createPlaylist(
-                    name,
-                  );
+                  await _playlistRepository.createPlaylist(name);
                   await _loadPlaylists();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -134,13 +137,16 @@ class _PlaylistSelectorBottomSheetState
       ),
     );
   }
+
   Future<void> _addToPlaylist(Playlist playlist) async {
     final playlistId = playlist.id;
     final item = widget.item;
     try {
       if (item != null) {
         if (item.songId != null) {
-          await _playlistRepository.addSongsToPlaylist(playlistId, [item.songId!]);
+          await _playlistRepository.addSongsToPlaylist(playlistId, [
+            item.songId!,
+          ]);
         } else if (item.youtubeId != null) {
           if (!mounted) return;
           final musicProvider = context.read<music_provider.MusicProvider>();
@@ -156,9 +162,9 @@ class _PlaylistSelectorBottomSheetState
       }
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added to "${playlist.name}"')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Added to "${playlist.name}"')));
       }
     } catch (e) {
       if (mounted) {
@@ -168,6 +174,7 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
+
   Future<void> _addToNowPlaying() async {
     final item = widget.item;
     if (item == null) return;
@@ -213,6 +220,7 @@ class _PlaylistSelectorBottomSheetState
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -347,7 +355,8 @@ class _PlaylistSelectorBottomSheetState
                   if (isAddMode &&
                       _playlists
                           .where(
-                            (p) => p.id != PlaylistRepository.nowPlayingPlaylistId,
+                            (p) =>
+                                p.id != PlaylistRepository.nowPlayingPlaylistId,
                           )
                           .isEmpty)
                     Padding(
@@ -370,6 +379,7 @@ class _PlaylistSelectorBottomSheetState
     );
   }
 }
+
 void showPlaylistSelector(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -378,6 +388,7 @@ void showPlaylistSelector(BuildContext context) {
     builder: (context) => const PlaylistSelectorBottomSheet(),
   );
 }
+
 void showAddToPlaylistSheet(
   BuildContext context, {
   required PlaylistItem item,
@@ -389,6 +400,7 @@ void showAddToPlaylistSheet(
     builder: (context) => PlaylistSelectorBottomSheet(item: item),
   );
 }
+
 void showAddYouTubeToPlaylistSheet(
   BuildContext context, {
   required String youtubeId,

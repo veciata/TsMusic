@@ -1,4 +1,5 @@
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
 class ModernUserAgentHttpClient extends YoutubeHttpClient {
   @override
   Map<String, String> get headers => {

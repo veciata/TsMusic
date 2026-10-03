@@ -3,7 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/github_release.dart';
 import 'package:tsmusic/services/github_release_service.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
+
 enum UpdateCheckState { idle, loading, loaded, error }
+
 class UpdateNotificationProvider extends ChangeNotifier {
   final GitHubReleaseService _releaseService;
   static const String _lastSeenVersionKey = 'last_seen_version';
@@ -48,6 +50,7 @@ class UpdateNotificationProvider extends ChangeNotifier {
       return false;
     }
   }
+
   Future<void> acknowledgeUpdates() async {
     final currentVersion = PackageInfoUtils.version;
     final prefs = await SharedPreferences.getInstance();
@@ -57,6 +60,7 @@ class UpdateNotificationProvider extends ChangeNotifier {
     _state = UpdateCheckState.idle;
     notifyListeners();
   }
+
   static int _compareVersions(String a, String b) {
     final aParts = _parseVersion(a);
     final bParts = _parseVersion(b);
@@ -69,6 +73,7 @@ class UpdateNotificationProvider extends ChangeNotifier {
     }
     return 0;
   }
+
   static List<int> _parseVersion(String v) {
     var clean = v.trim();
     if (clean.startsWith('v') || clean.startsWith('V')) {
@@ -80,6 +85,7 @@ class UpdateNotificationProvider extends ChangeNotifier {
     if (dashIdx >= 0) clean = clean.substring(0, dashIdx);
     return clean.split('.').map((s) => int.tryParse(s) ?? 0).toList();
   }
+
   List<GitHubRelease> _getReleasesSinceLastSeen(List<GitHubRelease> all) {
     final currentVersion = PackageInfoUtils.version;
     if (_lastSeenVersion.isEmpty) {
@@ -96,6 +102,7 @@ class UpdateNotificationProvider extends ChangeNotifier {
     }
     return result;
   }
+
   @override
   void dispose() {
     _releaseService.dispose();

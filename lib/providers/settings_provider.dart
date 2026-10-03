@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/playback_mode.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
+
 class SettingsProvider with ChangeNotifier {
   static const String _audioFormatKey = 'audioFormat';
   static const String _languageKey = 'language';
@@ -47,6 +48,7 @@ class SettingsProvider with ChangeNotifier {
       return const Locale('en', 'US');
     }
   }
+
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final audioFormatString = prefs.getString(_audioFormatKey);
@@ -75,6 +77,7 @@ class SettingsProvider with ChangeNotifier {
     _autoDownloadOnPlay = prefs.getBool(_autoDownloadOnPlayKey) ?? false;
     notifyListeners();
   }
+
   Future<void> setAutoDownloadOnPlay(bool value) async {
     if (_autoDownloadOnPlay != value) {
       _autoDownloadOnPlay = value;
@@ -83,6 +86,7 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
   Future<void> setAudioFormat(AudioFormat format) async {
     if (_audioFormat != format) {
       _audioFormat = format;
@@ -91,6 +95,7 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
   Future<void> setLanguage(Locale locale) async {
     if (_locale != locale) {
       _locale = locale;
@@ -99,6 +104,7 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
   String getAudioFormatName(AudioFormat format) {
     if (format == AudioFormat.mp3) {
       return 'MP3 (Best available audio)';
@@ -111,6 +117,7 @@ class SettingsProvider with ChangeNotifier {
     }
     return 'Best available audio';
   }
+
   Future<void> setDownloadLocation(String location) async {
     if (_downloadLocation != location) {
       _downloadLocation = location;
@@ -119,6 +126,7 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
   String getDownloadLocationName(String location) {
     if (location == 'internal') {
       return 'Internal Storage (App folder)';
@@ -129,6 +137,7 @@ class SettingsProvider with ChangeNotifier {
     }
     return 'Internal Storage (App folder)';
   }
+
   Future<void> setDefaultPlaybackMode(PlaybackMode mode) async {
     if (_defaultPlaybackMode != mode) {
       _defaultPlaybackMode = mode;
@@ -137,6 +146,7 @@ class SettingsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
   String getPlaybackModeName(PlaybackMode mode, AppLocalizations l10n) =>
       mode == PlaybackMode.online ? l10n.online : l10n.local;
   String getLanguageName(Locale locale) {

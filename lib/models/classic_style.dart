@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tsmusic/models/style_params.dart';
+
 Widget buildClassicStyle(StyleParams params) {
   final theme = params.theme;
   final currentSong = params.currentSong;

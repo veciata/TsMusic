@@ -69,8 +69,10 @@ class PlaybackDiagnostics {
   });
 
   /// A resolved URL was rejected outright and playback could not start.
-  static void resolveFailed({required String videoId, required String reason}) =>
-      _emit('resolve-failed', {'videoId': videoId, 'reason': reason});
+  static void resolveFailed({
+    required String videoId,
+    required String reason,
+  }) => _emit('resolve-failed', {'videoId': videoId, 'reason': reason});
 
   /// A track was handed to the player.
   ///
@@ -162,12 +164,12 @@ class PlaybackDiagnostics {
   /// Kept as a plain function on the diagnostics class so call sites stay
   /// one-liners and the media_kit import lives in exactly one place.
   static PlayerSample sampleOf(dynamic state) => (
-        positionMs: state.position.inMilliseconds as int,
-        durationMs: state.duration.inMilliseconds as int,
-        buffering: state.buffering as bool,
-        playing: state.playing as bool,
-        completed: state.completed as bool,
-      );
+    positionMs: state.position.inMilliseconds as int,
+    durationMs: state.duration.inMilliseconds as int,
+    buffering: state.buffering as bool,
+    playing: state.playing as bool,
+    completed: state.completed as bool,
+  );
 
   /// Stops any running [startSampling] loop.
   static void stopSampling() {

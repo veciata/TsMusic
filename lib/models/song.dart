@@ -1,4 +1,5 @@
 import 'storage_type.dart';
+
 class Song {
   final int id;
   final String? youtubeId;
@@ -21,6 +22,7 @@ class Song {
     final seconds = duration % 60;
     return '$minutes:${twoDigits(seconds)}';
   }
+
   Duration get durationObject => Duration(milliseconds: duration);
   final bool isFavorite;
   final bool isDownloaded;

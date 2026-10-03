@@ -81,7 +81,8 @@ class DownloadQueueEntry {
 
   String get videoId => request.videoId;
   String get title => request.title;
-  bool get isFinished => state == DownloadQueueState.done ||
+  bool get isFinished =>
+      state == DownloadQueueState.done ||
       state == DownloadQueueState.failed ||
       state == DownloadQueueState.cancelled;
 
@@ -110,7 +111,8 @@ class DownloadQueue with ChangeNotifier {
   final Future<DownloadResult?> Function(
     String videoId,
     void Function(double) onProgress,
-  ) download;
+  )
+  download;
 
   /// The authoritative set of videoIds already saved on the device.
   final Future<Set<String>> Function() downloadedVideoIds;
@@ -119,7 +121,8 @@ class DownloadQueue with ChangeNotifier {
   ///
   /// Mutable rather than constructor-injected because the library provider is
   /// built after this service and attaches itself once it exists.
-  void Function(DownloadQueueEntry entry, DownloadResult? result)? onEntryFinished;
+  void Function(DownloadQueueEntry entry, DownloadResult? result)?
+  onEntryFinished;
 
   final List<DownloadQueueEntry> _entries = [];
   final Map<String, _QueueSlot> _slots = {};
@@ -141,23 +144,21 @@ class DownloadQueue with ChangeNotifier {
   List<DownloadQueueEntry> get finishedEntries =>
       _entries.where((e) => e.isFinished).toList(growable: false);
 
-  bool get isWorking =>
-      _workerRunning || _entries.any((e) => !e.isFinished);
+  bool get isWorking => _workerRunning || _entries.any((e) => !e.isFinished);
 
   bool get hasQueuedWork => _entries.any((e) => !e.isFinished);
 
   int get totalCount => _entries.length;
 
-  int get completedCount => _entries
-      .where((e) => e.state == DownloadQueueState.done)
-      .length;
+  int get completedCount =>
+      _entries.where((e) => e.state == DownloadQueueState.done).length;
 
-  int get failedCount => _entries
-      .where((e) => e.state == DownloadQueueState.failed)
-      .length;
+  int get failedCount =>
+      _entries.where((e) => e.state == DownloadQueueState.failed).length;
 
-  DownloadQueueEntry? get current =>
-      _entries.where((e) => e.state == DownloadQueueState.downloading).firstOrNull;
+  DownloadQueueEntry? get current => _entries
+      .where((e) => e.state == DownloadQueueState.downloading)
+      .firstOrNull;
 
   /// Adds tracks to the queue, dropping any that are already on the device.
   ///

@@ -4,6 +4,7 @@ String formatDurationFromMs(int durationMs) {
   final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
 }
+
 String formatDuration(Duration duration) {
   String twoDigits(int n) => n.toString().padLeft(2, '0');
   final hours = duration.inHours;
@@ -14,6 +15,7 @@ String formatDuration(Duration duration) {
   }
   return '${twoDigits(minutes)}:${twoDigits(seconds)}';
 }
+
 String formatDurationFromSeconds(int seconds) {
   final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
   final remainingSeconds = (seconds % 60).toString().padLeft(2, '0');

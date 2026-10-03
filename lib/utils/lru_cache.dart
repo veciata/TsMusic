@@ -11,6 +11,7 @@ class LRUCache<K, V> {
     }
     return null;
   }
+
   void put(K key, V value) {
     if (_cache.containsKey(key)) {
       _accessOrder.remove(key);
@@ -20,6 +21,7 @@ class LRUCache<K, V> {
     _cache[key] = value;
     _accessOrder.add(key);
   }
+
   bool containsKey(K key) => _cache.containsKey(key);
   List<V> getAll() => _cache.values.toList();
   int get size => _cache.length;
@@ -27,10 +29,12 @@ class LRUCache<K, V> {
     _cache.clear();
     _accessOrder.clear();
   }
+
   V? remove(K key) {
     _accessOrder.remove(key);
     return _cache.remove(key);
   }
+
   Map<String, dynamic> getStats() => {
     'capacity': maxCapacity,
     'size': _cache.length,

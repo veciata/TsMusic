@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:tsmusic/models/song.dart';
+
 class PaginationResult<T> {
   final List<T> items;
   final int page;
@@ -16,6 +17,7 @@ class PaginationResult<T> {
   });
   int get totalPages => (totalCount / pageSize).ceil();
 }
+
 class PaginatedSongsService {
   final List<Song> _allSongs;
   final int pageSize;
@@ -36,6 +38,7 @@ class PaginatedSongsService {
       'pageSize': pageSize,
     });
   }
+
   Future<void> streamAllPages() async {
     final totalPages = (_allSongs.length / pageSize).ceil();
     for (int page = 1; page <= totalPages; page++) {
@@ -45,10 +48,10 @@ class PaginatedSongsService {
           _streamController.add(result);
         }
         await Future.delayed(const Duration(milliseconds: 10));
-      } catch (e) {
-      }
+      } catch (e) {}
     }
   }
+
   Future<PaginationResult<Song>> filterAndPaginate(
     String query,
     int pageNumber,
@@ -68,6 +71,7 @@ class PaginatedSongsService {
       'pageSize': pageSize,
     });
   }
+
   Future<PaginationResult<Song>> loadPageWithSort(
     int pageNumber,
     int Function(Song, Song) comparator,
@@ -80,9 +84,11 @@ class PaginatedSongsService {
       'pageSize': pageSize,
     });
   }
+
   void dispose() {
     _streamController.close();
   }
+
   static PaginationResult<Song> _loadPageInBackground(
     Map<String, dynamic> params,
   ) {

@@ -36,6 +36,7 @@ import 'package:tsmusic/services/download_notification_service.dart';
 import 'package:tsmusic/services/home_widget_service.dart';
 import 'package:tsmusic/providers/update_notification_provider.dart';
 import 'package:tsmusic/widgets/update_notification_modal.dart';
+
 final GlobalKey<MainNavigationScreenState> mainNavKey = GlobalKey();
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 void main() {
@@ -127,6 +128,7 @@ void main() {
     },
   );
 }
+
 class MusicPlayerApp extends StatefulWidget {
   final YouTubeService youTubeService;
   final Player player;
@@ -142,6 +144,7 @@ class MusicPlayerApp extends StatefulWidget {
   @override
   State<MusicPlayerApp> createState() => _MusicPlayerAppState();
 }
+
 class _MusicPlayerAppState extends State<MusicPlayerApp>
     with WidgetsBindingObserver {
   late bool _introCompleted;
@@ -152,6 +155,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     WidgetsBinding.instance.addObserver(this);
     _introCompleted = widget.introCompleted;
   }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -159,6 +163,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       _checkClipboard();
     }
   }
+
   Future<void> _checkClipboard() async {
     final link = await _clipboardService.checkClipboard();
     final navigator = rootNavigatorKey.currentState;
@@ -178,6 +183,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       },
     );
   }
+
   void _handleYouTubeDownload(YouTubeLinkResult link) {
     final navigator = rootNavigatorKey.currentState;
     if (navigator == null) return;
@@ -194,6 +200,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       );
     }
   }
+
   Future<void> _playYouTubePlaylist(
     YouTubeService ytService,
     YouTubeLinkResult link,
@@ -226,6 +233,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       );
     }
   }
+
   Future<void> _saveYouTubePlaylist(YouTubeLinkResult link) async {
     final navigator = rootNavigatorKey.currentState;
     if (navigator == null) return;
@@ -257,9 +265,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
         );
         return;
       }
-      final playlistId = await playlistRepository.createPlaylist(
-      link.url,
-    );
+      final playlistId = await playlistRepository.createPlaylist(link.url);
       for (final audio in audios) {
         await musicProvider.addOnlineSongToPlaylist(
           youtubeId: audio.id,
@@ -280,15 +286,18 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       );
     }
   }
+
   void _handleYouTubeSearch(YouTubeLinkResult link) {
     final query = link.videoId ?? link.playlistId ?? link.url;
     mainNavKey.currentState?._openSearch(query);
   }
+
   void _onIntroComplete() {
     setState(() {
       _introCompleted = true;
     });
   }
+
   @override
   Widget build(BuildContext context) => MultiProvider(
     providers: [
@@ -296,9 +305,8 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
       Provider<SongRepository>(create: (_) => SongRepository()),
       Provider<PlaylistRepository>(create: (_) => PlaylistRepository()),
       ChangeNotifierProvider(
-        create: (ctx) => LibraryViewModel(
-          songRepository: ctx.read<SongRepository>(),
-        ),
+        create: (ctx) =>
+            LibraryViewModel(songRepository: ctx.read<SongRepository>()),
       ),
       ChangeNotifierProvider(
         create: (ctx) => music_provider.MusicProvider(
@@ -363,11 +371,13 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
     ),
   );
 }
+
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
   @override
   MainNavigationScreenState createState() => MainNavigationScreenState();
 }
+
 class MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
@@ -400,8 +410,10 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           return Future.value(false);
       }
     });
-    final pendingResumeProvider =
-        Provider.of<music_provider.MusicProvider>(context, listen: false);
+    final pendingResumeProvider = Provider.of<music_provider.MusicProvider>(
+      context,
+      listen: false,
+    );
     _navigationChannel
         .invokeMethod('getPendingWidgetResume')
         .then((value) {
@@ -427,6 +439,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       _checkForUpdates();
     });
   }
+
   void _openSearch([String? query]) {
     Navigator.push(
       context,
@@ -435,6 +448,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
     );
   }
+
   Future<void> _initializeMusic(music_provider.MusicProvider musicProv) async {
     try {
       await musicProv.loadFromDatabaseOnly();
@@ -444,10 +458,10 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
     } catch (e) {
       try {
         await musicProv.scanForNewMusic();
-      } catch (scanError) {
-      }
+      } catch (scanError) {}
     }
   }
+
   Future<void> _checkForUpdates() async {
     try {
       final provider = Provider.of<UpdateNotificationProvider>(
@@ -458,9 +472,9 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       if (hasUpdates && mounted) {
         await showUpdateNotificationModal(context);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
+
   Future<void> _requestNotificationPermission() async {
     if (Platform.isAndroid || Platform.isIOS) {
       final status = await Permission.notification.status;
@@ -469,6 +483,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       }
     }
   }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -479,9 +494,11 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     });
   }
+
   void goToDownloads() {
     _onItemTapped(1);
   }
+
   String _getTitle() {
     final l10n = AppLocalizations.of(context);
     switch (_selectedIndex) {
@@ -497,6 +514,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         return l10n.tsMusic;
     }
   }
+
   void _onWidgetUpdate(music_provider.MusicProvider musicProv) {
     try {
       final youTubeService = Provider.of<YouTubeService>(
@@ -532,11 +550,13 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     } catch (_) {}
   }
+
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
