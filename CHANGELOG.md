@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+### Fixed / Düzeltildi
+- Local playback no longer reported progress from a stale online (HLS) session: the elapsed time used to jump in ~4s steps because the previous YouTube track's stream state leaked into local files. Starting a local track now clears that state.
+  Yerel çalma artık eski bir çevrimiçi (HLS) oturumundan ilerleme bildirmiyor: geçen süre, önceki YouTube parçasının akış durumu yerel dosyalara sızdığı için ~4 saniyelik adımlarla sıçrıyordu. Yerel parça başlatıldığında bu durum artık temizlenir.
+- Downloading a playlist's online tracks now turns them into local tracks in place (the cloud icon becomes a music note) instead of leaving the playlist pointing at the online placeholder; a one-time repair also fixes lists downloaded by older versions.
+  Bir çalma listesindeki çevrimiçi parçaları indirmek artık onları yerinde yerel parçaya dönüştürür (bulut simgesi nota olur); eski sürümlerle indirilen listeler tek seferlik bir onarımla düzeltilir.
+- Local file paths with spaces or non-ASCII characters are opened with a properly encoded URI; a missing local file that falls back to streaming is now logged instead of failing silently.
+  Boşluk veya ASCII dışı karakter içeren yerel dosya yolları düzgün kodlanmış bir URI ile açılır; çevrimiçine düşen eksik yerel dosya artık sessizce başarısız olmak yerine günlüğe yazılır.
+
 ## [1.4.0] - 2026-10-03
 ### Fixed / Düzeltildi
 - Online (HLS) playback no longer jumps: progress bar and elapsed time count up smoothly across segment boundaries (use real track length).

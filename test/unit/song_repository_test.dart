@@ -2,14 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:tsmusic/data/repositories/playlist_repository.dart';
 import 'package:tsmusic/data/repositories/song_repository.dart';
+import 'package:tsmusic/database/database_helper.dart';
 import 'package:tsmusic/models/song.dart';
 
-Song _song({
-  required String url,
-  List<String>? artists,
-  List<String>? tags,
-}) =>
+Song _song({required String url, List<String>? artists, List<String>? tags}) =>
     Song(
       id: url.hashCode,
       title: 'Title of $url',
@@ -111,7 +109,9 @@ void main() {
     await repository.saveSong(_song(url: '/music/del_three.mp3'));
 
     final all = await repository.getAllSongs();
-    final deletable = all.where((s) => s.url.startsWith('/music/del_')).toList();
+    final deletable = all
+        .where((s) => s.url.startsWith('/music/del_'))
+        .toList();
     expect(deletable, hasLength(3));
     expect(await repository.search('del_one.mp3'), hasLength(1));
 
@@ -183,7 +183,9 @@ void main() {
     await repository.recordPlay(a.id);
 
     final recent = await repository.getRecentlyPlayed(limit: 10);
-    final recentStats = recent.where((s) => s.url.startsWith('/music/stats_')).toList();
+    final recentStats = recent
+        .where((s) => s.url.startsWith('/music/stats_'))
+        .toList();
     expect(recentStats.map((s) => s.url).toSet(), {
       '/music/stats_a.mp3',
       '/music/stats_b.mp3',
@@ -192,8 +194,167 @@ void main() {
     expect(recentStats.first.url, '/music/stats_a.mp3');
 
     final most = await repository.getMostPlayed(limit: 10);
-    final mostStats = most.where((s) => s.url.startsWith('/music/stats_')).toList();
+    final mostStats = most
+        .where((s) => s.url.startsWith('/music/stats_'))
+        .toList();
     expect(mostStats.first.url, '/music/stats_c.mp3');
     expect(mostStats, hasLength(3));
   });
+
+  test(
+    'downloading a placeholder track upgrades that row in place so playlists switch to local',
+    () async {
+      const videoId = 'reconcileVideo1';
+      final placeholdersRepo = repository;
+
+      // Add-to-playlist flow: creates the `yt:<id>` placeholder row that the
+      // playlist (and queue) reference.
+      final placeholderId = await placeholdersRepo.addYouTubeSong(
+        youtubeId: videoId,
+        title: 'Remote Song',
+        artists: ['Remote Artist'],
+        duration: 200000,
+      );
+      final playlistId = await PlaylistRepository().createPlaylist('Reconcile');
+      await placeholdersRepo.addToPlaylist(playlistId, [placeholderId]);
+
+      // Download flow: must reconcile the placeholder into a real file instead
+      // of inserting a second row.
+      final song = await placeholdersRepo.addSongFromYouTube(
+        videoId: videoId,
+        filePath: '/music/reconciled.mp3',
+        title: 'Remote Song',
+        artists: ['Remote Artist'],
+        duration: 200000,
+        thumbnailPath: '/thumbs/reconciled.jpg',
+      );
+
+      expect(song.id, placeholderId, reason: 'row id must not change');
+      expect(song.url, '/music/reconciled.mp3');
+      expect(song.isDownloaded, isTrue);
+      expect(song.hasTag('tsmusic'), isTrue);
+      expect(song.localThumbnailPath, '/thumbs/reconciled.jpg');
+
+      final viaYtId = await placeholdersRepo.getSongByYouTubeId(videoId);
+      expect(viaYtId?.id, placeholderId);
+      expect(viaYtId?.url, '/music/reconciled.mp3');
+
+      // No leftover duplicate row for this video.
+      final all = await placeholdersRepo.getAllSongs();
+      expect(
+        all.where((s) => s.youtubeId == videoId),
+        hasLength(1),
+        reason: 'placeholder + download must collapse to a single row',
+      );
+
+      // The playlist that referenced the placeholder now sees the local file.
+      final playlistSongs = await placeholdersRepo.getPlaylistSongs(playlistId);
+      expect(playlistSongs, hasLength(1));
+      expect(playlistSongs.single.id, placeholderId);
+      expect(playlistSongs.single.url, '/music/reconciled.mp3');
+
+      // The real file + tag makes it count as downloaded everywhere.
+      expect(
+        await placeholdersRepo.getDownloadedYouTubeIds(),
+        contains(videoId),
+      );
+    },
+  );
+
+  test(
+    're-downloading to a new path reuses the existing downloaded row',
+    () async {
+      const videoId = 'redownloadVideo1';
+      final r = repository;
+      final first = await r.addSongFromYouTube(
+        videoId: videoId,
+        filePath: '/music/original.mp3',
+        title: 'Re Download',
+        artists: ['Re Artist'],
+        duration: 150000,
+      );
+      final second = await r.addSongFromYouTube(
+        videoId: videoId,
+        filePath: '/music/relocated.mp3',
+        title: 'Re Download',
+        artists: ['Re Artist'],
+        duration: 150000,
+      );
+      expect(second.id, first.id);
+      final all = await r.getAllSongs();
+      expect(all.where((s) => s.youtubeId == videoId), hasLength(1));
+    },
+  );
+
+  test(
+    'legacy repair merges a placeholder with its old duplicate download',
+    () async {
+      const videoId = 'legacyVideo1';
+      final r = repository;
+
+      // State written by app versions before reconciliation existed: a `yt:`
+      // placeholder that the playlist references ...
+      final placeholderId = await r.addYouTubeSong(
+        youtubeId: videoId,
+        title: 'Legacy Song',
+        artists: ['Legacy Artist'],
+        duration: 170000,
+      );
+      final playlistId = await PlaylistRepository().createPlaylist(
+        'Legacy Fix',
+      );
+      await r.addToPlaylist(playlistId, [placeholderId]);
+
+      // ... plus a separate real-file row from the old download.
+      await r.saveSong(
+        Song(
+          id: -1,
+          youtubeId: videoId,
+          title: 'Legacy Song',
+          artists: ['Legacy Artist'],
+          url: '/music/legacy.mp3',
+          duration: 170000,
+          tags: ['tsmusic'],
+        ),
+      );
+      // Both rows exist in the raw table (getAllSongs filters out `yt:` rows).
+      Future<int> rawRowsForVideo() async {
+        final db = await DatabaseHelper().database;
+        final rows = await db.query(
+          DatabaseHelper.tableSongs,
+          where: 'youtube_id = ?',
+          whereArgs: [videoId],
+        );
+        return rows.length;
+      }
+
+      expect(await rawRowsForVideo(), 2);
+
+      await DatabaseHelper().repairLegacyPlaylistDownloads(
+        await DatabaseHelper().database,
+      );
+
+      final rows = (await r.getAllSongs())
+          .where((s) => s.youtubeId == videoId)
+          .toList();
+      expect(rows, hasLength(1));
+      expect(rows.single.id, placeholderId, reason: 'keep the referenced row');
+      expect(rows.single.url, '/music/legacy.mp3');
+      expect(rows.single.hasTag('tsmusic'), isTrue);
+
+      final playlistSongs = await r.getPlaylistSongs(playlistId);
+      expect(playlistSongs, hasLength(1));
+      expect(playlistSongs.single.id, placeholderId);
+      expect(playlistSongs.single.url, '/music/legacy.mp3');
+
+      // Running again is a no-op (idempotent).
+      await DatabaseHelper().repairLegacyPlaylistDownloads(
+        await DatabaseHelper().database,
+      );
+      expect(
+        (await r.getAllSongs()).where((s) => s.youtubeId == videoId),
+        hasLength(1),
+      );
+    },
+  );
 }

@@ -10,7 +10,6 @@ import 'package:tsmusic/data/repositories/song_repository.dart';
 import 'package:tsmusic/models/song.dart';
 import 'package:tsmusic/models/song_sort_option.dart';
 import 'package:tsmusic/models/playlist_item.dart';
-import 'package:tsmusic/models/storage_type.dart';
 import 'package:tsmusic/providers/library_view_model.dart';
 import 'package:tsmusic/core/services/error_tracking_service.dart';
 import 'package:tsmusic/core/services/playback_diagnostics.dart';
@@ -206,7 +205,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         duration: audio.duration?.inMilliseconds ?? 0,
         albumArtUrl: audio.thumbnailUrl,
         url: audio.audioUrl ?? '',
-        storageType: StorageType.remote,
       );
       audioHandler.setOnlineMedia(song, isPlaying: isOnlinePlaying);
     } else if (currentSong != null) {
@@ -343,10 +341,16 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     return _player.state.duration;
   }
 
-  bool _isOnlineNow() {
-    if (_isCurrentSongYouTubeOnly()) return true;
-    return _isOnlineOnlySession;
-  }
+  /// Whether playback currently renders through the online (YouTube/HLS) path.
+  ///
+  /// The primary signal is the current song (a `yt:` track). An online-only
+  /// *session* — a curated mix, or a single online track with no queue — also
+  /// renders online. Critically, local playback can never satisfy either
+  /// clause anymore: starting a local track clears `YouTubeService.currentAudio`
+  /// (`markLocalPlaybackStarted`) and hard-resets the online progress bank, so
+  /// a stale HLS session can no longer leak the online renderers into a local
+  /// track (which made its elapsed time jump at segment boundaries, ~4s).
+  bool _isOnlineNow() => _isCurrentSongYouTubeOnly() || _isOnlineOnlySession;
 
   Song? get activeSong {
     if (_isOnlineNow()) {
@@ -368,7 +372,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           duration: audio.duration?.inMilliseconds ?? 0,
           albumArtUrl: audio.thumbnailUrl,
           url: audio.audioUrl ?? '',
-          storageType: StorageType.remote,
         );
       }
     }
@@ -418,7 +421,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
             albumArtUrl: a.thumbnailUrl,
             url: a.audioUrl ?? '',
             tags: ['youtube'],
-            storageType: StorageType.remote,
           ),
         )
         .toList();
@@ -1028,7 +1030,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
                 duration: yt.duration?.inMilliseconds ?? 0,
                 albumArtUrl: yt.thumbnailUrl,
                 url: 'yt:${yt.id}',
-                storageType: StorageType.remote,
               ),
             );
             addedFromSeed++;
@@ -1076,7 +1077,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         duration: first.duration?.inMilliseconds ?? 0,
         albumArtUrl: first.thumbnailUrl,
         url: 'yt:${first.id}',
-        storageType: StorageType.remote,
       ),
       priority: 0,
     );
@@ -1105,7 +1105,6 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
               duration: a.duration?.inMilliseconds ?? 0,
               albumArtUrl: a.thumbnailUrl,
               url: 'yt:${a.id}',
-              storageType: StorageType.remote,
             ),
           )
           .toList();
@@ -1410,6 +1409,15 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
         }
       }
       if (ytId != null && _youTubeService != null) {
+        // The local file is gone; fall back to streaming the matching video.
+        // This was silent before, which made "local play plays a different
+        // cloud track" look like a bug — log it so it is diagnosable.
+        ErrorTrackingService().recordError(
+          'Local file missing for "${song.title}"; falling back to YouTube '
+          '(id=$ytId).',
+          StackTrace.current,
+          context: 'MusicProvider.local-file-fallback',
+        );
         final ytSong = Song(
           id: -1,
           youtubeId: ytId,
@@ -1419,21 +1427,29 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
           duration: song.duration,
           albumArtUrl: song.albumArtUrl,
           url: 'yt:$ytId',
-          storageType: StorageType.remote,
         );
         await _playYouTubeSong(ytSong, forceDash: forceDash);
         return;
       }
     }
+    // A local file is about to own the (shared) player. Drop every piece of
+    // leftover online state so none of it leaks into the local render path:
+    // the HLS progress bank, the stall watchdog, and the stale YouTube
+    // "current" metadata. Otherwise the elapsed time jumps at segment
+    // boundaries (~4s) and the wrong duration/metadata is shown.
+    _onlineProgress.reset();
+    _onlineStall.reset();
+    _onlineStallStartedAt = DateTime.now().millisecondsSinceEpoch;
+    _onlineStallTimer?.cancel();
     _youTubeService?.markLocalPlaybackStarted();
     if (audioHandler != null) {
       final mediaPath = song.url.startsWith('/')
-          ? 'file://${song.url}'
+          ? Uri.file(song.url).toString()
           : song.url;
       await audioHandler.setMedia(Media(mediaPath), song: song);
     } else {
       final mediaPath = song.url.startsWith('/')
-          ? 'file://${song.url}'
+          ? Uri.file(song.url).toString()
           : song.url;
       await _player.open(Media(mediaPath));
     }

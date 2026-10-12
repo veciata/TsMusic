@@ -1,5 +1,3 @@
-import 'storage_type.dart';
-
 class Song {
   final int id;
   final String? youtubeId;
@@ -9,7 +7,6 @@ class Song {
   final String? albumArtUrl;
   final String url;
   final int duration;
-  final StorageType storageType;
   final List<String> tags;
   final int? trackNumber;
   final DateTime dateAdded;
@@ -37,7 +34,6 @@ class Song {
     this.albumArtUrl,
     required this.url,
     required this.duration,
-    this.storageType = StorageType.local,
     this.isFavorite = false,
     this.isDownloaded = false,
     List<String>? tags,
@@ -55,7 +51,6 @@ class Song {
     String? albumArtUrl,
     String? url,
     int? duration,
-    StorageType? storageType,
     bool? isFavorite,
     bool? isDownloaded,
     List<String>? tags,
@@ -71,7 +66,6 @@ class Song {
     albumArtUrl: albumArtUrl ?? this.albumArtUrl,
     url: url ?? this.url,
     duration: duration ?? this.duration,
-    storageType: storageType ?? this.storageType,
     isFavorite: isFavorite ?? this.isFavorite,
     isDownloaded: isDownloaded ?? this.isDownloaded,
     tags: tags ?? this.tags,
@@ -88,13 +82,6 @@ class Song {
     } else {
       songId = 0;
     }
-    final storageStr = json['storageType'] as String?;
-    final storageType = storageStr != null
-        ? StorageType.values.firstWhere(
-            (e) => e.name == storageStr,
-            orElse: () => StorageType.local,
-          )
-        : StorageType.local;
     return Song(
       id: songId,
       youtubeId: json['youtubeId'] as String?,
@@ -106,7 +93,6 @@ class Song {
       albumArtUrl: json['albumArtUrl'] as String?,
       url: json['url'] as String,
       duration: json['duration'] as int,
-      storageType: storageType,
       isFavorite: json['isFavorite'] as bool? ?? false,
       isDownloaded: json['isDownloaded'] as bool? ?? false,
       tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
@@ -126,7 +112,6 @@ class Song {
     'albumArtUrl': albumArtUrl,
     'url': url,
     'duration': duration,
-    'storageType': storageType.name,
     'isFavorite': isFavorite,
     'isDownloaded': isDownloaded,
     'tags': tags,

@@ -982,10 +982,12 @@ class YouTubeService with ChangeNotifier {
 
   void markLocalPlaybackStarted() {
     // A local file is about to be opened on the same shared player, so the
-    // service must not start an online open on top of it.
+    // service must not start an online open on top of it — and its stream
+    // metadata must not leak into the local track's rendering.
     _stopStallWatch();
-    if (!_onlineSessionActive) return;
+    _currentAudio = null;
     _onlineSessionActive = false;
+    _onlinePlaylistIndex = -1;
     notifyListeners();
   }
 

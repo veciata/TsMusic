@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:tsmusic/models/song.dart';
@@ -163,12 +164,124 @@ class DatabaseHelper {
   static const int databaseVersion = 7;
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), 'music_player.db');
-    return await openDatabase(
+    final db = await openDatabase(
       path,
       version: databaseVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+    await repairLegacyPlaylistDownloads(db);
+    return db;
+  }
+
+  /// Repair for installs that downloaded playlist tracks before placeholder
+  /// reconciliation existed (older app versions).
+  ///
+  /// Those installs ended up with two rows per video: a `yt:<id>` placeholder
+  /// that playlists and the queue still reference, and a separate real-file
+  /// row carrying the download. This upgrades the placeholder in place (same
+  /// row id, so every reference follows automatically), re-points any
+  /// playlist link that pointed at the duplicate, and drops the duplicate.
+  ///
+  /// Idempotent: rows that are no longer placeholders are left untouched, so
+  /// it is safe to run on every database open and to call from tests.
+  Future<void> repairLegacyPlaylistDownloads(Database db) async {
+    try {
+      final placeholders = await db.query(
+        tableSongs,
+        where: "file_path LIKE 'yt:%' AND youtube_id IS NOT NULL",
+      );
+      for (final placeholder in placeholders) {
+        final videoId = placeholder['youtube_id'] as String;
+        final placeholderId = placeholder['id'] as int;
+        final duplicates = await db.query(
+          tableSongs,
+          where: 'youtube_id = ? AND file_path NOT LIKE ? AND $columnId != ?',
+          whereArgs: [videoId, 'yt:%', placeholderId],
+        );
+        if (duplicates.isEmpty) continue;
+        final duplicate = duplicates.first;
+        final duplicateId = duplicate['id'] as int;
+        final duplicateArtists = await db.query(
+          tableSongArtist,
+          where: 'song_id = ?',
+          whereArgs: [duplicateId],
+        );
+        // 1) Re-point playlist references that pointed at the duplicate, then
+        //    delete the duplicate's own rows. `file_path` is UNIQUE, so the
+        //    duplicate has to release the real path before the placeholder can
+        //    take it (otherwise the UPDATE below fails the constraint).
+        await db.rawDelete(
+          '''
+          UPDATE $tablePlaylistSongs
+          SET song_id = ?
+          WHERE song_id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM $tablePlaylistSongs p2
+              WHERE p2.playlist_id = $tablePlaylistSongs.playlist_id
+                AND p2.song_id = ?
+            )
+          ''',
+          [placeholderId, duplicateId, placeholderId],
+        );
+        await db.delete(
+          tablePlaylistSongs,
+          where: 'song_id = ?',
+          whereArgs: [duplicateId],
+        );
+        await db.delete(
+          tableSongArtist,
+          where: 'song_id = ?',
+          whereArgs: [duplicateId],
+        );
+        await db.delete(
+          tableSongTags,
+          where: 'song_id = ?',
+          whereArgs: [duplicateId],
+        );
+        await db.delete(
+          tableSongs,
+          where: '$columnId = ?',
+          whereArgs: [duplicateId],
+        );
+        // 2) Point the placeholder at the real file (path is now free). Same
+        //    row id, so everything that referenced it follows automatically.
+        await db.update(
+          tableSongs,
+          {
+            'title': duplicate['title'],
+            'file_path': duplicate['file_path'],
+            'duration': duplicate['duration'],
+            'thumbnail_path': duplicate['thumbnail_path'],
+            'play_count': duplicate['play_count'] ?? 0,
+            'last_played_at': duplicate['last_played_at'],
+          },
+          where: '$columnId = ?',
+          whereArgs: [placeholderId],
+        );
+        // 3) Copy the artists onto the placeholder.
+        await db.delete(
+          tableSongArtist,
+          where: 'song_id = ?',
+          whereArgs: [placeholderId],
+        );
+        for (final row in duplicateArtists) {
+          await db.insert(tableSongArtist, {
+            'song_id': placeholderId,
+            'artist_id': row['artist_id'],
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        }
+        // 4) Make sure the placeholder carries the download tag.
+        final tagId = await _getOrCreateTag(db, 'tsmusic');
+        await db.insert(tableSongTags, {
+          'song_id': placeholderId,
+          'tag_id': tagId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    } catch (e) {
+      // Non-fatal: the app works without the repair; it just retries next run.
+      debugPrint('repairLegacyPlaylistDownloads failed: $e');
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -221,19 +334,6 @@ class DatabaseHelper {
         )
       ''');
     }
-    if (oldVersion < 6) {
-      try {
-        await db.execute(
-          'ALTER TABLE $tablePlaylists ADD COLUMN playlist_type TEXT NOT NULL DEFAULT \'local_only\'',
-        );
-        await db.update(
-          tablePlaylists,
-          {'playlist_type': 'remote_compatible'},
-          where: '$columnId = ?',
-          whereArgs: [nowPlayingPlaylistId],
-        );
-      } catch (e) {}
-    }
     if (oldVersion < 4) {
       try {
         await db.execute('ALTER TABLE $tableSongs ADD COLUMN youtube_id TEXT');
@@ -272,7 +372,6 @@ class DatabaseHelper {
         name TEXT NOT NULL UNIQUE,
         description TEXT,
         cover_art_url TEXT,
-        playlist_type TEXT NOT NULL DEFAULT 'local_only',
         $columnCreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     ''');
@@ -662,7 +761,10 @@ class DatabaseHelper {
     });
   }
 
-  Future<int> _getOrCreateArtist(Transaction txn, String artistName) async {
+  Future<int> _getOrCreateArtist(
+    DatabaseExecutor txn,
+    String artistName,
+  ) async {
     if (artistName.trim().isEmpty) {
       throw ArgumentError('Artist name cannot be empty');
     }
@@ -699,7 +801,7 @@ class DatabaseHelper {
     });
   }
 
-  Future<int> _getOrCreateTag(Transaction txn, String tagName) async {
+  Future<int> _getOrCreateTag(DatabaseExecutor txn, String tagName) async {
     if (tagName.trim().isEmpty) {
       throw ArgumentError('Tag name cannot be empty');
     }
@@ -962,13 +1064,82 @@ class DatabaseHelper {
     final db = await database;
     int? songId;
     await db.transaction((txn) async {
-      final existingSongs = await txn.query(
+      // 1) Already downloaded for this video: keep that row so anything that
+      // references a real file (playlists added after the first download) keeps
+      // pointing at it. Re-running a download of the same video must not insert
+      // a duplicate row.
+      final downloadedForVideo = await txn.query(
+        tableSongs,
+        where: 'youtube_id = ? AND file_path NOT LIKE ?',
+        whereArgs: [videoId, 'yt:%'],
+      );
+      if (downloadedForVideo.isNotEmpty) {
+        songId = downloadedForVideo.first['id'] as int;
+        return;
+      }
+      // 2) The song is still a YouTube placeholder (`file_path = 'yt:<id>'`)
+      // that playlists and the queue point at. Upgrade that row in place so
+      // every reference automatically starts resolving to the local file.
+      final placeholder = await txn.query(
+        tableSongs,
+        where: 'youtube_id = ? AND file_path = ?',
+        whereArgs: [videoId, 'yt:$videoId'],
+      );
+      if (placeholder.isNotEmpty) {
+        final placeholderId = placeholder.first['id'] as int;
+        // `file_path` is UNIQUE. If some other row already owns this path we
+        // cannot move the placeholder onto it — fall through to the path-reuse
+        // branch below instead of throwing.
+        final pathOwner = await txn.query(
+          tableSongs,
+          columns: [columnId],
+          where: 'file_path = ? AND $columnId != ?',
+          whereArgs: [filePath, placeholderId],
+        );
+        if (pathOwner.isEmpty) {
+          songId = placeholderId;
+          await txn.update(
+            tableSongs,
+            {
+              'title': title,
+              'file_path': filePath,
+              'duration': duration,
+              'thumbnail_path': thumbnailPath,
+            },
+            where: '$columnId = ?',
+            whereArgs: [songId],
+          );
+          await txn.delete(
+            tableSongArtist,
+            where: 'song_id = ?',
+            whereArgs: [songId],
+          );
+          final artistsList = artists.isNotEmpty ? artists : ['Unknown Artist'];
+          for (final artistName in artistsList) {
+            final artistId = await _getOrCreateArtist(txn, artistName);
+            await txn.insert(tableSongArtist, {
+              'song_id': songId,
+              'artist_id': artistId,
+            }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          }
+          final tagId = await _getOrCreateTag(txn, 'tsmusic');
+          await txn.insert(tableSongTags, {
+            'song_id': songId,
+            'tag_id': tagId,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          return;
+        }
+      }
+      // 3) Nothing references this video yet. Reuse a row that already points
+      // at the same file path (re-download landing in the same location), else
+      // insert a new row tagged as an app download.
+      final existingByPath = await txn.query(
         tableSongs,
         where: 'file_path = ?',
         whereArgs: [filePath],
       );
-      if (existingSongs.isNotEmpty) {
-        songId = existingSongs.first['id'] as int;
+      if (existingByPath.isNotEmpty) {
+        songId = existingByPath.first['id'] as int;
       } else {
         final songMap = {
           'title': title,

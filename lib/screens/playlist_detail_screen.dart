@@ -425,9 +425,50 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       youTubeService: context.read<YouTubeService>(),
       settings: context.read<SettingsProvider>(),
     );
-    // No refresh here: the batch runs in the background and the library is
-    // updated per track as it lands, so reloading now would just be a no-op
-    // followed by another reload in a few seconds.
+    // The batch downloads in the background. Reload the list once the queue
+    // drains: the placeholder rows are reconciled to the real files in place,
+    // so this refresh is what flips the cloud icons to music notes.
+    _watchBatchDownloads(context.read<YouTubeService>());
+  }
+
+  /// Refresh [_songs] when the download queue finishes the batch that
+  /// [_downloadAllRemoteSongs] just kicked off.
+  DownloadQueue? _downloadQueue;
+  VoidCallback? _onDownloadQueueChanged;
+  void _watchBatchDownloads(YouTubeService service) {
+    final queue = service.downloadQueue;
+    _downloadQueue = queue;
+    _onDownloadQueueChanged = () {
+      if (!mounted) {
+        _detachDownloadWatch();
+        return;
+      }
+      if (!queue.hasQueuedWork && !queue.isWorking) {
+        _detachDownloadWatch();
+        _loadSongs();
+      }
+    };
+    queue.addListener(_onDownloadQueueChanged!);
+    // The batch may have drained before the listener attached (small queues
+    // finish fast), which would leave us waiting for a notification that never
+    // comes. Attach first, then evaluate once to cover that case.
+    _onDownloadQueueChanged!();
+  }
+
+  void _detachDownloadWatch() {
+    final queue = _downloadQueue;
+    final callback = _onDownloadQueueChanged;
+    if (queue != null && callback != null) {
+      queue.removeListener(callback);
+    }
+    _downloadQueue = null;
+    _onDownloadQueueChanged = null;
+  }
+
+  @override
+  void dispose() {
+    _detachDownloadWatch();
+    super.dispose();
   }
 
   @override
