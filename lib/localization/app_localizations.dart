@@ -119,6 +119,13 @@ class AppLocalizations {
   String get clearQueue => throw UnimplementedError();
   String get queueCleared => throw UnimplementedError();
   String get defaultPlaybackMode => throw UnimplementedError();
+  String get playbackSpeed => throw UnimplementedError();
+  String get sleepTimer => throw UnimplementedError();
+  String get sleepTimerEndOfTrack => throw UnimplementedError();
+  String get off => throw UnimplementedError();
+  String get minutesShort => throw UnimplementedError();
+  String get skipSilence => throw UnimplementedError();
+  String get skipSilenceDescription => throw UnimplementedError();
   String get downloading => throw UnimplementedError();
   String get downloadStarted => throw UnimplementedError();
   String get downloadFailed => throw UnimplementedError();

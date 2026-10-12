@@ -191,6 +191,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get defaultPlaybackMode => 'Default Playback Mode';
   @override
+  String get playbackSpeed => 'Playback Speed';
+  @override
+  String get sleepTimer => 'Sleep Timer';
+  @override
+  String get sleepTimerEndOfTrack => 'End of track';
+  @override
+  String get off => 'Off';
+  @override
+  String get minutesShort => 'min';
+  @override
+  String get skipSilence => 'Skip silence';
+  @override
+  String get skipSilenceDescription => 'Trim silent parts of tracks';
+  @override
   String get queue => 'Queue';
   @override
   String get clearQueue => 'Clear Queue';

@@ -68,6 +68,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _onYouTubeQueueSongCompleted() async {
+    if (_sleepAtEndOfTrack) {
+      await _pauseForSleep();
+      return;
+    }
     if (_mixSession) return;
     if (!_isCurrentSongYouTubeOnly()) return;
     final activePlaylist = _getActivePlaylist();
@@ -266,6 +270,26 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   final PlaybackStallWatchdog _onlineStall = PlaybackStallWatchdog();
   Timer? _onlineStallTimer;
   int _onlineStallStartedAt = 0;
+
+  // ---- Playback speed / sleep timer / skip silence -------------------------
+  static const String _speedPrefKey = 'playbackSpeed';
+  static const String _skipSilencePrefKey = 'skip_silence';
+
+  /// mpv audio filter that trims silence. `silenceremove` is an FFmpeg lavfi
+  /// filter bundled with the libmpv build; when it is unavailable the `af`
+  /// property simply fails to load and playback continues unaffected.
+  static const String _skipSilenceFilter =
+      'lavfi=[silenceremove=start_periods=1:start_duration=0:'
+      'start_threshold=-50dB:stop_periods=-1:stop_duration=0.35:'
+      'stop_threshold=-50dB]';
+
+  double _speed = 1.0;
+  bool _skipSilence = false;
+  Timer? _sleepTimer;
+  DateTime? _sleepTimerEndsAt;
+  Duration? _sleepTimerTotal;
+  bool _sleepAtEndOfTrack = false;
+
   List<Song> get librarySongs => _library.librarySongs;
   List<Song> get songs => _library.songs;
   List<Song> get filteredSongs => _library.filteredSongs;
@@ -273,6 +297,22 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   int get enrichedCount => _enrichedCount;
   bool get shuffleEnabled => _shuffleEnabled;
   PlaylistMode get loopMode => _loopMode;
+  double get speed => _speed;
+  bool get skipSilence => _skipSilence;
+
+  /// True while a sleep timer is armed, whether it counts down or waits for
+  /// the current track to finish.
+  bool get sleepTimerActive => _sleepTimer != null || _sleepAtEndOfTrack;
+  bool get sleepTimerEndsAtTrack => _sleepAtEndOfTrack;
+
+  /// The preset a counting sleep timer was armed with, for highlighting the
+  /// active option in the picker.
+  Duration? get sleepTimerTotal => _sleepTimerTotal;
+
+  /// Time left on a counting sleep timer, or null for "off" and
+  /// "end of track".
+  Duration? get sleepTimerRemaining =>
+      _sleepTimerEndsAt?.difference(DateTime.now());
 
   /// Playback position, smoothed so it never runs backwards within a track.
   ///
@@ -505,6 +545,10 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _onPlaybackCompleted() async {
+    if (_sleepAtEndOfTrack) {
+      await _pauseForSleep();
+      return;
+    }
     if (_isCurrentSongYouTubeOnly()) return;
     final activePlaylist = _getActivePlaylist();
     if (activePlaylist.isEmpty) return;
@@ -689,6 +733,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       );
     }
     _library.initThumbnailService();
+    await _restorePlaybackPreferences();
     _lastPlayedSong = await _loadLastPlayedSong();
     if (_lastPlayedSong != null) {}
     await _library.loadLocalMusic().catchError((e) {});
@@ -699,6 +744,26 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
       const Duration(seconds: 5),
       (_) => _savePlaybackState(),
     );
+  }
+
+  /// Applies the persisted playback speed and skip-silence preference once the
+  /// audio handler is ready. mpv keeps `speed` globally, but it resets to 1.0
+  /// on a fresh process, so this has to run on every launch.
+  Future<void> _restorePlaybackPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _speed = (prefs.getDouble(_speedPrefKey) ?? 1.0).clamp(0.25, 3.0);
+      _skipSilence = prefs.getBool(_skipSilencePrefKey) ?? false;
+      final audioHandler = AudioNotificationService.audioHandler;
+      if (audioHandler != null) {
+        await audioHandler.setSpeed(_speed);
+      } else {
+        await _player.setRate(_speed);
+      }
+      await _applySkipSilence();
+    } catch (e) {
+      // A missing prefs store must not block startup.
+    }
   }
 
   bool isThumbnailLoading(Song song) => _library.isThumbnailLoading(song);
@@ -799,6 +864,93 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
   void toggleShuffle() {
     _shuffleEnabled = !_shuffleEnabled;
     notifyListeners();
+  }
+
+  /// Sets the playback rate (0.25x–3x) and persists it across sessions.
+  Future<void> setSpeed(double speed) async {
+    _speed = speed.clamp(0.25, 3.0);
+    final audioHandler = AudioNotificationService.audioHandler;
+    if (audioHandler != null) {
+      await audioHandler.setSpeed(_speed);
+    } else {
+      await _player.setRate(_speed);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_speedPrefKey, _speed);
+    } catch (e) {
+      // Persisting is best-effort; playback keeps the in-memory speed.
+    }
+    notifyListeners();
+  }
+
+  /// Enables/disables the mpv audio filter that trims silence, and persists it.
+  Future<void> setSkipSilence(bool enabled) async {
+    _skipSilence = enabled;
+    await _applySkipSilence();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_skipSilencePrefKey, enabled);
+    } catch (e) {
+      // Persisting is best-effort; playback keeps the in-memory preference.
+    }
+    notifyListeners();
+  }
+
+  Future<void> _applySkipSilence() async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return;
+    try {
+      await platform.setProperty('af', _skipSilence ? _skipSilenceFilter : '');
+    } catch (e) {
+      debugPrint('Failed to set skip-silence filter: $e');
+    }
+  }
+
+  /// Arms a sleep timer that pauses playback after [duration]; null disarms.
+  void setSleepTimer(Duration? duration) {
+    _cancelSleepTimer();
+    if (duration != null) {
+      _sleepTimerTotal = duration;
+      _sleepTimerEndsAt = DateTime.now().add(duration);
+      _sleepTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        final remaining =
+            _sleepTimerEndsAt?.difference(DateTime.now()) ?? Duration.zero;
+        if (remaining <= Duration.zero) {
+          unawaited(_pauseForSleep());
+        } else {
+          notifyListeners();
+        }
+      });
+    }
+    notifyListeners();
+  }
+
+  /// Arms a sleep timer that pauses playback when the current track ends.
+  void setSleepTimerEndOfTrack() {
+    _cancelSleepTimer();
+    _sleepAtEndOfTrack = true;
+    notifyListeners();
+  }
+
+  void cancelSleepTimer() {
+    if (!sleepTimerActive) return;
+    _cancelSleepTimer();
+    notifyListeners();
+  }
+
+  void _cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEndsAt = null;
+    _sleepTimerTotal = null;
+    _sleepAtEndOfTrack = false;
+  }
+
+  Future<void> _pauseForSleep() async {
+    _cancelSleepTimer();
+    notifyListeners();
+    await pause();
   }
 
   void cycleRepeatMode() {
@@ -1564,6 +1716,7 @@ class MusicProvider extends ChangeNotifier with WidgetsBindingObserver {
     _stopPositionFeed();
     _displayPosition.close();
     _playbackStateSaveTimer?.cancel();
+    _sleepTimer?.cancel();
     if (!_initialization.isCompleted) _initialization.complete();
     AudioNotificationService.dispose();
     _player.dispose();

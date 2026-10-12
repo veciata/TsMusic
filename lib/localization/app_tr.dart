@@ -189,6 +189,20 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get defaultPlaybackMode => 'Varsayılan Oynatma Modu';
   @override
+  String get playbackSpeed => 'Oynatma Hızı';
+  @override
+  String get sleepTimer => 'Uyku Zamanlayıcısı';
+  @override
+  String get sleepTimerEndOfTrack => 'Parça sonunda';
+  @override
+  String get off => 'Kapalı';
+  @override
+  String get minutesShort => 'dk';
+  @override
+  String get skipSilence => 'Sessizliği atla';
+  @override
+  String get skipSilenceDescription => 'Parçalardaki sessiz kısımları atla';
+  @override
   String get queue => 'Kuyruk';
   @override
   String get clearQueue => 'Kuyruğu Temizle';

@@ -236,6 +236,26 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         title: Text(l10n.nowPlaying),
         centerTitle: true,
         actions: [
+          TextButton(
+            onPressed: () => _showSpeedSelector(context, musicProvider, l10n),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.onSurface,
+            ),
+            child: Text(
+              '${musicProvider.speed}x',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              musicProvider.sleepTimerActive
+                  ? Icons.bedtime
+                  : Icons.bedtime_outlined,
+            ),
+            tooltip: l10n.sleepTimer,
+            onPressed: () =>
+                _showSleepTimerSelector(context, musicProvider, l10n),
+          ),
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) => IconButton(
               icon: const Icon(Icons.palette),
@@ -422,5 +442,149 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ),
       ),
     );
+  }
+
+  void _showSpeedSelector(
+    BuildContext context,
+    MusicProvider musicProvider,
+    AppLocalizations l10n,
+  ) {
+    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  l10n.playbackSpeed,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              ...speeds.map((value) {
+                final isSelected = (musicProvider.speed - value).abs() < 0.001;
+                return ListTile(
+                  leading: Icon(
+                    isSelected ? Icons.check_circle : Icons.circle_outlined,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  title: Text('${value}x'),
+                  onTap: () {
+                    musicProvider.setSpeed(value);
+                    Navigator.pop(context);
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSleepTimerSelector(
+    BuildContext context,
+    MusicProvider musicProvider,
+    AppLocalizations l10n,
+  ) {
+    const minutes = [5, 10, 15, 30, 45, 60];
+    final remaining = musicProvider.sleepTimerRemaining;
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.sleepTimer,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    if (remaining != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _formatRemaining(remaining),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              ListTile(
+                leading: Icon(
+                  !musicProvider.sleepTimerActive
+                      ? Icons.check_circle
+                      : Icons.circle_outlined,
+                  color: !musicProvider.sleepTimerActive
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                title: Text(l10n.off),
+                onTap: () {
+                  musicProvider.cancelSleepTimer();
+                  Navigator.pop(context);
+                },
+              ),
+              ...minutes.map((value) {
+                final isSelected =
+                    musicProvider.sleepTimerTotal == Duration(minutes: value);
+                return ListTile(
+                  leading: Icon(
+                    isSelected ? Icons.check_circle : Icons.circle_outlined,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  title: Text('$value ${l10n.minutesShort}'),
+                  onTap: () {
+                    musicProvider.setSleepTimer(Duration(minutes: value));
+                    Navigator.pop(context);
+                  },
+                );
+              }),
+              ListTile(
+                leading: Icon(
+                  musicProvider.sleepTimerEndsAtTrack
+                      ? Icons.check_circle
+                      : Icons.circle_outlined,
+                  color: musicProvider.sleepTimerEndsAtTrack
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                title: Text(l10n.sleepTimerEndOfTrack),
+                onTap: () {
+                  musicProvider.setSleepTimerEndOfTrack();
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatRemaining(Duration duration) {
+    final total = duration.inSeconds.clamp(0, 24 * 3600);
+    final hours = total ~/ 3600;
+    final minutes = (total % 3600) ~/ 60;
+    final seconds = total % 60;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return hours > 0
+        ? '$hours:${two(minutes)}:${two(seconds)}'
+        : '${two(minutes)}:${two(seconds)}';
   }
 }

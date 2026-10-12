@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/providers/music_provider.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/playback_mode.dart';
 import 'package:tsmusic/models/player_styles.dart';
@@ -550,6 +551,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
+    final musicProvider = Provider.of<MusicProvider>(context);
     final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settings)),
@@ -620,6 +622,14 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 onTap: () => _showPlaybackModeDialog(context, settingsProvider),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                title: Text(l10n.skipSilence),
+                subtitle: Text(l10n.skipSilenceDescription),
+                value: musicProvider.skipSilence,
+                onChanged: musicProvider.setSkipSilence,
+                secondary: const Icon(Icons.volume_off),
               ),
               const Divider(height: 1),
               Padding(
