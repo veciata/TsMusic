@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
 import 'package:tsmusic/providers/music_provider.dart';
+import 'package:tsmusic/screens/scrobbling_settings_screen.dart';
 import 'package:tsmusic/models/audio_format.dart';
 import 'package:tsmusic/models/playback_mode.dart';
 import 'package:tsmusic/models/player_styles.dart';
@@ -630,6 +631,18 @@ class SettingsScreen extends StatelessWidget {
                 value: musicProvider.skipSilence,
                 onChanged: musicProvider.setSkipSilence,
                 secondary: const Icon(Icons.volume_off),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                title: Text(l10n.scrobbling),
+                leading: const Icon(Icons.scatter_plot),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ScrobblingSettingsScreen(),
+                  ),
+                ),
               ),
               const Divider(height: 1),
               Padding(

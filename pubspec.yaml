@@ -35,6 +35,9 @@ dependencies:
   youtube_explode_dart: ^3.1.0
   http: ^1.2.0
 
+  # Scrobbling (Last.fm request signing)
+  crypto: ^3.0.7
+
   # Connectivity
   connectivity_plus: ^7.1.1
 

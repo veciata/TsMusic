@@ -207,6 +207,41 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get noLyricsFound => 'Şarkı sözü bulunamadı';
   @override
+  String get scrobbling => 'Scrobbling';
+  @override
+  String get enableScrobbling => "Scrobbling'i etkinleştir";
+  @override
+  String get enableScrobblingDescription => 'Dinlediklerini paylaş';
+  @override
+  String get scrobblingService => 'Servis';
+  @override
+  String get listenBrainzToken => 'ListenBrainz kullanıcı jetonu';
+  @override
+  String get listenBrainzTokenHint => 'ListenBrainz profil ayarlarında bulunur';
+  @override
+  String get lastFmApiKey => 'API anahtarı';
+  @override
+  String get lastFmSharedSecret => 'Paylaşılan gizli anahtar';
+  @override
+  String get lastFmAuthorize => 'Last.fm ile yetkilendir';
+  @override
+  String get lastFmCompleteAuth => 'Bağlantıyı tamamla';
+  @override
+  String get lastFmConnected => 'Bağlandı';
+  @override
+  String get lastFmAuthorizationHint =>
+      'last.fm/api adresinden bir API hesabı oluşturup bu uygulamayı yetkilendirin.';
+  @override
+  String get lastFmCredentialsRequired =>
+      'Önce API anahtarını ve gizli anahtarı girin';
+  @override
+  String get lastFmConnectFailed => 'Last.fm bağlantısı başarısız';
+  @override
+  String get lastFmAuthorizedHint =>
+      'Tarayıcıda yetkilendirin, ardından "Bağlantıyı tamamla"ya dokunun';
+  @override
+  String get saved => 'Kaydedildi';
+  @override
   String get queue => 'Kuyruk';
   @override
   String get clearQueue => 'Kuyruğu Temizle';

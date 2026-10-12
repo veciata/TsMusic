@@ -1,6 +1,14 @@
 # Changelog
 
 ## [Unreleased]
+### Added / Eklendi
+- Playback speed (0.5x–2x), a sleep timer (countdown or end-of-track) and an optional skip-silence filter, reachable from the now-playing screen and Settings.
+  Oynatma hızı (0.5x–2x), uyku zamanlayıcısı (geri sayım veya parça sonu) ve isteğe bağlı sessizlik atlama filtresi; oynatma ekranından ve Ayarlar'dan erişilebilir.
+- Lyrics view with synced-line highlighting, sourced from a sibling `.lrc` file, LRCLIB and lyrics.ovh (first hit wins).
+  İlerlemeli satır vurgulu şarkı sözleri görünümü; aynı klasördeki `.lrc` dosyası, LRCLIB ve lyrics.ovh kaynaklarından gelir (ilk bulunan kullanılır).
+- Scrobbling to ListenBrainz and Last.fm (now playing + completed listens), configured from Settings.
+  ListenBrainz ve Last.fm'e scrobbling (şu an çalıyor + tamamlanan dinlemeler); Ayarlar'dan yapılandırılır.
+
 ### Fixed / Düzeltildi
 - Local playback no longer reported progress from a stale online (HLS) session: the elapsed time used to jump in ~4s steps because the previous YouTube track's stream state leaked into local files. Starting a local track now clears that state.
   Yerel çalma artık eski bir çevrimiçi (HLS) oturumundan ilerleme bildirmiyor: geçen süre, önceki YouTube parçasının akış durumu yerel dosyalara sızdığı için ~4 saniyelik adımlarla sıçrıyordu. Yerel parça başlatıldığında bu durum artık temizlenir.

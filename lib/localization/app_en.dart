@@ -209,6 +209,42 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noLyricsFound => 'No lyrics found';
   @override
+  String get scrobbling => 'Scrobbling';
+  @override
+  String get enableScrobbling => 'Enable scrobbling';
+  @override
+  String get enableScrobblingDescription => 'Share what you listen to';
+  @override
+  String get scrobblingService => 'Service';
+  @override
+  String get listenBrainzToken => 'ListenBrainz user token';
+  @override
+  String get listenBrainzTokenHint =>
+      'Found in your ListenBrainz profile settings';
+  @override
+  String get lastFmApiKey => 'API key';
+  @override
+  String get lastFmSharedSecret => 'Shared secret';
+  @override
+  String get lastFmAuthorize => 'Authorize with Last.fm';
+  @override
+  String get lastFmCompleteAuth => 'Complete connection';
+  @override
+  String get lastFmConnected => 'Connected';
+  @override
+  String get lastFmAuthorizationHint =>
+      'Register an API account at last.fm/api, then authorize this app.';
+  @override
+  String get lastFmCredentialsRequired =>
+      'Enter the API key and shared secret first';
+  @override
+  String get lastFmConnectFailed => 'Last.fm connection failed';
+  @override
+  String get lastFmAuthorizedHint =>
+      'Authorize in the browser, then tap "Complete connection"';
+  @override
+  String get saved => 'Saved';
+  @override
   String get queue => 'Queue';
   @override
   String get clearQueue => 'Clear Queue';
