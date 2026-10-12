@@ -23,6 +23,7 @@ import 'package:tsmusic/providers/library_view_model.dart';
 import 'package:tsmusic/services/youtube_service.dart';
 import 'package:tsmusic/services/artist_image_cache.dart';
 import 'package:tsmusic/providers/settings_provider.dart';
+import 'package:tsmusic/providers/lyrics_provider.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/utils/package_info_utils.dart';
 import 'package:tsmusic/widgets/bottom_navigation_widget.dart';
@@ -325,6 +326,7 @@ class _MusicPlayerAppState extends State<MusicPlayerApp>
         create: (_) => YouTubePlayerProvider(widget.youTubeService),
       ),
       ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(create: (_) => LyricsProvider()),
       ChangeNotifierProvider(
         create: (_) =>
             UpdateNotificationProvider(lastSeenVersion: widget.lastSeenVersion),

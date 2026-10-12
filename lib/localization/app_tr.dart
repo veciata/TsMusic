@@ -203,6 +203,10 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get skipSilenceDescription => 'Parçalardaki sessiz kısımları atla';
   @override
+  String get lyrics => 'Şarkı Sözleri';
+  @override
+  String get noLyricsFound => 'Şarkı sözü bulunamadı';
+  @override
   String get queue => 'Kuyruk';
   @override
   String get clearQueue => 'Kuyruğu Temizle';

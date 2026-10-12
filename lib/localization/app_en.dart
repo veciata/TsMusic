@@ -205,6 +205,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get skipSilenceDescription => 'Trim silent parts of tracks';
   @override
+  String get lyrics => 'Lyrics';
+  @override
+  String get noLyricsFound => 'No lyrics found';
+  @override
   String get queue => 'Queue';
   @override
   String get clearQueue => 'Clear Queue';

@@ -7,6 +7,7 @@ import 'package:tsmusic/providers/theme_provider.dart';
 import 'package:tsmusic/models/player_styles.dart';
 import 'package:tsmusic/models/style_params.dart';
 import 'package:tsmusic/widgets/now_playing_queue_bottom_sheet.dart';
+import 'package:tsmusic/screens/lyrics_screen.dart';
 import 'package:tsmusic/localization/app_localizations.dart';
 import 'package:tsmusic/utils/format_utils.dart';
 
@@ -394,6 +395,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            IconButton(
+              icon: const Icon(Icons.lyrics_outlined),
+              onPressed: () => showLyricsSheet(context),
+              tooltip: AppLocalizations.of(context).lyrics,
+            ),
             IconButton(
               icon: const Icon(Icons.queue_music),
               onPressed: () {

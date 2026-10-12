@@ -126,6 +126,8 @@ class AppLocalizations {
   String get minutesShort => throw UnimplementedError();
   String get skipSilence => throw UnimplementedError();
   String get skipSilenceDescription => throw UnimplementedError();
+  String get lyrics => throw UnimplementedError();
+  String get noLyricsFound => throw UnimplementedError();
   String get downloading => throw UnimplementedError();
   String get downloadStarted => throw UnimplementedError();
   String get downloadFailed => throw UnimplementedError();
