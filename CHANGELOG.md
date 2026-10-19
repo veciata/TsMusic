@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.4.1]
 ### Added / Eklendi
 - Playback speed (0.5x–2x), a sleep timer (countdown or end-of-track) and an optional skip-silence filter, reachable from the now-playing screen and Settings.
   Oynatma hızı (0.5x–2x), uyku zamanlayıcısı (geri sayım veya parça sonu) ve isteğe bağlı sessizlik atlama filtresi; oynatma ekranından ve Ayarlar'dan erişilebilir.
@@ -17,7 +17,7 @@
 - Local file paths with spaces or non-ASCII characters are opened with a properly encoded URI; a missing local file that falls back to streaming is now logged instead of failing silently.
   Boşluk veya ASCII dışı karakter içeren yerel dosya yolları düzgün kodlanmış bir URI ile açılır; çevrimiçine düşen eksik yerel dosya artık sessizce başarısız olmak yerine günlüğe yazılır.
 
-## [1.4.0] - 2026-10-03
+## [1.4.0]
 ### Fixed / Düzeltildi
 - Online (HLS) playback no longer jumps: progress bar and elapsed time count up smoothly across segment boundaries (use real track length).
   Çevrimiçi (HLS) çalma artık sıçramıyor; ilerleme çubuğu ve geçen süre her segmentte sıfırlanmadan kesintisiz artıyor (gerçek şarkı uzunluğu kullanılıyor).
@@ -33,7 +33,7 @@
 
 
 
-## [1.3.4] - 2026-09-15
+## [1.3.4]
 
 ### Fixed / Düzeltildi
 - Fixed audio downloads stopping at ~1 MiB on networks where YouTube enforces a range cap on unsigned DASH streams; downloads now use VOD HLS (m3u8) which bypasses the limitation entirely.
@@ -41,7 +41,7 @@
 - Bumped `youtube_explode_dart` to ^3.1.0 and applied safe dependency updates within current majors.
   `youtube_explode_dart` ^3.1.0'a güncellendi ve ana major sınırlar içinde güvenli bağımlılık güncellemeleri uygulandı.
 
-## [1.3.3] - 2026-09-06
+## [1.3.3]
 
 ### Changed / Değiştirildi
 - Android build toolchain modernized: Gradle 9.1.0, Android Gradle Plugin 9.0.1, Kotlin 2.3.20.  
@@ -51,7 +51,7 @@
 - Full static-analysis cleanup: 196 analyzer issues resolved down to zero.  
   Statik analiz temizliği tamamlandı: 196 analizci sorunu sıfıra indirildi.
 
-## [1.2.1] - 2026-05-31
+## [1.2.1]
 
 ### Fixed / Düzeltildi
 - YouTube song no longer triggers local audio simultaneously — online and local players are properly isolated.  
@@ -75,7 +75,7 @@
 - Android home widgets: updated to use gradient backgrounds with consistent margins for a polished appearance.  
   Android ana ekran widget'ları: gradient arka plan ve tutarlı kenar boşlukları ile görsel olarak iyileştirildi.
 
-## [1.2.0] - 2026-05-22
+## [1.2.0]
 
 ### Added
 - Language support — Turkish (Türkçe) and English localization
@@ -89,52 +89,52 @@
 - Queue JSON encoding bug in home widget service
 - Widget `setColorFilter` guarded for API 29+
 
-## [1.1.12] - 2026-05-22
+## [1.1.12]
 
 ### Added
 - Adaptive player widget layout
 
-## [1.1.11] - 2026-05-22
+## [1.1.11]
 
 - Maintenance release
 
-## [1.1.10] - 2026-05-11
+## [1.1.10]
 
 ### Added
 - Redesigned search widget with transparent background
 - Accent color support for widgets
 - Sliding text animation for long titles
 
-## [1.1.9] - 2026-05-10
+## [1.1.9]
 
 ### Added
 - Changelog modal in settings
 - Search widget layout improvements
 
-## [1.1.8] - 2026-01-15
+## [1.1.8]
 
 - Release build
 
-## [1.1.7] - 2026-01-15
+## [1.1.7]
 
 - Maintenance release
 
-## [1.1.6] - 2025-08-09
+## [1.1.6]
 
 ### Added
 - Animations and multi-select features
 
-## [1.1.5] - 2025-08-07
+## [1.1.5]
 
 ### Added
 - Download notifications and local thumbnail support
 
-## [1.1.4] - 2025-08-05
+## [1.1.4]
 
 ### Added
 - Notification player controls with proper skip/next and play/pause
 - MediaKit notification integration
 
-## [1.1.3] - 2025-08-04
+## [1.1.3]
 
 - Initial notification integration
